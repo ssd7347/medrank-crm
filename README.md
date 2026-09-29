@@ -16,7 +16,7 @@ Full requirements: [docs/MBBS_CRM_Master_Specification_Complete.pdf](docs/MBBS_C
 calendar & choice lists (lock with confirmation), 4.6 allotments & freeze/float/withdraw decisions (single +
 bulk CSV), 4.9 alert pipeline (in-app notifications, WhatsApp/SMS queue with escalation), round desk.
 WhatsApp/SMS runs in **simulated mode** (messages are logged, not delivered) until a provider such as
-Gupshup/Interakt or MSG91 is connected by adding a  implementation.
+Gupshup/Interakt or MSG91 is connected by adding a `MessageSender` implementation.
 
 Next: Phase 3 (documents, fees, staff management, helpdesk, refund rules engine, grievance register) per spec
 section 12. Works on phones and laptops (tables turn into cards on small screens).
