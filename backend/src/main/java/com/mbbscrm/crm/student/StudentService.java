@@ -167,6 +167,19 @@ public class StudentService {
         return StudentResponse.of(s, leadId, eligibility.evaluate(s));
     }
 
+    /** Loads a student the current user may view; others get 404 so their existence is not revealed. */
+    @Transactional(readOnly = true)
+    public Student requireReadable(Long id) {
+        return loadReadable(id);
+    }
+
+    /** Loads a student the current user may act on (admins, or the assigned counsellor). */
+    @Transactional(readOnly = true)
+    public Student requireWritable(Long id) {
+        requireWrite();
+        return loadReadable(id);
+    }
+
     private Student loadReadable(Long id) {
         CurrentUser me = requireRead();
         Student s = students.findById(id).orElseThrow(() -> ApiException.notFound("Student"));
