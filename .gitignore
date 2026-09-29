@@ -1,0 +1,18 @@
+# Build output
+target/
+build/
+dist/
+.next/
+node_modules/
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+# Secrets
+.env
+.env.*
+!.env.example
+*.jks
+*.p12
