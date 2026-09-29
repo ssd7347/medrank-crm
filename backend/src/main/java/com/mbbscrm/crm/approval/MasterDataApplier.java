@@ -27,6 +27,12 @@ import com.mbbscrm.crm.college.CutoffRecordRepository;
 import com.mbbscrm.crm.college.SeatMatrixEntry;
 import com.mbbscrm.crm.college.SeatMatrixRepository;
 import com.mbbscrm.crm.common.ApiException;
+import com.mbbscrm.crm.counselling.AuthorityRepository;
+import com.mbbscrm.crm.refund.RefundRule;
+import com.mbbscrm.crm.refund.RefundRuleDtos;
+import com.mbbscrm.crm.refund.RefundRuleDtos.RefundRulePayload;
+import com.mbbscrm.crm.refund.RefundRuleDtos.RefundRuleView;
+import com.mbbscrm.crm.refund.RefundRuleRepository;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
@@ -48,15 +54,20 @@ class MasterDataApplier {
     private final SeatMatrixRepository seats;
     private final CollegeFeeRepository fees;
     private final CutoffRecordRepository cutoffs;
+    private final RefundRuleRepository refundRules;
+    private final AuthorityRepository authorities;
 
     MasterDataApplier(ObjectMapper mapper, Validator validator, CollegeRepository colleges,
-                      SeatMatrixRepository seats, CollegeFeeRepository fees, CutoffRecordRepository cutoffs) {
+                      SeatMatrixRepository seats, CollegeFeeRepository fees, CutoffRecordRepository cutoffs,
+                      RefundRuleRepository refundRules, AuthorityRepository authorities) {
         this.mapper = mapper;
         this.validator = validator;
         this.colleges = colleges;
         this.seats = seats;
         this.fees = fees;
         this.cutoffs = cutoffs;
+        this.refundRules = refundRules;
+        this.authorities = authorities;
     }
 
     // ------------------------------------------------------------------ submit-time
@@ -80,6 +91,7 @@ class MasterDataApplier {
             case SeatMatrixPayload s -> checkSeat(s, entityId, action);
             case FeePayload f -> checkFee(f, entityId, action);
             case CutoffPayload c -> checkCutoff(c, entityId, action);
+            case RefundRulePayload r -> checkRefundRule(r, entityId, action);
             case BulkSeatMatrixPayload b -> {
                 b.rows().forEach(r -> requireCollege(r.collegeId()));
                 yield "Bulk seat matrix upload: " + b.rows().size() + " rows";
@@ -91,6 +103,26 @@ class MasterDataApplier {
             default -> throw new IllegalStateException();
         };
         return new Prepared(truncate(summary), mapper.writeValueAsString(dto));
+    }
+
+    private String checkRefundRule(RefundRulePayload r, Long id, Action action) {
+        if (action == Action.UPDATE) {
+            refundRules.findById(id).orElseThrow(() -> ApiException.notFound("Refund rule #" + id));
+        }
+        if (r.authorityId() == null && r.collegeId() == null) {
+            throw ApiException.badRequest("A refund rule needs an authority, a college, or both");
+        }
+        String scope = "";
+        if (r.authorityId() != null) {
+            scope += authorities.findById(r.authorityId())
+                    .orElseThrow(() -> ApiException.badRequest("Authority not found")).getCode();
+        }
+        if (r.collegeId() != null) {
+            scope += (scope.isEmpty() ? "" : " / ") + requireCollege(r.collegeId()).getName();
+        }
+        return "Refund rule " + r.academicYear() + " " + scope + (r.roundType() == null ? "" : " " + r.roundType())
+                + ": deposit " + (r.depositForfeited() ? "forfeited" : "refunded") + ", tuition refund "
+                + r.tuitionRefundPercent() + "%";
     }
 
     private String checkCollege(CollegePayload c, Long id, Action action) {
@@ -196,6 +228,12 @@ class MasterDataApplier {
                         .orElseThrow(() -> ApiException.notFound("Cutoff row"));
                 yield cutoffs.save(fillCutoff(e, c)).getId();
             }
+            case RefundRulePayload rule -> {
+                RefundRule e = id == null ? new RefundRule() : refundRules.findById(id)
+                        .orElseThrow(() -> ApiException.notFound("Refund rule"));
+                RefundRuleDtos.fill(e, rule);
+                yield refundRules.save(e).getId();
+            }
             case BulkSeatMatrixPayload b -> {
                 for (SeatMatrixPayload s : b.rows()) {
                     SeatMatrixEntry e = seats
@@ -234,6 +272,8 @@ class MasterDataApplier {
             case SEAT_MATRIX -> seats.delete(seats.findById(id).orElseThrow(() -> ApiException.notFound("Row")));
             case FEE -> fees.delete(fees.findById(id).orElseThrow(() -> ApiException.notFound("Row")));
             case CUTOFF -> cutoffs.delete(cutoffs.findById(id).orElseThrow(() -> ApiException.notFound("Row")));
+            case REFUND_RULE -> refundRules.delete(refundRules.findById(id)
+                    .orElseThrow(() -> ApiException.notFound("Rule")));
         }
     }
 
@@ -247,6 +287,7 @@ class MasterDataApplier {
             case SEAT_MATRIX -> seats.findById(id).map(SeatMatrixResponse::of).orElse(null);
             case FEE -> fees.findById(id).map(FeeResponse::of).orElse(null);
             case CUTOFF -> cutoffs.findById(id).map(CutoffResponse::of).orElse(null);
+            case REFUND_RULE -> refundRules.findById(id).map(RefundRuleView::of).orElse(null);
         };
     }
 
@@ -259,6 +300,7 @@ class MasterDataApplier {
             case SEAT_MATRIX -> bulk ? BulkSeatMatrixPayload.class : SeatMatrixPayload.class;
             case FEE -> FeePayload.class;
             case CUTOFF -> bulk ? BulkCutoffPayload.class : CutoffPayload.class;
+            case REFUND_RULE -> RefundRulePayload.class;
         };
     }
 

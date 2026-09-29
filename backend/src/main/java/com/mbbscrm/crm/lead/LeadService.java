@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.mbbscrm.crm.audit.AuditService;
 import com.mbbscrm.crm.common.ActivityType;
+import com.mbbscrm.crm.fee.CommissionService;
 import com.mbbscrm.crm.common.ApiException;
 import com.mbbscrm.crm.common.Language;
 import com.mbbscrm.crm.common.LeadSource;
@@ -63,17 +64,19 @@ public class LeadService {
     private final AppUserRepository users;
     private final ReferralAssociateRepository associates;
     private final StudentService studentService;
+    private final CommissionService commissions;
     private final AuditService audit;
 
     public LeadService(LeadRepository leads, LeadActivityRepository activities, FollowUpRepository followUps,
                        AppUserRepository users, ReferralAssociateRepository associates,
-                       StudentService studentService, AuditService audit) {
+                       StudentService studentService, CommissionService commissions, AuditService audit) {
         this.leads = leads;
         this.activities = activities;
         this.followUps = followUps;
         this.users = users;
         this.associates = associates;
         this.studentService = studentService;
+        this.commissions = commissions;
         this.audit = audit;
     }
 
@@ -186,6 +189,9 @@ public class LeadService {
         activities.save(new LeadActivity(lead.getId(), ActivityType.STATUS_CHANGE, from + " -> " + status,
                 blankToNull(note), users.getReferenceById(me.id())));
         audit.record(me.id(), "LEAD_STATUS_CHANGED", "LEAD", lead.getId(), from + " -> " + status);
+        if (status == LeadStatus.ADMISSION_CONFIRMED) {
+            commissions.onAdmissionConfirmed(lead, me.id());
+        }
         return LeadResponse.of(lead);
     }
 

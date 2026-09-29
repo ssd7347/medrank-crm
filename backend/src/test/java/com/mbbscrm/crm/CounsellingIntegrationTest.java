@@ -177,7 +177,9 @@ class CounsellingIntegrationTest {
         mvc.perform(auth(get("/api/allotments/" + allotment + "/decision-preview").param("decision", "WITHDRAW"),
                         counsellor))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.consequences[0]").value(org.hamcrest.Matchers.containsString("Round 1")));
+                .andExpect(jsonPath("$.refundRuleFound").value(false))
+                .andExpect(jsonPath("$.consequences", org.hamcrest.Matchers.hasItem(
+                        org.hamcrest.Matchers.containsString("Round 1"))));
         mvc.perform(auth(post("/api/allotments/" + allotment + "/decision"), counsellor)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"FREEZE\"}"))
                 .andExpect(status().isOk())

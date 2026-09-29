@@ -156,7 +156,8 @@ public final class CounsellingDtos {
     }
 
     /** Shown before confirming a decision, so nobody gives up a seat unaware of the consequences. */
-    public record DecisionPreview(Decision decision, List<String> consequences, boolean pastDeadline) {
+    public record DecisionPreview(Decision decision, List<String> consequences, boolean pastDeadline,
+                                  boolean refundRuleFound) {
     }
 
     public record BulkAllotmentResult(int recorded, int noAllotment, List<BulkError> errors) {

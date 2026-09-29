@@ -38,6 +38,7 @@ import com.mbbscrm.crm.counselling.CounsellingDtos.RoundResponse;
 import com.mbbscrm.crm.counselling.CounsellingDtos.TrackRequest;
 import com.mbbscrm.crm.counselling.CounsellingDtos.TrackResponse;
 import com.mbbscrm.crm.counselling.CounsellingDtos.TrackUpdateRequest;
+import com.mbbscrm.crm.refund.RefundRuleEngine;
 import com.mbbscrm.crm.security.CurrentUser;
 import com.mbbscrm.crm.student.Student;
 import com.mbbscrm.crm.student.StudentService;
@@ -68,12 +69,13 @@ public class CounsellingService {
     private final AlertTexts texts;
     private final AuditService audit;
     private final ObjectMapper mapper;
+    private final RefundRuleEngine refundRules;
 
     public CounsellingService(StudentService studentService, AuthorityRepository authorities, RoundRepository rounds,
                               StudentCounsellingRepository tracks, ChoiceListRepository choiceLists,
                               AllotmentRepository allotments, CollegeRepository colleges, AppUserRepository users,
                               OutboundMessageRepository messages, AlertService alerts, AlertTexts texts,
-                              AuditService audit, ObjectMapper mapper) {
+                              AuditService audit, ObjectMapper mapper, RefundRuleEngine refundRules) {
         this.studentService = studentService;
         this.authorities = authorities;
         this.rounds = rounds;
@@ -87,6 +89,7 @@ public class CounsellingService {
         this.texts = texts;
         this.audit = audit;
         this.mapper = mapper;
+        this.refundRules = refundRules;
     }
 
     // ================================================================== tracks
@@ -349,7 +352,19 @@ public class CounsellingService {
     public DecisionPreview previewDecision(Long allotmentId, Decision decision) {
         AllotmentResult a = allotments.findById(allotmentId).orElseThrow(() -> ApiException.notFound("Allotment"));
         studentService.requireReadable(a.getStudentCounselling().getStudent().getId());
-        return new DecisionPreview(decision, consequences(a, decision), isPastDeadline(a));
+        List<String> lines = new ArrayList<>();
+        boolean ruleFound = false;
+        if (decision == Decision.WITHDRAW) {
+            RefundRuleEngine.Assessment r = refundRules.assess(new RefundRuleEngine.Seat(a.getRound().getAcademicYear(),
+                    a.getRound().getAuthority().getId(), a.getCollege() == null ? null : a.getCollege().getId(),
+                    a.getRound().getRoundType(), a.getRecordedAt()), Instant.now());
+            ruleFound = r.ruleFound();
+            lines.addAll(r.lines());
+        }
+        List<String> general = consequences(a, decision);
+        // With a recorded rule, drop the generic deposit guess (first WITHDRAW line) in favour of the exact rule.
+        lines.addAll(ruleFound ? general.subList(1, general.size()) : general);
+        return new DecisionPreview(decision, lines, isPastDeadline(a), ruleFound);
     }
 
     @Transactional

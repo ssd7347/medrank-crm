@@ -36,5 +36,16 @@ public interface AllotmentRepository extends JpaRepository<AllotmentResult, Long
             """)
     List<AllotmentResult> findAllUndecidedOpen(Instant now);
 
+    /** Allotted seats (not withdrawn) whose reporting deadline falls in the window. */
+    @EntityGraph(attributePaths = {"studentCounselling", "studentCounselling.student",
+            "studentCounselling.student.assignedCounsellor", "college", "round", "round.authority"})
+    @Query("""
+            select a from AllotmentResult a
+            where a.college is not null
+              and (a.decision is null or a.decision <> com.mbbscrm.crm.counselling.Decision.WITHDRAW)
+              and a.decisionDeadline > :from and a.decisionDeadline <= :to
+            """)
+    List<AllotmentResult> findReportingBetween(Instant from, Instant to);
+
     long countByRoundId(Long roundId);
 }

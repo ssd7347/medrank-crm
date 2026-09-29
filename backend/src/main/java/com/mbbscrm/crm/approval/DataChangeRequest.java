@@ -23,7 +23,7 @@ import jakarta.persistence.Table;
 @Table(name = "data_change_request")
 public class DataChangeRequest {
 
-    public enum EntityType { COLLEGE, SEAT_MATRIX, FEE, CUTOFF }
+    public enum EntityType { COLLEGE, SEAT_MATRIX, FEE, CUTOFF, REFUND_RULE }
 
     public enum Action { CREATE, UPDATE, DELETE, BULK_UPSERT }
 

@@ -167,6 +167,26 @@ public class StudentService {
         return StudentResponse.of(s, leadId, eligibility.evaluate(s));
     }
 
+    /**
+     * Module-specific access: roles in {@code fullAccess} may act on any student; counsellors (if allowed)
+     * only on their own. Everyone else is refused.
+     */
+    @Transactional(readOnly = true)
+    public Student requireAccess(Long id, java.util.Set<Role> fullAccess, boolean counsellorOwn) {
+        CurrentUser me = CurrentUser.get();
+        Student s = students.findById(id).orElseThrow(() -> ApiException.notFound("Student"));
+        if (fullAccess.contains(me.role())) {
+            return s;
+        }
+        if (counsellorOwn && me.role() == Role.COUNSELLOR) {
+            if (s.getAssignedCounsellor() != null && s.getAssignedCounsellor().getId().equals(me.id())) {
+                return s;
+            }
+            throw ApiException.notFound("Student");
+        }
+        throw ApiException.forbidden("You do not have access to this");
+    }
+
     /** Loads a student the current user may view; others get 404 so their existence is not revealed. */
     @Transactional(readOnly = true)
     public Student requireReadable(Long id) {
