@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 
+import { CounsellingTab } from "@/components/counselling-tab";
 import { StudentForm } from "@/components/student-form";
-import { Alert, Badge, Button, Card, DescList, Loading, PageHeader } from "@/components/ui";
+import { MessagesTab, ShortlistTab } from "@/components/student-tabs";
+import { Alert, Badge, Button, ButtonLink, Card, DescList, Loading, PageHeader, cx } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatNumber, label } from "@/lib/format";
@@ -41,8 +43,26 @@ function toRequest(s: Student): StudentRequest {
   };
 }
 
+const TABS = [
+  { key: "profile", label: "Profile" },
+  { key: "counselling", label: "Counselling" },
+  { key: "shortlist", label: "Shortlist" },
+  { key: "messages", label: "Messages" },
+] as const;
+
 export default function StudentPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <StudentView />
+    </Suspense>
+  );
+}
+
+function StudentView() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const params = useSearchParams();
+  const tab = TABS.some((t) => t.key === params.get("tab")) ? params.get("tab")! : "profile";
   const { hasRole } = useAuth();
   const canEdit = hasRole("SUPER_ADMIN", "COUNSELLOR");
   const { data: s, error, loading, setData } = useApi<Student>(`/api/students/${id}`);
@@ -73,10 +93,48 @@ export default function StudentPage() {
             )}
           </span>
         }
-        actions={canEdit && !editing && <Button variant="secondary" onClick={() => setEditing(true)}>Edit profile</Button>}
+        actions={
+          !editing && (
+            <>
+              <ButtonLink href={`/predictor?studentId=${id}`} variant="secondary">
+                Predict colleges
+              </ButtonLink>
+              {canEdit && tab === "profile" && (
+                <Button variant="secondary" onClick={() => setEditing(true)}>
+                  Edit profile
+                </Button>
+              )}
+            </>
+          )
+        }
       />
 
-      {editing ? (
+      {!editing && (
+        <div role="tablist" className="-mx-4 mb-5 flex gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={tab === t.key}
+              onClick={() => router.replace(`/students/${id}?tab=${t.key}`, { scroll: false })}
+              className={cx(
+                "-mb-px border-b-2 px-3 py-2 text-sm whitespace-nowrap",
+                tab === t.key ? "border-brand-600 font-medium text-brand-800" : "border-transparent text-ink-soft hover:text-ink",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === "counselling" && !editing ? (
+        <CounsellingTab studentId={s.id} studentCategory={s.category} />
+      ) : tab === "shortlist" && !editing ? (
+        <ShortlistTab studentId={s.id} />
+      ) : tab === "messages" && !editing ? (
+        <MessagesTab studentId={s.id} />
+      ) : editing ? (
         <Card title="Edit profile">
           <StudentForm
             initial={toRequest(s)}

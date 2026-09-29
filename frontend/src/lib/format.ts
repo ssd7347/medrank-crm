@@ -69,6 +69,36 @@ const LABELS: Record<string, string> = {
   PENDING: "Pending",
   APPROVED: "Approved",
   REJECTED: "Rejected",
+  NOT_REGISTERED: "Not registered",
+  REGISTERED: "Registered",
+  CHOICES_FILLED: "Choices locked",
+  ALLOTTED: "Seat allotted",
+  ADMITTED: "Admitted",
+  EXITED: "Exited",
+  DRAFT: "Draft",
+  LOCKED: "Locked",
+  IN_PERSON: "In person",
+  VIDEO: "Video call",
+  FREEZE: "Accept & freeze",
+  FLOAT: "Accept & upgrade (float)",
+  WITHDRAW: "Withdraw",
+  UPCOMING: "Upcoming",
+  REGISTRATION: "Registration open",
+  CHOICE_FILLING: "Choice filling open",
+  AWAITING_RESULT: "Awaiting result",
+  RESULT_OUT: "Result out",
+  REPORTING: "Reporting open",
+  HIGH: "High chance",
+  MODERATE: "Moderate chance",
+  LOW: "Low chance",
+  URGENT: "Urgent",
+  NORMAL: "Normal",
+  SIMULATED: "Simulated (no provider)",
+  SENT: "Sent",
+  QUEUED: "Queued",
+  FAILED: "Failed",
+  STUDENT: "Student",
+  PARENT: "Parent",
 };
 
 export function label(value: string | null | undefined): string {
@@ -149,3 +179,26 @@ export const INDIAN_STATES = [
   "Uttarakhand",
   "West Bengal",
 ];
+
+/** ISO instant -> value for <input type="datetime-local"> in the browser's time zone (IST for staff). */
+export function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** <input type="datetime-local"> value -> ISO instant, or null when empty. */
+export function fromLocalInput(value: string): string | null {
+  return value ? new Date(value).toISOString() : null;
+}
+
+/** "in 2 d 4 h" style countdown for deadlines. */
+export function countdown(iso: string): string {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return "passed";
+  const h = Math.floor(ms / 3_600_000);
+  if (h < 1) return `in ${Math.max(1, Math.round(ms / 60_000))} min`;
+  if (h < 48) return `in ${h} h`;
+  return `in ${Math.floor(h / 24)} d ${h % 24} h`;
+}

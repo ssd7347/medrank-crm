@@ -34,6 +34,46 @@ body {
   color: var(--color-ink);
 }
 
+/* Phones: tables become stacked cards, each value labelled with its column name. */
+@media (max-width: 639px) {
+  .rtable thead {
+    display: none;
+  }
+  .rtable tr {
+    display: block;
+    padding: 0.625rem 1rem;
+  }
+  .rtable td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.2rem 0;
+    text-align: right;
+    white-space: normal;
+  }
+  .rtable td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: var(--color-ink-faint);
+    text-align: left;
+  }
+  /* The first column (usually the name) reads as the card title. */
+  .rtable td:first-child {
+    font-size: 0.95rem;
+    text-align: left;
+    justify-content: flex-start;
+  }
+  .rtable td:first-child::before,
+  .rtable td[data-label=""]::before {
+    content: none;
+  }
+  .rtable td[data-label=""] {
+    justify-content: flex-end;
+  }
+}
+
 /* Native <dialog> centring and scroll lock. */
 dialog::backdrop {
   backdrop-filter: blur(1px);

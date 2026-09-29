@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Logo } from "@/components/logo";
+import { NotificationBell } from "@/components/notification-bell";
 import { Loading, cx } from "@/components/ui";
 import { DATA_ROLES, LEAD_ROLES, STUDENT_ROLES, useAuth } from "@/lib/auth";
 import { label } from "@/lib/format";
@@ -20,6 +21,14 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { href: "/leads", label: "Leads", roles: LEAD_ROLES },
       { href: "/follow-ups", label: "My follow-ups", roles: LEAD_ROLES },
       { href: "/students", label: "Students", roles: STUDENT_ROLES },
+    ],
+  },
+  {
+    section: "Counselling",
+    items: [
+      { href: "/counselling/desk", label: "Round desk", roles: ["SUPER_ADMIN", "COUNSELLOR"] },
+      { href: "/counselling/calendar", label: "Calendar" },
+      { href: "/predictor", label: "College predictor" },
     ],
   },
   {
@@ -111,8 +120,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[15rem_1fr]">
       <aside className="sticky top-0 hidden h-screen flex-col border-r border-line bg-surface lg:flex">
-        <div className="px-5 py-4">
+        <div className="flex items-center justify-between px-5 py-4">
           <Logo />
+          <NotificationBell />
         </div>
         {nav}
         {account}
@@ -120,14 +130,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-surface px-4 py-3 lg:hidden">
         <Logo />
-        <button
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <button
           onClick={() => setMenuOpen((o) => !o)}
           className="rounded-lg border border-line px-3 py-1.5 text-sm"
           aria-expanded={menuOpen}
           aria-controls="mobile-nav"
         >
           {menuOpen ? "Close" : "Menu"}
-        </button>
+          </button>
+        </div>
       </header>
       {menuOpen && (
         <div id="mobile-nav" className="fixed inset-x-0 top-[57px] bottom-0 z-10 flex flex-col overflow-y-auto bg-surface lg:hidden">

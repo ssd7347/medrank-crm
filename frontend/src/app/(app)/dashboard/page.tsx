@@ -5,9 +5,11 @@ import Link from "next/link";
 import { LeadStatusBadge } from "@/components/badges";
 import { Alert, Card, EmptyState, Loading, PageHeader, cx } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
-import { formatNumber, label, relativeTime } from "@/lib/format";
+import { countdown, formatDateTime, formatNumber, label, relativeTime } from "@/lib/format";
 import { LEAD_SOURCES, LEAD_STATUSES, type DashboardSummary, type FollowUp } from "@/lib/types";
+import type { Deadline } from "@/lib/types-counselling";
 import { useApi } from "@/lib/use-api";
+import { useNow } from "@/lib/use-now";
 
 function Stat({ title, value, href, tone }: { title: string; value: number | string; href?: string; tone?: "red" | "amber" }) {
   const body = (
@@ -50,6 +52,8 @@ export default function DashboardPage() {
               <Stat title="Data changes awaiting approval" value={data.pendingApprovals} href="/approvals" tone={data.pendingApprovals ? "amber" : undefined} />
             )}
           </div>
+
+          <DeadlinesCard />
 
           {data.showsLeads && (
             <div className="grid gap-6 lg:grid-cols-5">
@@ -134,5 +138,36 @@ function SourceList({ summary }: { summary: DashboardSummary }) {
         </Link>
       ))}
     </div>
+  );
+}
+
+function DeadlinesCard() {
+  const { data } = useApi<Deadline[]>("/api/counselling/deadlines", { days: 7 });
+  const now = useNow();
+  if (!data?.length) return null;
+  return (
+    <Card
+      title="Counselling deadlines this week"
+      actions={
+        <Link href="/counselling/calendar" className="text-xs font-medium text-brand-700 hover:underline">
+          Calendar
+        </Link>
+      }
+    >
+      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {data.slice(0, 6).map((d) => {
+          const soon = new Date(d.at).getTime() - now < 24 * 3_600_000;
+          return (
+            <li key={`${d.roundId}-${d.kind}`} className={cx("rounded-lg border p-3", soon ? "border-red-200 bg-red-50" : "border-line")}>
+              <p className="text-sm font-medium">{d.kind}</p>
+              <p className="text-xs text-ink-soft">{d.roundLabel}</p>
+              <p className={cx("mt-1 text-xs", soon ? "font-semibold text-red-700" : "text-ink-faint")}>
+                {countdown(d.at)} · {formatDateTime(d.at)}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useId, useRef } from "react";
 
 // Small, dependency-free UI kit. Colours come from the theme tokens in globals.css.
 
@@ -266,11 +266,24 @@ export function Pagination({ page, totalPages, totalItems, onPage }: { page: num
   );
 }
 
-/** Responsive table shell: scrolls horizontally inside its card on narrow screens. */
+/**
+ * Responsive table. On laptops it is a normal table; on phones each row becomes a stacked card with the
+ * column name beside each value (see `.rtable` in globals.css). Column labels are passed down to each Td.
+ */
 export function Table({ head, children }: { head: React.ReactNode[]; children: React.ReactNode }) {
+  const labels = head.map((h) => (typeof h === "string" ? h : ""));
+  const rows = Children.map(children, (row) => {
+    if (!isValidElement<{ children?: React.ReactNode }>(row)) return row;
+    let col = 0;
+    const cells = Children.map(row.props.children, (cell) => {
+      if (!isValidElement(cell)) return cell;
+      return cloneElement(cell as React.ReactElement<{ label?: string }>, { label: labels[col++] ?? "" });
+    });
+    return cloneElement(row, {}, cells);
+  });
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-sm">
+    <div className="sm:overflow-x-auto">
+      <table className="rtable min-w-full text-sm">
         <thead>
           <tr className="border-b border-line text-left text-xs font-medium tracking-wide text-ink-faint uppercase">
             {head.map((h, i) => (
@@ -280,14 +293,18 @@ export function Table({ head, children }: { head: React.ReactNode[]; children: R
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-line">{children}</tbody>
+        <tbody className="divide-y divide-line">{rows}</tbody>
       </table>
     </div>
   );
 }
 
-export function Td({ children, className }: { children?: React.ReactNode; className?: string }) {
-  return <td className={cx("px-4 py-2.5 align-middle text-ink", className)}>{children}</td>;
+export function Td({ children, className, label }: { children?: React.ReactNode; className?: string; label?: string }) {
+  return (
+    <td data-label={label ?? ""} className={cx("px-4 py-2.5 align-middle text-ink", className)}>
+      {children}
+    </td>
+  );
 }
 
 export function DescList({ items }: { items: [string, React.ReactNode][] }) {
