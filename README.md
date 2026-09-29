@@ -9,10 +9,17 @@ Full requirements: [docs/MBBS_CRM_Master_Specification_Complete.pdf](docs/MBBS_C
 
 ## Status
 
-**Phase 1 (foundation) — built.** Spec modules 4.1 Leads, 4.2 NEET profile & eligibility, 4.3 College & seat
-matrix (with admin approval workflow), plus staff login/roles, audit log and a basic dashboard.
-Later phases (predictor, choice lists, allotments, alerts, documents, fees, portal, AI voice agent) follow
-the roadmap in spec section 12.
+**Phase 1 (foundation) — built.** Spec 4.1 Leads, 4.2 NEET profile & eligibility, 4.3 College & seat matrix
+(with admin approval workflow), staff login/roles, audit log, dashboard.
+
+**Phase 2 (counselling core) — built.** Spec 4.4 rank-based predictor (bands + shortlist), 4.5 counselling
+calendar & choice lists (lock with confirmation), 4.6 allotments & freeze/float/withdraw decisions (single +
+bulk CSV), 4.9 alert pipeline (in-app notifications, WhatsApp/SMS queue with escalation), round desk.
+WhatsApp/SMS runs in **simulated mode** (messages are logged, not delivered) until a provider such as
+Gupshup/Interakt or MSG91 is connected by adding a  implementation.
+
+Next: Phase 3 (documents, fees, staff management, helpdesk, refund rules engine, grievance register) per spec
+section 12. Works on phones and laptops (tables turn into cards on small screens).
 
 ## Stack
 
