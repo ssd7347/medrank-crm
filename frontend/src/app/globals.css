@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* Design tokens. Brand is a deep teal: calm and clinical, distinct from generic SaaS blue. */
+@theme {
+  --color-brand-50: #effbf9;
+  --color-brand-100: #d7f4ef;
+  --color-brand-200: #b0e8df;
+  --color-brand-300: #7dd5c9;
+  --color-brand-400: #45b9ac;
+  --color-brand-500: #259d91;
+  --color-brand-600: #197e76;
+  --color-brand-700: #186560;
+  --color-brand-800: #17514e;
+  --color-brand-900: #164442;
+
+  --color-canvas: #f5f7f8;
+  --color-surface: #ffffff;
+  --color-muted: #eef2f3;
+  --color-line: #dfe5e7;
+  --color-ink: #13201f;
+  --color-ink-soft: #4a5a59;
+  --color-ink-faint: #7b8b8a;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* Native <dialog> centring and scroll lock. */
+dialog::backdrop {
+  backdrop-filter: blur(1px);
+}
+html:has(dialog[open]) {
+  overflow: hidden;
+}
