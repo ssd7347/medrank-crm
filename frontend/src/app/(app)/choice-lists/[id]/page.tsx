@@ -236,7 +236,7 @@ export default function ChoiceListPage() {
                           <span className="block truncate">{s.collegeName}</span>
                           <span className="text-xs text-ink-soft">
                             {s.course} · {s.quota}
-                            {s.band && ` · ${label(s.band)}`}
+                            {s.band && ` · ${label(s.band)} chance`}
                           </span>
                         </span>
                         <Button size="sm" variant="secondary" disabled={added} onClick={() => addChoice({ id: s.collegeId, name: s.collegeName, state: s.state }, s.course, s.quota)}>

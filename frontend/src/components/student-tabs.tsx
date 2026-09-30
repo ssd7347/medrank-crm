@@ -41,7 +41,7 @@ export function ShortlistTab({ studentId }: { studentId: number }) {
                 <Td>{s.state}</Td>
                 <Td>{s.course}</Td>
                 <Td>{s.quota}</Td>
-                <Td>{s.band ? <Badge tone={s.band === "HIGH" ? "green" : s.band === "MODERATE" ? "amber" : "red"}>{label(s.band)}</Badge> : "—"}</Td>
+                <Td>{s.band ? <Badge tone={s.band === "HIGH" ? "green" : s.band === "MODERATE" ? "amber" : "red"}>{label(s.band)} chance</Badge> : "—"}</Td>
                 <Td className="text-right">
                   {canEdit && (
                     <Button

@@ -99,7 +99,7 @@ export type ChoiceList = {
   updatedAt: string;
 };
 
-export type DecisionPreview = { decision: Decision; consequences: string[]; pastDeadline: boolean };
+export type DecisionPreview = { decision: Decision; consequences: string[]; pastDeadline: boolean; refundRuleFound: boolean };
 
 export type DeskRow = {
   allotmentId: number;

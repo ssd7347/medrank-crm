@@ -408,6 +408,9 @@ function DecisionForm({ allotment, onDone }: { allotment: Allotment; onDone: () 
         <div className="space-y-3">
           <Alert tone={decision === "WITHDRAW" ? "red" : "amber"}>
             <p className="font-medium">Before confirming, tell the family:</p>
+            {decision === "WITHDRAW" && (
+              <p className="mt-1 text-xs">{preview.refundRuleFound ? "Based on the recorded refund rule for this seat." : "No refund rule recorded for this seat: general guidance only."}</p>
+            )}
             <ul className="mt-1 list-disc space-y-1 pl-5">
               {preview.consequences.map((c) => (
                 <li key={c}>{c}</li>

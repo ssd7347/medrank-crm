@@ -185,7 +185,7 @@ function PredictorView() {
                   return (
                     <section key={band}>
                       <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                        <Badge tone={BAND_TONE[band]}>{label(band)}</Badge>
+                        <Badge tone={BAND_TONE[band]}>{label(band)} chance</Badge>
                         <span className="text-ink-faint">{rows.length}</span>
                       </h2>
                       <div className="grid gap-3 xl:grid-cols-2">

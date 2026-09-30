@@ -5,11 +5,14 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
 import { CounsellingTab } from "@/components/counselling-tab";
+import { DocumentsTab } from "@/components/documents-tab";
+import { FeesTab } from "@/components/fees-tab";
+import { StudentTickets } from "@/components/tickets";
 import { StudentForm } from "@/components/student-form";
 import { MessagesTab, ShortlistTab } from "@/components/student-tabs";
 import { Alert, Badge, Button, ButtonLink, Card, DescList, Loading, PageHeader, cx } from "@/components/ui";
 import { api } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { DOCUMENT_ROLES, FEE_READ_ROLES, useAuth } from "@/lib/auth";
 import { formatDate, formatNumber, label } from "@/lib/format";
 import type { Student, StudentRequest } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
@@ -46,7 +49,10 @@ function toRequest(s: Student): StudentRequest {
 const TABS = [
   { key: "profile", label: "Profile" },
   { key: "counselling", label: "Counselling" },
+  { key: "documents", label: "Documents" },
+  { key: "fees", label: "Fees" },
   { key: "shortlist", label: "Shortlist" },
+  { key: "tickets", label: "Tickets" },
   { key: "messages", label: "Messages" },
 ] as const;
 
@@ -111,7 +117,7 @@ function StudentView() {
 
       {!editing && (
         <div role="tablist" className="-mx-4 mb-5 flex gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0">
-          {TABS.map((t) => (
+          {TABS.filter((t) => (t.key !== "documents" || hasRole(...DOCUMENT_ROLES)) && (t.key !== "fees" || hasRole(...FEE_READ_ROLES))).map((t) => (
             <button
               key={t.key}
               role="tab"
@@ -132,6 +138,12 @@ function StudentView() {
         <CounsellingTab studentId={s.id} studentCategory={s.category} />
       ) : tab === "shortlist" && !editing ? (
         <ShortlistTab studentId={s.id} />
+      ) : tab === "documents" && !editing ? (
+        <DocumentsTab studentId={s.id} />
+      ) : tab === "fees" && !editing ? (
+        <FeesTab studentId={s.id} />
+      ) : tab === "tickets" && !editing ? (
+        <StudentTickets studentId={s.id} />
       ) : tab === "messages" && !editing ? (
         <MessagesTab studentId={s.id} />
       ) : editing ? (

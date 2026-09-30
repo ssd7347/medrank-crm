@@ -58,7 +58,7 @@ public class FeeService {
 
     public FeeService(FeePlanRepository plans, ServicePackageRepository packages, PaymentRepository payments,
                       FeeRefundRepository refunds, StudentService students, AppUserRepository users,
-                      AuditService audit, EntityManager em, @Value("${app.org-name:Counselling CRM}") String orgName) {
+                      AuditService audit, EntityManager em, @Value("${app.org-name}") String orgName) {
         this.plans = plans;
         this.packages = packages;
         this.payments = payments;

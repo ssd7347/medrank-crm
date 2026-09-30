@@ -124,3 +124,19 @@ export function errorMessage(e: unknown): string {
   if (e instanceof TypeError) return "Cannot reach the server. Check your connection.";
   return "Something went wrong.";
 }
+
+/** Fetches a protected file (e.g. a document scan) and opens it in a new tab via a temporary object URL. */
+export async function openProtectedFile(path: string) {
+  const win = window.open("", "_blank");
+  const load = () => fetch(path, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}, credentials: "same-origin" });
+  let res = await load();
+  if (res.status === 401 && (await refreshSession())) res = await load();
+  if (!res.ok) {
+    win?.close();
+    throw new ApiError(res.status, { detail: res.status === 403 || res.status === 404 ? "You cannot open this file" : "Could not open the file" });
+  }
+  const url = URL.createObjectURL(await res.blob());
+  if (win) win.location.href = url;
+  else window.location.href = url;
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

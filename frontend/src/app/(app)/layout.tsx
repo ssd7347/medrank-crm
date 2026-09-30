@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { Logo } from "@/components/logo";
 import { NotificationBell } from "@/components/notification-bell";
 import { Loading, cx } from "@/components/ui";
-import { DATA_ROLES, LEAD_ROLES, STUDENT_ROLES, useAuth } from "@/lib/auth";
+import { DATA_ROLES, DOCUMENT_ROLES, FEE_READ_ROLES, FEE_WRITE_ROLES, LEAD_ROLES, STUDENT_ROLES, useAuth } from "@/lib/auth";
 import { label } from "@/lib/format";
 import type { Role } from "@/lib/types";
 
@@ -21,6 +21,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { href: "/leads", label: "Leads", roles: LEAD_ROLES },
       { href: "/follow-ups", label: "My follow-ups", roles: LEAD_ROLES },
       { href: "/students", label: "Students", roles: STUDENT_ROLES },
+      { href: "/tickets", label: "Helpdesk" },
     ],
   },
   {
@@ -32,9 +33,19 @@ const NAV: { section: string; items: NavItem[] }[] = [
     ],
   },
   {
+    section: "Operations",
+    items: [
+      { href: "/documents", label: "Documents desk", roles: DOCUMENT_ROLES },
+      { href: "/fees", label: "Fees & dues", roles: FEE_READ_ROLES.filter((r) => r !== "COUNSELLOR") },
+      { href: "/commissions", label: "Commissions", roles: FEE_WRITE_ROLES },
+      { href: "/grievances", label: "Grievances" },
+    ],
+  },
+  {
     section: "Data",
     items: [
       { href: "/colleges", label: "Colleges & seats" },
+      { href: "/refund-rules", label: "Refund rules" },
       { href: "/approvals", label: "Data approvals", roles: DATA_ROLES },
     ],
   },
@@ -43,6 +54,8 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin/users", label: "Staff users", roles: ["SUPER_ADMIN"] },
       { href: "/admin/associates", label: "Referral associates", roles: ["SUPER_ADMIN"] },
+      { href: "/staff", label: "Team performance", roles: ["SUPER_ADMIN"] },
+      { href: "/admin/document-types", label: "Document checklist", roles: ["SUPER_ADMIN"] },
     ],
   },
 ];
@@ -118,8 +131,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[15rem_1fr]">
-      <aside className="sticky top-0 hidden h-screen flex-col border-r border-line bg-surface lg:flex">
+    <div className="min-h-screen lg:grid lg:grid-cols-[15rem_1fr] print:block">
+      <aside className="sticky top-0 hidden h-screen flex-col border-r border-line bg-surface lg:flex print:hidden">
         <div className="flex items-center justify-between px-5 py-4">
           <Logo />
           <NotificationBell />
@@ -128,7 +141,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {account}
       </aside>
 
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-surface px-4 py-3 lg:hidden">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-surface px-4 py-3 lg:hidden print:hidden">
         <Logo />
         <div className="flex items-center gap-2">
           <NotificationBell />

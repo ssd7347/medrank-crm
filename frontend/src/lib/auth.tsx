@@ -75,3 +75,11 @@ export const STUDENT_ROLES: Role[] = [
 ];
 /** Roles that may propose changes to college data. */
 export const DATA_ROLES: Role[] = ["SUPER_ADMIN", "DATA_EXEC"];
+/** Roles that manage the document checklist (counsellors: own students). */
+export const DOCUMENT_ROLES: Role[] = ["SUPER_ADMIN", "DOCUMENTATION_EXEC", "COUNSELLOR"];
+/** Roles that can see consultancy fees (counsellors: own students). */
+export const FEE_READ_ROLES: Role[] = ["SUPER_ADMIN", "ACCOUNTANT", "LOAN_DESK", "COUNSELLOR"];
+/** Roles that record money. */
+export const FEE_WRITE_ROLES: Role[] = ["SUPER_ADMIN", "ACCOUNTANT"];
+/** Roles that manage the grievance register. */
+export const GRIEVANCE_ROLES: Role[] = ["SUPER_ADMIN", "GRIEVANCE_OFFICER"];

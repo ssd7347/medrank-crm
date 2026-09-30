@@ -262,7 +262,7 @@ export type CutoffRow = Omit<SeatRow, "seats"> & { closingRank: number };
 
 export type CollegeDetail = { college: College; seatMatrix: SeatRow[]; fees: FeeRow[]; cutoffs: CutoffRow[] };
 
-export type ChangeEntity = "COLLEGE" | "SEAT_MATRIX" | "FEE" | "CUTOFF";
+export type ChangeEntity = "COLLEGE" | "SEAT_MATRIX" | "FEE" | "CUTOFF" | "REFUND_RULE";
 export type ChangeAction = "CREATE" | "UPDATE" | "DELETE" | "BULK_UPSERT";
 export type ChangeStatus = "PENDING" | "APPROVED" | "REJECTED";
 

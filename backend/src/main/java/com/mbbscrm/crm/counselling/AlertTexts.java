@@ -23,7 +23,7 @@ public class AlertTexts {
 
     private final String org;
 
-    public AlertTexts(@Value("${app.org-name:your counselling team}") String org) {
+    public AlertTexts(@Value("${app.org-name}") String org) {
         this.org = org;
     }
 
