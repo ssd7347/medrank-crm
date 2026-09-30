@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ApiError, errorMessage, type ProblemBody } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { STUDENT_ROLES, useAuth } from "@/lib/auth";
 import { INDIAN_STATES, label } from "@/lib/format";
 import {
   CATEGORIES,
@@ -16,11 +16,13 @@ import {
   type LeadRequest,
   type UserRef,
 } from "@/lib/types";
+import type { Branch, CampaignRef } from "@/lib/types-growth";
 import { useApi } from "@/lib/use-api";
 
+import { StudentPicker, type PickedStudent } from "./student-picker";
 import { Alert, Button, Field, Input, Select, Textarea } from "./ui";
 
-type FormState = Record<keyof Omit<LeadRequest, "allowDuplicatePhone">, string>;
+type FormState = Record<keyof Omit<LeadRequest, "allowDuplicatePhone" | "referredByStudentId">, string>;
 
 function toState(l?: Lead): FormState {
   return {
@@ -39,6 +41,8 @@ function toState(l?: Lead): FormState {
     languagePreference: l?.languagePreference ?? "ENGLISH",
     notes: l?.notes ?? "",
     assignedCounsellorId: l?.assignedCounsellor?.id.toString() ?? "",
+    branchId: l?.branch?.id.toString() ?? "",
+    campaignId: l?.campaign?.id.toString() ?? "",
   };
 }
 
@@ -56,9 +60,12 @@ export function LeadForm({
   onSubmit: (req: LeadRequest) => Promise<void>;
   onCancel?: () => void;
 }) {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const isAdmin = hasRole("SUPER_ADMIN");
+  // Branch staff always work in their own branch; head office picks one.
+  const choosesBranch = isAdmin || !user?.branch;
   const [f, setF] = useState<FormState>(() => toState(initial));
+  const [referrer, setReferrer] = useState<PickedStudent | null>(initial?.referredByStudent ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -66,6 +73,9 @@ export function LeadForm({
 
   const associates = useApi<Associate[]>("/api/referral-associates");
   const staff = useApi<UserRef[]>(isAdmin ? "/api/users/assignable" : null);
+  const campaigns = useApi<CampaignRef[]>("/api/marketing/campaign-options");
+  const branches = useApi<Branch[]>(choosesBranch ? "/api/branches" : null);
+  const campaignOptions = (campaigns.data ?? []).filter((c) => c.channel === f.source || String(c.id) === f.campaignId);
 
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setF((prev) => ({ ...prev, [k]: e.target.value }));
@@ -93,6 +103,9 @@ export function LeadForm({
         // Non-admins cannot change assignment; send the current value back unchanged.
         assignedCounsellorId: isAdmin ? num(f.assignedCounsellorId) : (initial?.assignedCounsellor?.id ?? null),
         allowDuplicatePhone,
+        branchId: num(f.branchId),
+        campaignId: campaignOptions.some((c) => String(c.id) === f.campaignId) ? num(f.campaignId) : null,
+        referredByStudentId: f.source === "PAST_STUDENT_REFERRAL" ? (referrer?.id ?? null) : null,
       });
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && e.body.duplicates) {
@@ -202,6 +215,37 @@ export function LeadForm({
                   value: String(a.id),
                   label: `${a.fullName}${a.district ? ` (${a.district})` : ""}`,
                 }))}
+              />
+            )}
+          </Field>
+        )}
+        {f.source === "PAST_STUDENT_REFERRAL" && hasRole(...STUDENT_ROLES) && (
+          <Field label="Referred by (past student)" hint="Credits the referral to this student in the alumni directory">
+            {() => <StudentPicker value={referrer} onChange={setReferrer} />}
+          </Field>
+        )}
+        {campaignOptions.length > 0 && (
+          <Field label="Campaign" hint="Which seminar, ad run or drive brought this inquiry">
+            {(id) => (
+              <Select
+                id={id}
+                value={f.campaignId}
+                onChange={set("campaignId")}
+                placeholder="None / not known"
+                options={campaignOptions.map((c) => ({ value: String(c.id), label: c.name }))}
+              />
+            )}
+          </Field>
+        )}
+        {choosesBranch && !!branches.data?.length && (
+          <Field label="Branch">
+            {(id) => (
+              <Select
+                id={id}
+                value={f.branchId}
+                onChange={set("branchId")}
+                placeholder="Head office (no branch)"
+                options={branches.data!.filter((b) => b.active || String(b.id) === f.branchId).map((b) => ({ value: String(b.id), label: b.name }))}
               />
             )}
           </Field>

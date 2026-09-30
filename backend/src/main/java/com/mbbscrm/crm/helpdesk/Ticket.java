@@ -63,6 +63,8 @@ public class Ticket {
     private AppUser createdBy;
     private Instant createdAt;
     private Instant updatedAt;
+    /** Set when the family raised the ticket themselves through the portal. */
+    private Long portalAccountId;
 
     @PrePersist
     void onCreate() {
@@ -95,6 +97,8 @@ public class Ticket {
     public Long getId() { return id; }
     public Student getStudent() { return student; }
     public void setStudent(Student student) { this.student = student; }
+    public Long getPortalAccountId() { return portalAccountId; }
+    public void setPortalAccountId(Long portalAccountId) { this.portalAccountId = portalAccountId; }
     public Lead getLead() { return lead; }
     public void setLead(Lead lead) { this.lead = lead; }
     public String getRaisedByName() { return raisedByName; }

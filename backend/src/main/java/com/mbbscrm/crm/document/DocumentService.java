@@ -25,6 +25,7 @@ import com.mbbscrm.crm.security.CurrentUser;
 import com.mbbscrm.crm.storage.FileStorage;
 import com.mbbscrm.crm.student.Student;
 import com.mbbscrm.crm.student.StudentService;
+import com.mbbscrm.crm.user.AppUser;
 import com.mbbscrm.crm.user.AppUserRepository;
 import com.mbbscrm.crm.user.UserDtos.UserRef;
 
@@ -62,10 +63,10 @@ public class DocumentService {
     // ------------------------------------------------------------------ DTOs
 
     public record FileInfo(Long id, String originalName, String contentType, long sizeBytes, UserRef uploadedBy,
-                           Instant uploadedAt) {
+                           Instant uploadedAt, boolean fromPortal) {
         static FileInfo of(DocumentFile f) {
             return new FileInfo(f.getId(), f.getOriginalName(), f.getContentType(), f.getSizeBytes(),
-                    UserRef.of(f.getUploadedBy()), f.getUploadedAt());
+                    UserRef.of(f.getUploadedBy()), f.getUploadedAt(), f.getPortalAccountId() != null);
         }
     }
 
@@ -105,7 +106,8 @@ public class DocumentService {
         return buildChecklist(s);
     }
 
-    Checklist buildChecklist(Student s) {
+    /** No access check: for callers that have already checked access themselves. */
+    public Checklist buildChecklist(Student s) {
         Map<Long, StudentDocument> byType = docs.findByStudentId(s.getId()).stream()
                 .collect(Collectors.toMap(d -> d.getDocumentType().getId(), d -> d));
         Map<Long, List<FileInfo>> filesByDoc = new HashMap<>();
@@ -172,6 +174,28 @@ public class DocumentService {
     @Transactional
     public Checklist upload(Long studentId, Long typeId, MultipartFile file) {
         Student s = students.requireAccess(studentId, FULL_ACCESS, true);
+        CurrentUser me = CurrentUser.get();
+        store(s, typeId, file, users.getReferenceById(me.id()), me.id(), null);
+        return buildChecklist(s);
+    }
+
+    /**
+     * A scan sent by the student or parent through the portal. The caller has already checked that this
+     * login belongs to the student; the file lands in the documentation team's verification queue.
+     */
+    @Transactional
+    public Checklist uploadFromPortal(Student s, Long typeId, MultipartFile file, Long portalAccountId) {
+        DocumentType t = types.findById(typeId).filter(DocumentType::isActive)
+                .orElseThrow(() -> ApiException.notFound("Document type"));
+        if (!t.requiredFor(s) && t.getAppliesWhen() != AppliesWhen.OPTIONAL) {
+            throw ApiException.badRequest("This document is not on the checklist");
+        }
+        store(s, typeId, file, null, null, portalAccountId);
+        return buildChecklist(s);
+    }
+
+    private void store(Student s, Long typeId, MultipartFile file, AppUser uploader, Long actorId,
+                       Long portalAccountId) {
         DocumentType t = types.findById(typeId).orElseThrow(() -> ApiException.notFound("Document type"));
         byte[] bytes = readChecked(file);
         String contentType = sniff(bytes);
@@ -180,7 +204,6 @@ public class DocumentService {
         }
         StudentDocument d = docs.findByStudentIdAndDocumentTypeId(s.getId(), t.getId())
                 .orElseGet(() -> docs.save(new StudentDocument(s, t)));
-        CurrentUser me = CurrentUser.get();
         String ext = switch (contentType) {
             case "application/pdf" -> "pdf";
             case "image/png" -> "png";
@@ -188,14 +211,15 @@ public class DocumentService {
         };
         String key = "students/" + s.getId() + "/" + UUID.randomUUID() + "." + ext;
         storage.put(key, bytes, contentType);
-        files.save(new DocumentFile(d, key, safeName(file.getOriginalFilename(), ext), contentType, bytes.length,
-                sha256(bytes), users.getReferenceById(me.id())));
+        DocumentFile saved = new DocumentFile(d, key, safeName(file.getOriginalFilename(), ext), contentType,
+                bytes.length, sha256(bytes), uploader);
+        saved.setPortalAccountId(portalAccountId);
+        files.save(saved);
         if (d.getStatus() == DocumentStatus.NOT_COLLECTED || d.getStatus() == DocumentStatus.REJECTED) {
-            d.setStatus(DocumentStatus.COLLECTED, users.getReferenceById(me.id()));
+            d.setStatus(DocumentStatus.COLLECTED, uploader);
         }
-        audit.record(me.id(), "DOCUMENT_UPLOADED", "STUDENT_DOCUMENT", d.getId(), t.getCode() + " " + bytes.length
-                + " bytes");
-        return buildChecklist(s);
+        audit.record(actorId, "DOCUMENT_UPLOADED", "STUDENT_DOCUMENT", d.getId(), t.getCode() + " " + bytes.length
+                + " bytes" + (portalAccountId == null ? "" : " via portal login " + portalAccountId));
     }
 
     @Transactional(readOnly = true)
@@ -218,8 +242,10 @@ public class DocumentService {
         }
         boolean mineOnly = me.role() == Role.COUNSELLOR;
         List<QueueRow> awaiting = docs.findByStatusOrderByUpdatedAtAsc(DocumentStatus.COLLECTED).stream()
+                .filter(d -> !me.outsideBranch(d.getStudent().getBranch()))
                 .filter(d -> !mineOnly || isMine(d.getStudent(), me)).map(QueueRow::of).toList();
         List<QueueRow> expiring = docs.findExpiringBy(LocalDate.now().plusDays(EXPIRY_WARNING_DAYS)).stream()
+                .filter(d -> !me.outsideBranch(d.getStudent().getBranch()))
                 .filter(d -> !mineOnly || isMine(d.getStudent(), me)).map(QueueRow::of).toList();
         return new Queue(awaiting, expiring);
     }

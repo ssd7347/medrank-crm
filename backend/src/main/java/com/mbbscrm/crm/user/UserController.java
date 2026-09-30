@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.mbbscrm.crm.audit.AuditService;
+import com.mbbscrm.crm.branch.Branch;
+import com.mbbscrm.crm.branch.BranchRepository;
 import com.mbbscrm.crm.common.ApiException;
 import com.mbbscrm.crm.common.Role;
 import com.mbbscrm.crm.security.CurrentUser;
@@ -41,9 +43,11 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokens;
     private final AuditService audit;
+    private final BranchRepository branches;
 
     public UserController(AppUserRepository users, PasswordEncoder passwordEncoder,
-                          RefreshTokenService refreshTokens, AuditService audit) {
+                          RefreshTokenService refreshTokens, AuditService audit, BranchRepository branches) {
+        this.branches = branches;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokens = refreshTokens;
@@ -77,6 +81,7 @@ public class UserController {
         u.setPhone(blankToNull(req.phone()));
         u.setRole(req.role());
         u.setPasswordHash(passwordEncoder.encode(req.password()));
+        u.setBranch(branch(req.branchId()));
         users.save(u);
         audit.record(CurrentUser.get().id(), "USER_CREATED", "USER", u.getId(), "role=" + u.getRole());
         return UserResponse.of(u);
@@ -96,6 +101,7 @@ public class UserController {
         u.setPhone(blankToNull(req.phone()));
         u.setRole(req.role());
         u.setActive(req.active());
+        u.setBranch(branch(req.branchId()));
         if (!u.isActive()) {
             refreshTokens.revokeAllForUser(u.getId());
         }
@@ -113,6 +119,10 @@ public class UserController {
         u.setPasswordHash(passwordEncoder.encode(req.password()));
         refreshTokens.revokeAllForUser(u.getId());
         audit.record(CurrentUser.get().id(), "PASSWORD_RESET", "USER", u.getId(), null);
+    }
+
+    private Branch branch(Long id) {
+        return id == null ? null : branches.findById(id).orElseThrow(() -> ApiException.badRequest("Branch not found"));
     }
 
     private static String blankToNull(String s) {

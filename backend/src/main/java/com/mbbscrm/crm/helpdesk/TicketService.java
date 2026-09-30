@@ -153,6 +153,41 @@ public class TicketService {
         return TicketView.of(t, List.of());
     }
 
+    /**
+     * A question raised by the student or parent through the portal (spec 4.14). It goes to the student's
+     * counsellor, or to the admins when nobody is assigned.
+     */
+    @Transactional
+    public TicketView createFromPortal(Student student, String raisedByName, String subject, String description,
+                                       TicketCategory category, Long portalAccountId) {
+        Ticket t = new Ticket();
+        t.setStudent(student);
+        t.setRaisedByName(raisedByName);
+        t.setRaisedVia(Channel.PORTAL);
+        t.setSubject(subject.trim());
+        t.setDescription(blankToNull(description));
+        t.setCategory(category);
+        t.setPriority(TicketPriority.NORMAL);
+        t.setDueAt(Instant.now().plus(Ticket.slaFor(TicketPriority.NORMAL, false)));
+        t.setPortalAccountId(portalAccountId);
+        AppUser counsellor = student.getAssignedCounsellor();
+        t.setAssignedTo(counsellor != null && counsellor.isActive() ? counsellor : null);
+        tickets.save(t);
+        audit.record(null, "TICKET_CREATED", "TICKET", t.getId(), "via portal login " + portalAccountId);
+        alerts.notifyStaffFor(student, "TICKET_ASSIGNED", Priority.NORMAL, "Portal question: " + t.getSubject(),
+                student.getFullName() + " asked through the portal. Respond by "
+                        + com.mbbscrm.crm.counselling.AlertTexts.when(t.getDueAt()) + ".", "/tickets/" + t.getId(),
+                "TICKET:" + t.getId() + ":ASSIGNED");
+        return TicketView.of(t, List.of());
+    }
+
+    /** Tickets about one student, for the family portal. The caller has already checked access. */
+    @Transactional(readOnly = true)
+    public List<TicketView> forStudentUnchecked(Long studentId) {
+        return tickets.findByStudentIdOrderByCreatedAtDesc(studentId).stream()
+                .map(t -> TicketView.of(t, List.of())).toList();
+    }
+
     @Transactional
     public TicketView update(Long id, UpdateRequest req) {
         Ticket t = visible(id);
@@ -209,6 +244,9 @@ public class TicketService {
     }
 
     static boolean canSee(Ticket t, CurrentUser me) {
+        if (t.getStudent() != null && me.outsideBranch(t.getStudent().getBranch())) {
+            return false;
+        }
         if (SEE_ALL.contains(me.role())) {
             return true;
         }

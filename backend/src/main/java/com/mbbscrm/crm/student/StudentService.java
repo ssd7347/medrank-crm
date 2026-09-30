@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.mbbscrm.crm.audit.AuditService;
+import com.mbbscrm.crm.branch.BranchRepository;
 import com.mbbscrm.crm.common.ApiException;
 import com.mbbscrm.crm.common.Category;
 import com.mbbscrm.crm.common.PageResponse;
@@ -40,9 +41,11 @@ public class StudentService {
     private final AppUserRepository users;
     private final EligibilityService eligibility;
     private final AuditService audit;
+    private final BranchRepository branches;
 
     public StudentService(StudentRepository students, LeadRepository leads, AppUserRepository users,
-                          EligibilityService eligibility, AuditService audit) {
+                          EligibilityService eligibility, AuditService audit, BranchRepository branches) {
+        this.branches = branches;
         this.students = students;
         this.leads = leads;
         this.users = users;
@@ -52,10 +55,14 @@ public class StudentService {
 
     @Transactional(readOnly = true)
     public PageResponse<StudentListItem> search(String q, Category category, String homeState, Long counsellorId,
-                                                int page, int size) {
+                                                Long branchId, int page, int size) {
         CurrentUser me = requireRead();
+        Long branch = me.branchScope() != null ? me.branchScope() : branchId;
         Specification<Student> spec = (root, query, cb) -> {
             List<Predicate> p = new ArrayList<>();
+            if (branch != null) {
+                p.add(cb.equal(root.get("branch").get("id"), branch));
+            }
             if (me.role() == Role.COUNSELLOR) {
                 p.add(cb.equal(root.get("assignedCounsellor").get("id"), me.id()));
             } else if (counsellorId != null) {
@@ -148,6 +155,17 @@ public class StudentService {
         s.setLanguagePreference(req.languagePreference());
         s.setApaarId(blankToNull(req.apaarId()));
 
+        // Branch staff always work inside their own branch; head office may place a student anywhere.
+        Long scope = me.branchScope();
+        if (scope != null) {
+            if (s.getId() == null) {
+                s.setBranch(branches.getReferenceById(scope));
+            }
+        } else {
+            s.setBranch(req.branchId() == null ? null : branches.findById(req.branchId())
+                    .orElseThrow(() -> ApiException.badRequest("Branch not found")));
+        }
+
         Long current = s.getAssignedCounsellor() == null ? null : s.getAssignedCounsellor().getId();
         Long wanted = req.assignedCounsellorId();
         if (wanted != null && !wanted.equals(current)) {
@@ -175,6 +193,9 @@ public class StudentService {
     public Student requireAccess(Long id, java.util.Set<Role> fullAccess, boolean counsellorOwn) {
         CurrentUser me = CurrentUser.get();
         Student s = students.findById(id).orElseThrow(() -> ApiException.notFound("Student"));
+        if (me.outsideBranch(s.getBranch())) {
+            throw ApiException.notFound("Student");
+        }
         if (fullAccess.contains(me.role())) {
             return s;
         }
@@ -203,6 +224,9 @@ public class StudentService {
     private Student loadReadable(Long id) {
         CurrentUser me = requireRead();
         Student s = students.findById(id).orElseThrow(() -> ApiException.notFound("Student"));
+        if (me.outsideBranch(s.getBranch())) {
+            throw ApiException.notFound("Student");
+        }
         if (me.role() == Role.COUNSELLOR
                 && (s.getAssignedCounsellor() == null || !s.getAssignedCounsellor().getId().equals(me.id()))) {
             throw ApiException.notFound("Student");

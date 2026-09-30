@@ -68,6 +68,8 @@ export type ActivityType = (typeof MANUAL_ACTIVITY_TYPES)[number] | "STATUS_CHAN
 export type Page<T> = { items: T[]; page: number; size: number; totalItems: number; totalPages: number };
 
 export type UserRef = { id: number; fullName: string; role: Role };
+export type BranchRef = { id: number; name: string; code: string };
+export type CampaignRef = { id: number; name: string; channel: LeadSource };
 
 export type User = {
   id: number;
@@ -76,6 +78,7 @@ export type User = {
   phone: string | null;
   role: Role;
   active: boolean;
+  branch: BranchRef | null;
   createdAt: string;
 };
 
@@ -93,6 +96,8 @@ export type LeadListItem = {
   status: LeadStatus;
   assignedCounsellor: UserRef | null;
   studentId: number | null;
+  branch: BranchRef | null;
+  campaign: CampaignRef | null;
   createdAt: string;
 };
 
@@ -115,6 +120,9 @@ export type Lead = {
   languagePreference: Language;
   notes: string | null;
   studentId: number | null;
+  branch: BranchRef | null;
+  campaign: CampaignRef | null;
+  referredByStudent: { id: number; fullName: string } | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -136,6 +144,9 @@ export type LeadRequest = {
   notes?: string | null;
   assignedCounsellorId?: number | null;
   allowDuplicatePhone?: boolean;
+  branchId?: number | null;
+  campaignId?: number | null;
+  referredByStudentId?: number | null;
 };
 
 export type Activity = {
@@ -173,6 +184,7 @@ export type StudentListItem = {
   neetScore: number | null;
   neetAir: number | null;
   assignedCounsellor: UserRef | null;
+  branch: BranchRef | null;
   createdAt: string;
 };
 
@@ -201,11 +213,13 @@ export type StudentRequest = {
   languagePreference: Language;
   apaarId: string | null;
   assignedCounsellorId: number | null;
+  branchId: number | null;
 };
 
-export type Student = Omit<StudentRequest, "assignedCounsellorId"> & {
+export type Student = Omit<StudentRequest, "assignedCounsellorId" | "branchId"> & {
   id: number;
   assignedCounsellor: UserRef | null;
+  branch: BranchRef | null;
   leadId: number | null;
   eligibility: Eligibility;
   createdAt: string;

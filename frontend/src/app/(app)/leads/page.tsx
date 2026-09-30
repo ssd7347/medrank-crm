@@ -9,6 +9,7 @@ import { Alert, ButtonLink, Card, EmptyState, Input, Loading, PageHeader, Pagina
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatNumber, label } from "@/lib/format";
 import { LEAD_SOURCES, LEAD_STATUSES, type LeadListItem, type Page, type UserRef } from "@/lib/types";
+import type { Branch } from "@/lib/types-growth";
 import { useApi } from "@/lib/use-api";
 
 function LeadsView() {
@@ -20,6 +21,8 @@ function LeadsView() {
   const status = params.get("status") ?? "";
   const source = params.get("source") ?? "";
   const owner = params.get("owner") ?? "";
+  const branch = params.get("branch") ?? "";
+  const campaign = params.get("campaign") ?? "";
   const page = Number(params.get("page") ?? 0);
   const q = params.get("q") ?? "";
   const [search, setSearch] = useState(q);
@@ -42,6 +45,7 @@ function LeadsView() {
   }, [search]);
 
   const staff = useApi<UserRef[]>(isAdmin ? "/api/users/assignable" : null);
+  const branches = useApi<Branch[]>(isAdmin ? "/api/branches" : null);
   const { data, error, loading } = useApi<Page<LeadListItem>>("/api/leads", {
     q,
     status,
@@ -50,6 +54,8 @@ function LeadsView() {
     size: 25,
     counsellorId: owner && owner !== "unassigned" ? owner : undefined,
     unassigned: owner === "unassigned" ? true : undefined,
+    branchId: branch || undefined,
+    campaignId: campaign || undefined,
   });
 
   const ownerOptions = [
@@ -90,13 +96,33 @@ function LeadsView() {
         ))}
       </div>
 
+      {campaign && (
+        <div className="mb-3">
+          <Alert tone="blue">
+            Showing leads from one campaign{data?.items[0]?.campaign ? `: ${data.items[0].campaign.name}` : ""}.{" "}
+            <button className="underline" onClick={() => setParam("campaign", "")}>
+              Show all leads
+            </button>
+          </Alert>
+        </div>
+      )}
+
       <Card className="overflow-hidden">
         <div className="-m-4">
-          <div className="grid gap-2 border-b border-line p-3 sm:grid-cols-3">
+          <div className="grid gap-2 border-b border-line p-3 sm:grid-cols-2 lg:grid-cols-4">
             <Input placeholder="Search name, phone or NEET roll no." value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search leads" />
             <Select aria-label="Source" value={source} onChange={(e) => setParam("source", e.target.value)} options={LEAD_SOURCES} labelFor={label} placeholder="Any source" />
             {isAdmin && (
               <Select aria-label="Assigned to" value={owner} onChange={(e) => setParam("owner", e.target.value)} options={ownerOptions} placeholder="Anyone" />
+            )}
+            {isAdmin && !!branches.data?.length && (
+              <Select
+                aria-label="Branch"
+                value={branch}
+                onChange={(e) => setParam("branch", e.target.value)}
+                options={branches.data.map((b) => ({ value: String(b.id), label: b.name }))}
+                placeholder="All branches"
+              />
             )}
           </div>
           {error && (
@@ -107,7 +133,7 @@ function LeadsView() {
           {loading && !data ? (
             <Loading />
           ) : !data?.items.length ? (
-            <EmptyState title="No leads found">{q || status || source || owner ? "Try clearing the filters." : "Add your first lead to get started."}</EmptyState>
+            <EmptyState title="No leads found">{q || status || source || owner || branch ? "Try clearing the filters." : "Add your first lead to get started."}</EmptyState>
           ) : (
             <>
               <Table head={["Name", "Phone", "NEET score / AIR", "Category", "Source", "Stage", "Assigned to", "Added"]}>
@@ -124,7 +150,10 @@ function LeadsView() {
                       {formatNumber(l.neetScore)} / {formatNumber(l.neetAir)}
                     </Td>
                     <Td>{l.category ?? "—"}</Td>
-                    <Td className="whitespace-nowrap">{label(l.source)}</Td>
+                    <Td className="whitespace-nowrap">
+                      {label(l.source)}
+                      {l.campaign && <span className="block text-xs text-ink-faint">{l.campaign.name}</span>}
+                    </Td>
                     <Td>
                       <LeadStatusBadge status={l.status} />
                     </Td>

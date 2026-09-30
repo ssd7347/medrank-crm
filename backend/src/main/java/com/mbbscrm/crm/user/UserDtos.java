@@ -2,6 +2,7 @@ package com.mbbscrm.crm.user;
 
 import java.time.Instant;
 
+import com.mbbscrm.crm.branch.BranchRef;
 import com.mbbscrm.crm.common.Role;
 
 import jakarta.validation.constraints.Email;
@@ -16,10 +17,10 @@ public final class UserDtos {
     }
 
     public record UserResponse(Long id, String fullName, String email, String phone, Role role,
-                               boolean active, Instant createdAt) {
+                               boolean active, BranchRef branch, Instant createdAt) {
         public static UserResponse of(AppUser u) {
             return new UserResponse(u.getId(), u.getFullName(), u.getEmail(), u.getPhone(), u.getRole(),
-                    u.isActive(), u.getCreatedAt());
+                    u.isActive(), BranchRef.of(u.getBranch()), u.getCreatedAt());
         }
     }
 
@@ -35,14 +36,16 @@ public final class UserDtos {
             @NotBlank @Email @Size(max = 160) String email,
             @Pattern(regexp = "^[0-9+ -]{0,20}$", message = "invalid phone") String phone,
             @NotNull Role role,
-            @NotBlank @Size(min = 10, max = 72, message = "must be 10-72 characters") String password) {
+            @NotBlank @Size(min = 10, max = 72, message = "must be 10-72 characters") String password,
+            Long branchId) {
     }
 
     public record UpdateUserRequest(
             @NotBlank @Size(max = 120) String fullName,
             @Pattern(regexp = "^[0-9+ -]{0,20}$", message = "invalid phone") String phone,
             @NotNull Role role,
-            boolean active) {
+            boolean active,
+            Long branchId) {
     }
 
     public record ResetPasswordRequest(

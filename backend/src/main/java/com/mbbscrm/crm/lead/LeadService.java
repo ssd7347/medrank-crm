@@ -1,5 +1,11 @@
 package com.mbbscrm.crm.lead;
 
+import com.mbbscrm.crm.alumni.AlumniService;
+
+import com.mbbscrm.crm.branch.BranchRepository;
+import com.mbbscrm.crm.marketing.CampaignRepository;
+import com.mbbscrm.crm.student.StudentRepository;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -66,10 +72,20 @@ public class LeadService {
     private final StudentService studentService;
     private final CommissionService commissions;
     private final AuditService audit;
+    private final BranchRepository branches;
+    private final CampaignRepository campaigns;
+    private final StudentRepository students;
+    private final AlumniService alumni;
 
     public LeadService(LeadRepository leads, LeadActivityRepository activities, FollowUpRepository followUps,
                        AppUserRepository users, ReferralAssociateRepository associates,
-                       StudentService studentService, CommissionService commissions, AuditService audit) {
+                       StudentService studentService, CommissionService commissions, AuditService audit,
+                       BranchRepository branches, CampaignRepository campaigns, StudentRepository students,
+                       AlumniService alumni) {
+        this.alumni = alumni;
+        this.branches = branches;
+        this.campaigns = campaigns;
+        this.students = students;
         this.leads = leads;
         this.activities = activities;
         this.followUps = followUps;
@@ -84,10 +100,18 @@ public class LeadService {
 
     @Transactional(readOnly = true)
     public PageResponse<LeadListItem> search(String q, LeadStatus status, LeadSource source, Long counsellorId,
-                                             boolean unassignedOnly, int page, int size) {
+                                             boolean unassignedOnly, Long branchId, Long campaignId, int page,
+                                             int size) {
         CurrentUser me = requireLeadAccess();
+        Long branch = me.branchScope() != null ? me.branchScope() : branchId;
         Specification<Lead> spec = (root, query, cb) -> {
             List<Predicate> p = new ArrayList<>();
+            if (branch != null) {
+                p.add(cb.equal(root.get("branch").get("id"), branch));
+            }
+            if (campaignId != null) {
+                p.add(cb.equal(root.get("campaign").get("id"), campaignId));
+            }
             Join<Lead, AppUser> c = root.join("assignedCounsellor", JoinType.LEFT);
             if (!me.isAdmin()) {
                 p.add(cb.or(cb.equal(c.get("id"), me.id()), cb.isNull(c.get("id"))));
@@ -157,6 +181,9 @@ public class LeadService {
             return false;
         }
         lead.setCreatedBy(me.id());
+        if (me.branchId() != null) {
+            lead.setBranch(branches.getReferenceById(me.branchId()));
+        }
         if (lead.getAssignedCounsellor() == null && me.role() != Role.SUPER_ADMIN) {
             lead.setAssignedCounsellor(users.getReferenceById(me.id()));
         }
@@ -191,6 +218,7 @@ public class LeadService {
         audit.record(me.id(), "LEAD_STATUS_CHANGED", "LEAD", lead.getId(), from + " -> " + status);
         if (status == LeadStatus.ADMISSION_CONFIRMED) {
             commissions.onAdmissionConfirmed(lead, me.id());
+            alumni.onAdmissionConfirmed(lead.getStudent(), me.id());
         }
         return LeadResponse.of(lead);
     }
@@ -231,6 +259,9 @@ public class LeadService {
         StudentRequest withOwner = req.assignedCounsellorId() != null || lead.getAssignedCounsellor() == null
                 ? req : withCounsellor(req, lead.getAssignedCounsellor().getId(), me);
         Student student = studentService.createEntity(withOwner);
+        if (lead.getBranch() != null) {
+            student.setBranch(lead.getBranch());
+        }
         lead.setStudent(student);
         if (lead.getStatus() == LeadStatus.NEW) {
             lead.setStatus(LeadStatus.QUALIFIED);
@@ -330,6 +361,27 @@ public class LeadService {
             throw ApiException.badRequest("Pick the referral associate for a referral lead");
         }
 
+        // Branch staff always work inside their own branch; head office may place a lead anywhere.
+        Long scope = me.branchScope();
+        if (scope != null) {
+            if (lead.getId() == null) {
+                lead.setBranch(branches.getReferenceById(scope));
+            }
+        } else {
+            lead.setBranch(req.branchId() == null ? null : branches.findById(req.branchId())
+                    .orElseThrow(() -> ApiException.badRequest("Branch not found")));
+        }
+        lead.setCampaign(req.campaignId() == null ? null : campaigns.findById(req.campaignId())
+                .orElseThrow(() -> ApiException.badRequest("Campaign not found")));
+        if (req.referredByStudentId() == null) {
+            lead.setReferredByStudent(null);
+        } else {
+            Student referrer = students.findById(req.referredByStudentId())
+                    .filter(s -> !me.outsideBranch(s.getBranch()))
+                    .orElseThrow(() -> ApiException.badRequest("Referring student not found"));
+            lead.setReferredByStudent(referrer);
+        }
+
         Long current = lead.getAssignedCounsellor() == null ? null : lead.getAssignedCounsellor().getId();
         Long wanted = req.assignedCounsellorId();
         boolean changing = lead.getId() == null ? wanted != null : !java.util.Objects.equals(current, wanted);
@@ -386,6 +438,9 @@ public class LeadService {
 
     private Lead loadVisible(Long id, CurrentUser me) {
         Lead lead = leads.findById(id).orElseThrow(() -> ApiException.notFound("Lead"));
+        if (me.outsideBranch(lead.getBranch())) {
+            throw ApiException.notFound("Lead");
+        }
         if (!me.isAdmin() && lead.getAssignedCounsellor() != null
                 && !lead.getAssignedCounsellor().getId().equals(me.id())) {
             throw ApiException.notFound("Lead");
@@ -410,7 +465,7 @@ public class LeadService {
                 r.parentPhone(), r.category(), r.pwd(), r.homeState(), r.domicileStatus(), r.nationality(),
                 r.nriSponsored(), r.neetYear(), r.neetRollNo(), r.neetQualified(), r.neetScore(),
                 r.neetPercentile(), r.neetAir(), r.categoryRank(), r.categoryCertValidUntil(),
-                r.languagePreference(), r.apaarId(), counsellorId);
+                r.languagePreference(), r.apaarId(), counsellorId, r.branchId());
     }
 
     static String normalizeRoll(String roll) {

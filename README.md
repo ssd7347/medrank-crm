@@ -25,8 +25,24 @@ receipts, refunds and commissions, 4.11 staff performance & reassignment, 4.14 h
 Documents are stored under `data/uploads` until Cloudflare R2 keys (`R2_*`) are set. Payments are recorded
 manually (Razorpay later).
 
-Next: Phase 4 (4.10 student/parent portal, 4.12 marketing, 4.13 analytics, 4.15 multi-branch, 4.22 sub-agents,
-4.23 alumni) per spec section 12. Works on phones and laptops (tables turn into cards on small screens).
+**Phase 4 (self-service & growth) — built.**
+- 4.10 Student & parent portal at `/portal`: phone + password login, activated with a one-time code that staff
+  issue from the student's "Portal & alumni" tab. Shows the next deadline with a countdown, each counselling
+  track side by side, documents (with upload into the verification queue), fees, shortlist, and questions
+  (which become helpdesk tickets). Portal logins use a separate token type and cannot call staff endpoints.
+- 4.12 Marketing: campaigns, spend, and cost per lead / per confirmed admission by channel and campaign
+  (associate commission counts as the cost of the referral channel).
+- 4.13 Analytics (round-day numbers, funnel, revenue, outcomes by category and state) and a report builder
+  with column selection, CSV download for Excel and print-to-PDF. Voice-agent metrics arrive with Phase 6.
+- 4.15 Branches: staff with a branch only see that branch's leads, students, documents queue, dues and
+  tickets; admins and head-office staff see everything, with a branch filter and a branch comparison.
+  The round desk and dashboard counters are not yet split by branch.
+- 4.22 Associates & sub-agents: territory, agreement dates and terms, performance and commission totals.
+- 4.23 Alumni directory: satisfaction surveys, testimonials (public use needs consent + admin approval),
+  and past-student referral tracking on leads.
+
+Next: Phase 5 (DigiLocker, chatbot, predictive scoring, video, e-Sign, IVR, multi-language, loans) per spec
+section 12. Works on phones and laptops (tables turn into cards on small screens).
 
 ## Stack
 

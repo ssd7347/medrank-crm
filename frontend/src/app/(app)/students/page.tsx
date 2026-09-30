@@ -7,6 +7,7 @@ import { Alert, ButtonLink, Card, EmptyState, Input, Loading, PageHeader, Pagina
 import { useAuth } from "@/lib/auth";
 import { INDIAN_STATES, formatDate, formatNumber } from "@/lib/format";
 import { CATEGORIES, type Page, type StudentListItem } from "@/lib/types";
+import type { Branch } from "@/lib/types-growth";
 import { useApi } from "@/lib/use-api";
 
 export default function StudentsPage() {
@@ -16,6 +17,9 @@ export default function StudentsPage() {
   const [category, setCategory] = useState("");
   const [homeState, setHomeState] = useState("");
   const [page, setPage] = useState(0);
+  const [branch, setBranch] = useState("");
+  const isAdmin = hasRole("SUPER_ADMIN");
+  const branches = useApi<Branch[]>(isAdmin ? "/api/branches" : null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -25,7 +29,7 @@ export default function StudentsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data, error, loading } = useApi<Page<StudentListItem>>("/api/students", { q, category, homeState, page, size: 25 });
+  const { data, error, loading } = useApi<Page<StudentListItem>>("/api/students", { q, category, homeState, branchId: branch || undefined, page, size: 25 });
 
   return (
     <>
@@ -36,10 +40,22 @@ export default function StudentsPage() {
       />
       <Card className="overflow-hidden">
         <div className="-m-4">
-          <div className="grid gap-2 border-b border-line p-3 sm:grid-cols-3">
+          <div className="grid gap-2 border-b border-line p-3 sm:grid-cols-2 lg:grid-cols-4">
             <Input placeholder="Search name, phone or roll no." value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search students" />
             <Select aria-label="Category" value={category} onChange={(e) => { setCategory(e.target.value); setPage(0); }} options={CATEGORIES} placeholder="Any category" />
             <Select aria-label="Home state" value={homeState} onChange={(e) => { setHomeState(e.target.value); setPage(0); }} options={INDIAN_STATES} placeholder="Any home state" />
+            {isAdmin && !!branches.data?.length && (
+              <Select
+                aria-label="Branch"
+                value={branch}
+                onChange={(e) => {
+                  setBranch(e.target.value);
+                  setPage(0);
+                }}
+                options={branches.data.map((b) => ({ value: String(b.id), label: b.name }))}
+                placeholder="All branches"
+              />
+            )}
           </div>
           {error && (
             <div className="p-3">

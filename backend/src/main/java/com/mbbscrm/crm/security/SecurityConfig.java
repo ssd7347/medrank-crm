@@ -32,6 +32,9 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 @EnableConfigurationProperties(AppProperties.class)
 public class SecurityConfig {
 
+    private static final String[] STAFF_ROLES = java.util.Arrays.stream(com.mbbscrm.crm.common.Role.values())
+            .map(Enum::name).toArray(String[]::new);
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -43,8 +46,12 @@ public class SecurityConfig {
                 .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/portal/auth/login", "/api/portal/auth/activate",
+                        "/api/portal/auth/refresh", "/api/portal/auth/logout").permitAll()
                 .requestMatchers("/actuator/health", "/error").permitAll()
-                .requestMatchers("/api/**").authenticated()
+                // Family portal logins can reach the portal API and nothing else; staff cannot use it either.
+                .requestMatchers("/api/portal/**").hasRole(TokenService.PORTAL_ROLE)
+                .requestMatchers("/api/**").hasAnyRole(STAFF_ROLES)
                 .anyRequest().denyAll())
             .oauth2ResourceServer(rs -> rs.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
         return http.build();

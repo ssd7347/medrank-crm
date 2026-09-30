@@ -141,6 +141,12 @@ public class FeeService {
         return views(plans.findByStudentIdOrderByCreatedAtDesc(studentId));
     }
 
+    /** For callers that have already checked access themselves, such as the family portal. */
+    @Transactional(readOnly = true)
+    public List<PlanView> plansForStudent(Student student) {
+        return views(plans.findByStudentIdOrderByCreatedAtDesc(student.getId()));
+    }
+
     List<PlanView> views(List<FeePlan> list) {
         if (list.isEmpty()) {
             return List.of();
@@ -382,7 +388,8 @@ public class FeeService {
             throw ApiException.forbidden("Only accounts staff and admins can see refunds");
         }
         return refunds.findByStatusInOrderByRequestedAtAsc(List.of(RefundStatus.REQUESTED, RefundStatus.APPROVED))
-                .stream().map(RefundView::of).toList();
+                .stream().filter(r -> !me.outsideBranch(r.getPlan().getStudent().getBranch()))
+                .map(RefundView::of).toList();
     }
 
     // ================================================================== dues
@@ -402,11 +409,19 @@ public class FeeService {
         if (!READ_ACCESS.contains(me.role())) {
             throw ApiException.forbidden("Only accounts staff and admins can see dues");
         }
-        return computeDues(LocalDate.now());
+        return computeDues(LocalDate.now(), me.branchScope());
     }
 
     DuesSummary computeDues(LocalDate today) {
-        List<FeePlan> active = plans.findByStatus(PlanStatus.ACTIVE);
+        return computeDues(today, null);
+    }
+
+    /** {@code branchId} null means every branch. */
+    DuesSummary computeDues(LocalDate today, Long branchId) {
+        List<FeePlan> active = plans.findByStatus(PlanStatus.ACTIVE).stream()
+                .filter(p -> branchId == null || (p.getStudent().getBranch() != null
+                        && branchId.equals(p.getStudent().getBranch().getId())))
+                .toList();
         List<DueRow> rows = new ArrayList<>();
         BigDecimal outstanding = BigDecimal.ZERO;
         BigDecimal overdue = BigDecimal.ZERO;
@@ -430,7 +445,12 @@ public class FeeService {
             }
         }
         rows.sort((a, b) -> a.dueDate().compareTo(b.dueDate()));
-        BigDecimal collected = payments.sumCollectedBetween(today.withDayOfMonth(1), today);
+        LocalDate monthStart = today.withDayOfMonth(1);
+        // Branch staff see what their branch's active plans collected this month, not the whole firm's figure.
+        BigDecimal collected = branchId == null ? payments.sumCollectedBetween(monthStart, today)
+                : views(active).stream().flatMap(v -> v.payments().stream())
+                        .filter(x -> !x.voided() && !x.paidOn().isBefore(monthStart) && !x.paidOn().isAfter(today))
+                        .map(PaymentView::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new DuesSummary(outstanding, overdue, next7, collected, rows);
     }
 

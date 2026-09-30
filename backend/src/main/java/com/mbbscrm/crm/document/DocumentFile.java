@@ -36,6 +36,8 @@ public class DocumentFile {
     @JoinColumn(name = "uploaded_by")
     private AppUser uploadedBy;
     private Instant uploadedAt;
+    /** Set instead of {@code uploadedBy} when the family uploaded the file through the portal. */
+    private Long portalAccountId;
 
     protected DocumentFile() {
     }
@@ -53,6 +55,8 @@ public class DocumentFile {
     }
 
     public Long getId() { return id; }
+    public Long getPortalAccountId() { return portalAccountId; }
+    public void setPortalAccountId(Long portalAccountId) { this.portalAccountId = portalAccountId; }
     public StudentDocument getStudentDocument() { return studentDocument; }
     public String getStorageKey() { return storageKey; }
     public String getOriginalName() { return originalName; }

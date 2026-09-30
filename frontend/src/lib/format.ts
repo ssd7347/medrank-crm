@@ -142,6 +142,12 @@ const LABELS: Record<string, string> = {
   CONTACTED: "Contacted",
   ASSIGNED: "Assigned",
   REFUND_RULE: "Refund rule",
+  LEADS: "Leads",
+  STUDENTS: "Students",
+  PAYMENTS: "Payments received",
+  ADMISSIONS: "Confirmed admissions",
+  ALLOTMENTS: "Allotment results",
+  TICKETS: "Helpdesk tickets",
 };
 
 export function label(value: string | null | undefined): string {

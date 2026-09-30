@@ -1,5 +1,7 @@
 package com.mbbscrm.crm.student;
 
+import com.mbbscrm.crm.branch.BranchRef;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -52,15 +54,17 @@ public final class StudentDtos {
             LocalDate categoryCertValidUntil,
             @NotNull Language languagePreference,
             @Pattern(regexp = "^[A-Za-z0-9]{0,20}$", message = "letters and digits only") String apaarId,
-            Long assignedCounsellorId) {
+            Long assignedCounsellorId,
+            Long branchId) {
     }
 
     public record StudentListItem(Long id, String fullName, String phone, Category category, String homeState,
                                   Integer neetScore, Integer neetAir, UserRef assignedCounsellor,
-                                  Instant createdAt) {
+                                  BranchRef branch, Instant createdAt) {
         public static StudentListItem of(Student s) {
             return new StudentListItem(s.getId(), s.getFullName(), s.getPhone(), s.getCategory(), s.getHomeState(),
-                    s.getNeetScore(), s.getNeetAir(), UserRef.of(s.getAssignedCounsellor()), s.getCreatedAt());
+                    s.getNeetScore(), s.getNeetAir(), UserRef.of(s.getAssignedCounsellor()),
+                    BranchRef.of(s.getBranch()), s.getCreatedAt());
         }
     }
 
@@ -70,7 +74,8 @@ public final class StudentDtos {
             DomicileStatus domicileStatus, Nationality nationality, boolean nriSponsored, Integer neetYear,
             String neetRollNo, boolean neetQualified, Integer neetScore, BigDecimal neetPercentile, Integer neetAir,
             Integer categoryRank, LocalDate categoryCertValidUntil, Language languagePreference,
-            UserRef assignedCounsellor, Long leadId, Eligibility eligibility, Instant createdAt, Instant updatedAt) {
+            UserRef assignedCounsellor, BranchRef branch, Long leadId, Eligibility eligibility, Instant createdAt,
+            Instant updatedAt) {
 
         public static StudentResponse of(Student s, Long leadId, Eligibility eligibility) {
             return new StudentResponse(s.getId(), s.getApaarId(), s.getFullName(), s.getDateOfBirth(), s.getGender(),
@@ -78,7 +83,8 @@ public final class StudentDtos {
                     s.getHomeState(), s.getDomicileStatus(), s.getNationality(), s.isNriSponsored(), s.getNeetYear(),
                     s.getNeetRollNo(), s.isNeetQualified(), s.getNeetScore(), s.getNeetPercentile(), s.getNeetAir(),
                     s.getCategoryRank(), s.getCategoryCertValidUntil(), s.getLanguagePreference(),
-                    UserRef.of(s.getAssignedCounsellor()), leadId, eligibility, s.getCreatedAt(), s.getUpdatedAt());
+                    UserRef.of(s.getAssignedCounsellor()), BranchRef.of(s.getBranch()), leadId, eligibility,
+                    s.getCreatedAt(), s.getUpdatedAt());
         }
     }
 }

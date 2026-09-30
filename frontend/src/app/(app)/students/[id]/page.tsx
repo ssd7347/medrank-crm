@@ -9,6 +9,7 @@ import { DocumentsTab } from "@/components/documents-tab";
 import { FeesTab } from "@/components/fees-tab";
 import { StudentTickets } from "@/components/tickets";
 import { StudentForm } from "@/components/student-form";
+import { PortalAlumniTab } from "@/components/portal-alumni-tab";
 import { MessagesTab, ShortlistTab } from "@/components/student-tabs";
 import { Alert, Badge, Button, ButtonLink, Card, DescList, Loading, PageHeader, cx } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -43,6 +44,7 @@ function toRequest(s: Student): StudentRequest {
     languagePreference: s.languagePreference,
     apaarId: s.apaarId,
     assignedCounsellorId: s.assignedCounsellor?.id ?? null,
+    branchId: s.branch?.id ?? null,
   };
 }
 
@@ -54,6 +56,7 @@ const TABS = [
   { key: "shortlist", label: "Shortlist" },
   { key: "tickets", label: "Tickets" },
   { key: "messages", label: "Messages" },
+  { key: "portal", label: "Portal & alumni" },
 ] as const;
 
 export default function StudentPage() {
@@ -117,7 +120,7 @@ function StudentView() {
 
       {!editing && (
         <div role="tablist" className="-mx-4 mb-5 flex gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0">
-          {TABS.filter((t) => (t.key !== "documents" || hasRole(...DOCUMENT_ROLES)) && (t.key !== "fees" || hasRole(...FEE_READ_ROLES))).map((t) => (
+          {TABS.filter((t) => (t.key !== "documents" || hasRole(...DOCUMENT_ROLES)) && (t.key !== "fees" || hasRole(...FEE_READ_ROLES)) && (t.key !== "portal" || canEdit)).map((t) => (
             <button
               key={t.key}
               role="tab"
@@ -146,6 +149,8 @@ function StudentView() {
         <StudentTickets studentId={s.id} />
       ) : tab === "messages" && !editing ? (
         <MessagesTab studentId={s.id} />
+      ) : tab === "portal" && !editing && canEdit ? (
+        <PortalAlumniTab student={s} />
       ) : editing ? (
         <Card title="Edit profile">
           <StudentForm
@@ -193,6 +198,7 @@ function StudentView() {
                   ["Preferred language", label(s.languagePreference)],
                   ["APAAR ID", s.apaarId],
                   ["Counsellor", s.assignedCounsellor?.fullName],
+                  ["Branch", s.branch?.name],
                 ]}
               />
             </Card>

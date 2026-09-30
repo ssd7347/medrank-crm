@@ -7,17 +7,18 @@ import { ApiError, api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, label } from "@/lib/format";
 import { ROLES, type Role, type User } from "@/lib/types";
+import type { Branch } from "@/lib/types-growth";
 import { useApi } from "@/lib/use-api";
 
 const ROLE_HELP: Record<Role, string> = {
   SUPER_ADMIN: "Everything, including staff accounts and data approvals",
   COUNSELLOR: "Own leads and students; converts leads",
   TELECALLER: "Own leads and unassigned leads; no student profiles",
-  DOCUMENTATION_EXEC: "Reads student profiles",
+  DOCUMENTATION_EXEC: "Document checklists, uploads and verification",
   DATA_EXEC: "Proposes college / seat / cutoff changes",
-  ACCOUNTANT: "Reads student profiles",
+  ACCOUNTANT: "Fee plans, payments, receipts and commissions",
   LOAN_DESK: "Reads student profiles",
-  GRIEVANCE_OFFICER: "Reads student profiles",
+  GRIEVANCE_OFFICER: "Grievance register and escalations",
 };
 
 export default function UsersPage() {
@@ -47,7 +48,7 @@ export default function UsersPage() {
           ) : !data?.length ? (
             <EmptyState title="No users" />
           ) : (
-            <Table head={["Name", "Email", "Phone", "Role", "Status", "Since", ""]}>
+            <Table head={["Name", "Email", "Phone", "Role", "Branch", "Status", "Since", ""]}>
               {data.map((u) => (
                 <tr key={u.id}>
                   <Td className="font-medium">
@@ -57,6 +58,7 @@ export default function UsersPage() {
                   <Td>{u.email}</Td>
                   <Td className="tabular-nums">{u.phone ?? "—"}</Td>
                   <Td>{label(u.role)}</Td>
+                  <Td>{u.branch?.name ?? <span className="text-ink-faint">Head office</span>}</Td>
                   <Td>{u.active ? <Badge tone="green">Active</Badge> : <Badge>Deactivated</Badge>}</Td>
                   <Td className="whitespace-nowrap text-ink-soft">{formatDate(u.createdAt)}</Td>
                   <Td className="text-right whitespace-nowrap">
@@ -110,7 +112,9 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
     role: (user?.role ?? "COUNSELLOR") as Role,
     active: user?.active ?? true,
     password: "",
+    branchId: user?.branch?.id.toString() ?? "",
   });
+  const branches = useApi<Branch[]>("/api/branches");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -122,10 +126,10 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
     setFieldErrors({});
     try {
       if (user) {
-        await api(`/api/users/${user.id}`, { method: "PUT", body: { fullName: v.fullName, phone: v.phone, role: v.role, active: v.active } });
+        await api(`/api/users/${user.id}`, { method: "PUT", body: { fullName: v.fullName, phone: v.phone, role: v.role, active: v.active, branchId: v.branchId ? Number(v.branchId) : null } });
         onDone(`Saved ${v.fullName}.`);
       } else {
-        await api("/api/users", { body: { fullName: v.fullName, email: v.email, phone: v.phone, role: v.role, password: v.password } });
+        await api("/api/users", { body: { fullName: v.fullName, email: v.email, phone: v.phone, role: v.role, password: v.password, branchId: v.branchId ? Number(v.branchId) : null } });
         onDone(`Created ${v.fullName}. Share the password with them privately and ask them to change it after first login.`);
       }
     } catch (err) {
@@ -151,6 +155,19 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
       <Field label="Role" required hint={ROLE_HELP[v.role]}>
         {(id) => <Select id={id} disabled={isSelf} value={v.role} onChange={(e) => setV({ ...v, role: e.target.value as Role })} options={ROLES} labelFor={label} />}
       </Field>
+      {!!branches.data?.length && (
+        <Field label="Branch" hint="Staff with a branch only see that branch's leads and students. Admins always see everything.">
+          {(id) => (
+            <Select
+              id={id}
+              value={v.branchId}
+              onChange={(e) => setV({ ...v, branchId: e.target.value })}
+              placeholder="Head office (all branches)"
+              options={branches.data!.filter((b) => b.active || String(b.id) === v.branchId).map((b) => ({ value: String(b.id), label: b.name }))}
+            />
+          )}
+        </Field>
+      )}
       {!user && (
         <Field label="Initial password" required hint="At least 10 characters" error={fieldErrors.password}>
           {(id) => <Input id={id} type="password" autoComplete="new-password" required minLength={10} maxLength={72} value={v.password} onChange={(e) => setV({ ...v, password: e.target.value })} />}

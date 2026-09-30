@@ -8,7 +8,7 @@ export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
 export const APPLIES_WHEN = ["ALWAYS", "RESERVED_CATEGORY", "EWS", "DOMICILED", "PWD", "NRI", "OPTIONAL"] as const;
 export type AppliesWhen = (typeof APPLIES_WHEN)[number];
 
-export type DocFile = { id: number; originalName: string; contentType: string; sizeBytes: number; uploadedBy: UserRef | null; uploadedAt: string };
+export type DocFile = { id: number; originalName: string; contentType: string; sizeBytes: number; uploadedBy: UserRef | null; uploadedAt: string; fromPortal: boolean };
 
 export type ChecklistItem = {
   typeId: number;

@@ -138,6 +138,9 @@ export default function LeadDetailPage() {
                   ["Home state", l.homeState],
                   ["Domicile", l.domicileStatus ? label(l.domicileStatus) : null],
                   ["Referral associate", l.referralAssociate?.fullName],
+                  ["Referred by past student", l.referredByStudent?.fullName],
+                  ["Campaign", l.campaign?.name],
+                  ["Branch", l.branch?.name],
                 ]}
               />
               {l.notes && <p className="mt-4 rounded-lg bg-muted p-3 text-sm whitespace-pre-wrap">{l.notes}</p>}

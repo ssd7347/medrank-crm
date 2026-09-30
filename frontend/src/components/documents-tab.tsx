@@ -154,7 +154,10 @@ function DocumentCard({ item, studentId, onChanged }: { item: ChecklistItem; stu
                 {f.originalName}
                 {i > 0 && " (older)"}
               </button>
-              <span className="shrink-0 text-ink-faint">{formatDateTime(f.uploadedAt)}</span>
+              <span className="shrink-0 text-ink-faint">
+                {f.fromPortal && "from portal · "}
+                {formatDateTime(f.uploadedAt)}
+              </span>
             </li>
           ))}
         </ul>

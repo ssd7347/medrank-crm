@@ -2,6 +2,7 @@ package com.mbbscrm.crm.user;
 
 import java.time.Instant;
 
+import com.mbbscrm.crm.branch.Branch;
 import com.mbbscrm.crm.common.Role;
 
 import jakarta.persistence.Column;
@@ -11,6 +12,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -41,6 +44,11 @@ public class AppUser {
 
     private boolean active = true;
 
+    /** Null for head-office staff, who are not confined to one branch (spec 4.15). */
+    @ManyToOne
+    @JoinColumn(name = "branch_id")
+    private Branch branch;
+
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -67,5 +75,7 @@ public class AppUser {
     public void setRole(Role role) { this.role = role; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public Branch getBranch() { return branch; }
+    public void setBranch(Branch branch) { this.branch = branch; }
     public Instant getCreatedAt() { return createdAt; }
 }

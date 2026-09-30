@@ -18,7 +18,7 @@ import org.springframework.data.jpa.repository.Query;
 public interface LeadRepository extends JpaRepository<Lead, Long>, JpaSpecificationExecutor<Lead> {
 
     @Override
-    @EntityGraph(attributePaths = {"assignedCounsellor", "referralAssociate"})
+    @EntityGraph(attributePaths = {"assignedCounsellor", "referralAssociate", "branch", "campaign"})
     Page<Lead> findAll(Specification<Lead> spec, Pageable pageable);
 
     @Query("select l from Lead l where l.phone = :phone or l.altPhone = :phone")

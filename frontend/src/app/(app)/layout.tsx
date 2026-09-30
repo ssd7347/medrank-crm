@@ -42,6 +42,15 @@ const NAV: { section: string; items: NavItem[] }[] = [
     ],
   },
   {
+    section: "Growth",
+    items: [
+      { href: "/analytics", label: "Analytics", roles: ["SUPER_ADMIN"] },
+      { href: "/reports", label: "Report builder", roles: ["SUPER_ADMIN"] },
+      { href: "/marketing", label: "Marketing", roles: ["SUPER_ADMIN"] },
+      { href: "/alumni", label: "Alumni & referrals", roles: ["SUPER_ADMIN", "COUNSELLOR"] },
+    ],
+  },
+  {
     section: "Data",
     items: [
       { href: "/colleges", label: "Colleges & seats" },
@@ -53,7 +62,8 @@ const NAV: { section: string; items: NavItem[] }[] = [
     section: "Admin",
     items: [
       { href: "/admin/users", label: "Staff users", roles: ["SUPER_ADMIN"] },
-      { href: "/admin/associates", label: "Referral associates", roles: ["SUPER_ADMIN"] },
+      { href: "/admin/branches", label: "Branches", roles: ["SUPER_ADMIN"] },
+      { href: "/admin/associates", label: "Associates & sub-agents", roles: ["SUPER_ADMIN", "ACCOUNTANT"] },
       { href: "/staff", label: "Team performance", roles: ["SUPER_ADMIN"] },
       { href: "/admin/document-types", label: "Document checklist", roles: ["SUPER_ADMIN"] },
     ],
@@ -122,7 +132,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="border-t border-line p-3">
       <Link href="/account" className="block rounded-lg px-2 py-1.5 hover:bg-muted">
         <p className="truncate text-sm font-medium text-ink">{user.fullName}</p>
-        <p className="truncate text-xs text-ink-faint">{label(user.role)}</p>
+        <p className="truncate text-xs text-ink-faint">
+          {label(user.role)}
+          {user.branch && ` · ${user.branch.name}`}
+        </p>
       </Link>
       <button onClick={logout} className="mt-1 w-full rounded-lg px-2 py-1.5 text-left text-sm text-ink-soft hover:bg-muted hover:text-ink">
         Log out

@@ -1,5 +1,8 @@
 package com.mbbscrm.crm.lead;
 
+import com.mbbscrm.crm.branch.Branch;
+import com.mbbscrm.crm.marketing.Campaign;
+
 import java.time.Instant;
 
 import com.mbbscrm.crm.common.Category;
@@ -69,6 +72,20 @@ public class Lead {
     @JoinColumn(name = "student_id")
     private Student student;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id")
+    private Branch branch;
+
+    /** The marketing campaign this inquiry came from, if known (spec 4.12). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "campaign_id")
+    private Campaign campaign;
+
+    /** The past student who referred this lead (spec 4.23). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "referred_by_student_id")
+    private Student referredByStudent;
+
     private Long createdBy;
     private Instant createdAt;
     private Instant updatedAt;
@@ -118,6 +135,12 @@ public class Lead {
     public void setNotes(String notes) { this.notes = notes; }
     public Student getStudent() { return student; }
     public void setStudent(Student student) { this.student = student; }
+    public Branch getBranch() { return branch; }
+    public void setBranch(Branch branch) { this.branch = branch; }
+    public Campaign getCampaign() { return campaign; }
+    public void setCampaign(Campaign campaign) { this.campaign = campaign; }
+    public Student getReferredByStudent() { return referredByStudent; }
+    public void setReferredByStudent(Student referredByStudent) { this.referredByStudent = referredByStudent; }
     public Long getCreatedBy() { return createdBy; }
     public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
     public Instant getCreatedAt() { return createdAt; }

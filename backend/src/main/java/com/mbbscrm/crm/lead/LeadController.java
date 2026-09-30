@@ -51,9 +51,11 @@ public class LeadController {
                                              @RequestParam(required = false) LeadSource source,
                                              @RequestParam(required = false) Long counsellorId,
                                              @RequestParam(defaultValue = "false") boolean unassigned,
+                                             @RequestParam(required = false) Long branchId,
+                                             @RequestParam(required = false) Long campaignId,
                                              @RequestParam(defaultValue = "0") int page,
                                              @RequestParam(defaultValue = "25") int size) {
-        return service.search(q, status, source, counsellorId, unassigned, page, size);
+        return service.search(q, status, source, counsellorId, unassigned, branchId, campaignId, page, size);
     }
 
     @GetMapping("/leads/duplicates")

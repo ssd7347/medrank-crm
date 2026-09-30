@@ -34,9 +34,10 @@ public class StudentController {
                                                 @RequestParam(required = false) Category category,
                                                 @RequestParam(required = false) String homeState,
                                                 @RequestParam(required = false) Long counsellorId,
+                                                @RequestParam(required = false) Long branchId,
                                                 @RequestParam(defaultValue = "0") int page,
                                                 @RequestParam(defaultValue = "25") int size) {
-        return service.search(q, category, homeState, counsellorId, page, size);
+        return service.search(q, category, homeState, counsellorId, branchId, page, size);
     }
 
     @GetMapping("/{id}")

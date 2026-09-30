@@ -23,6 +23,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // The family portal has its own session (see lib/portal.ts); staff auth stays out of its way.
+    if (window.location.pathname.startsWith("/portal")) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
     // A page reload loses the in-memory access token; the refresh cookie gets a new one.
     refreshSession().then((session) => {
       setUser(session?.user ?? null);

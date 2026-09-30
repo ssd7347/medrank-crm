@@ -70,6 +70,10 @@ public class Student {
     @JoinColumn(name = "assigned_counsellor_id")
     private AppUser assignedCounsellor;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id")
+    private com.mbbscrm.crm.branch.Branch branch;
+
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -132,6 +136,8 @@ public class Student {
     public void setLanguagePreference(Language languagePreference) { this.languagePreference = languagePreference; }
     public AppUser getAssignedCounsellor() { return assignedCounsellor; }
     public void setAssignedCounsellor(AppUser assignedCounsellor) { this.assignedCounsellor = assignedCounsellor; }
+    public com.mbbscrm.crm.branch.Branch getBranch() { return branch; }
+    public void setBranch(com.mbbscrm.crm.branch.Branch branch) { this.branch = branch; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

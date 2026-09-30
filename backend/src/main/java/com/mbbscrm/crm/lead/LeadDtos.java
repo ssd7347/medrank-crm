@@ -1,5 +1,9 @@
 package com.mbbscrm.crm.lead;
 
+import com.mbbscrm.crm.branch.BranchRef;
+import com.mbbscrm.crm.marketing.CampaignRef;
+import com.mbbscrm.crm.student.Student;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -43,7 +47,16 @@ public final class LeadDtos {
             @Size(max = 2000) String notes,
             Long assignedCounsellorId,
             /** Set after the user has seen the duplicate warning and confirmed (e.g. siblings sharing a phone). */
-            boolean allowDuplicatePhone) {
+            boolean allowDuplicatePhone,
+            Long branchId,
+            Long campaignId,
+            Long referredByStudentId) {
+    }
+
+    public record StudentRef(Long id, String fullName) {
+        static StudentRef of(Student s) {
+            return s == null ? null : new StudentRef(s.getId(), s.getFullName());
+        }
     }
 
     public record AssociateRef(Long id, String fullName) {
@@ -54,12 +67,13 @@ public final class LeadDtos {
 
     public record LeadListItem(Long id, String fullName, String phone, Integer neetScore, Integer neetAir,
                                Category category, String homeState, LeadSource source, LeadStatus status,
-                               UserRef assignedCounsellor, Long studentId, Instant createdAt) {
+                               UserRef assignedCounsellor, Long studentId, BranchRef branch,
+                               CampaignRef campaign, Instant createdAt) {
         static LeadListItem of(Lead l) {
             return new LeadListItem(l.getId(), l.getFullName(), l.getPhone(), l.getNeetScore(), l.getNeetAir(),
                     l.getCategory(), l.getHomeState(), l.getSource(), l.getStatus(),
                     UserRef.of(l.getAssignedCounsellor()), l.getStudent() == null ? null : l.getStudent().getId(),
-                    l.getCreatedAt());
+                    BranchRef.of(l.getBranch()), CampaignRef.of(l.getCampaign()), l.getCreatedAt());
         }
     }
 
@@ -67,14 +81,17 @@ public final class LeadDtos {
                                String neetRollNo, Integer neetScore, Integer neetAir, Category category,
                                String homeState, DomicileStatus domicileStatus, LeadSource source,
                                AssociateRef referralAssociate, LeadStatus status, UserRef assignedCounsellor,
-                               Language languagePreference, String notes, Long studentId, Instant createdAt,
+                               Language languagePreference, String notes, Long studentId, BranchRef branch,
+                               CampaignRef campaign, StudentRef referredByStudent, Instant createdAt,
                                Instant updatedAt) {
         static LeadResponse of(Lead l) {
             return new LeadResponse(l.getId(), l.getFullName(), l.getPhone(), l.getAltPhone(), l.getEmail(),
                     l.getNeetRollNo(), l.getNeetScore(), l.getNeetAir(), l.getCategory(), l.getHomeState(),
                     l.getDomicileStatus(), l.getSource(), AssociateRef.of(l.getReferralAssociate()), l.getStatus(),
                     UserRef.of(l.getAssignedCounsellor()), l.getLanguagePreference(), l.getNotes(),
-                    l.getStudent() == null ? null : l.getStudent().getId(), l.getCreatedAt(), l.getUpdatedAt());
+                    l.getStudent() == null ? null : l.getStudent().getId(), BranchRef.of(l.getBranch()),
+                    CampaignRef.of(l.getCampaign()), StudentRef.of(l.getReferredByStudent()), l.getCreatedAt(),
+                    l.getUpdatedAt());
         }
     }
 

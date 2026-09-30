@@ -101,6 +101,13 @@ public class CounsellingService {
                 .map(this::toTrackResponse).toList();
     }
 
+    /** For callers that have already checked access themselves, such as the family portal. */
+    @Transactional(readOnly = true)
+    public List<TrackResponse> tracksForStudent(Student student) {
+        return tracks.findByStudentIdOrderByAcademicYearDescAuthorityIdAsc(student.getId()).stream()
+                .map(this::toTrackResponse).toList();
+    }
+
     @Transactional
     public TrackResponse createTrack(Long studentId, TrackRequest req) {
         Student student = studentService.requireWritable(studentId);

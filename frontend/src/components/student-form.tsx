@@ -14,6 +14,7 @@ import {
   type StudentRequest,
   type UserRef,
 } from "@/lib/types";
+import type { Branch } from "@/lib/types-growth";
 import { useApi } from "@/lib/use-api";
 
 import { Alert, Button, Checkbox, Field, Input, Select } from "./ui";
@@ -44,6 +45,7 @@ export function emptyStudent(): StudentRequest {
     languagePreference: "ENGLISH",
     apaarId: null,
     assignedCounsellorId: null,
+    branchId: null,
   };
 }
 
@@ -65,6 +67,7 @@ export function StudentForm({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const staff = useApi<UserRef[]>(isAdmin ? "/api/users/assignable" : null);
+  const branches = useApi<Branch[]>(isAdmin ? "/api/branches" : null);
 
   function text<K extends keyof StudentRequest>(k: K) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -200,6 +203,19 @@ export function StudentForm({
               />
             )}
           </Field>
+          {!!branches.data?.length && (
+            <Field label="Branch">
+              {(id) => (
+                <Select
+                  id={id}
+                  value={s.branchId?.toString() ?? ""}
+                  onChange={number("branchId")}
+                  placeholder="Head office (no branch)"
+                  options={branches.data!.filter((b) => b.active || b.id === s.branchId).map((b) => ({ value: String(b.id), label: b.name }))}
+                />
+              )}
+            </Field>
+          )}
         </fieldset>
       )}
 
