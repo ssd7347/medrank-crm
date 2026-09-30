@@ -7,6 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 import { ApiError, type ProblemBody } from "./api";
 import type { Category, Course, Quota } from "./types";
+import { IdleWarning, useIdleLogout } from "./use-idle";
 
 type Session = { accessToken: string; expiresIn: number; displayName: string };
 
@@ -109,8 +110,34 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Families often use shared phones: sign out after 3 minutes without activity (the server enforces it too).
+  const secondsLeft = useIdleLogout({
+    enabled: !!displayName,
+    storageKey: "crm:portal",
+    keepAlive: refresh,
+    onIdle: () => {
+      portalApi("/api/portal/auth/logout", { method: "POST" })
+        .catch(() => undefined)
+        .finally(() => {
+          token = null;
+          try {
+            window.sessionStorage.setItem("crm:portal:idle", "1");
+          } catch {
+            // The login page just will not show the reason.
+          }
+          // The portal page sends signed-out visitors to the login page.
+          setDisplayName(null);
+        });
+    },
+  });
+
   const value = useMemo(() => ({ displayName, loading, login, activate, logout }), [displayName, loading, login, activate, logout]);
-  return <PortalContext.Provider value={value}>{children}</PortalContext.Provider>;
+  return (
+    <PortalContext.Provider value={value}>
+      {children}
+      <IdleWarning secondsLeft={secondsLeft} />
+    </PortalContext.Provider>
+  );
 }
 
 export function usePortal() {

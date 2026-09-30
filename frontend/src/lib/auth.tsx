@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { api, refreshSession, setAccessToken, setSessionLostHandler } from "./api";
 import type { AuthResponse, Role, User } from "./types";
+import { IdleWarning, useIdleLogout } from "./use-idle";
 
 type AuthState = {
   user: User | null;
@@ -56,10 +57,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
+  // Signed out after 3 minutes without activity; the server enforces the same limit.
+  const secondsLeft = useIdleLogout({
+    enabled: !!user,
+    storageKey: "crm:staff",
+    keepAlive: refreshSession,
+    onIdle: () => {
+      api("/api/auth/logout", { method: "POST" })
+        .catch(() => undefined)
+        .finally(() => {
+          setAccessToken(null);
+          try {
+            window.sessionStorage.setItem("crm:staff:idle", "1");
+          } catch {
+            // The login page just will not show the reason.
+          }
+          // The app layout sends signed-out visitors to the login page.
+          setUser(null);
+        });
+    },
+  });
+
   const hasRole = useCallback((...roles: Role[]) => !!user && roles.includes(user.role), [user]);
 
   const value = useMemo(() => ({ user, loading, login, logout, hasRole }), [user, loading, login, logout, hasRole]);
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      <IdleWarning secondsLeft={secondsLeft} />
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

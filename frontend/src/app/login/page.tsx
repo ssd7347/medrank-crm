@@ -16,6 +16,20 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [idleNotice, setIdleNotice] = useState(false);
+
+  useEffect(() => {
+    let idle = false;
+    try {
+      idle = window.sessionStorage.getItem("crm:staff:idle") === "1";
+      window.sessionStorage.removeItem("crm:staff:idle");
+    } catch {
+      // Storage blocked: skip the notice.
+    }
+    // Only ever switch it on: in development React runs this twice and the flag is gone the second time.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (idle) setIdleNotice(true);
+  }, []);
 
   useEffect(() => {
     if (!loading && user) router.replace("/dashboard");
@@ -39,7 +53,9 @@ function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {params.get("expired") && !error && <Alert tone="amber">Your session expired. Please log in again.</Alert>}
+      {(idleNotice || params.get("expired")) && !error && (
+        <Alert tone="amber">{idleNotice ? "You were signed out after 3 minutes without activity. Please log in again." : "Your session expired. Please log in again."}</Alert>
+      )}
       {error && <Alert>{error}</Alert>}
       <Field label="Email" required>
         {(id) => (

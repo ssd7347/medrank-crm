@@ -18,6 +18,20 @@ export default function PortalLoginPage() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [idleNotice, setIdleNotice] = useState(false);
+
+  useEffect(() => {
+    let idle = false;
+    try {
+      idle = window.sessionStorage.getItem("crm:portal:idle") === "1";
+      window.sessionStorage.removeItem("crm:portal:idle");
+    } catch {
+      // Storage blocked: skip the notice.
+    }
+    // Only ever switch it on: in development React runs this twice and the flag is gone the second time.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (idle) setIdleNotice(true);
+  }, []);
 
   useEffect(() => {
     if (!loading && displayName) router.replace("/portal");
@@ -79,6 +93,7 @@ export default function PortalLoginPage() {
 
         <form onSubmit={onSubmit} className="mt-5 space-y-4">
           {error && <Alert>{error}</Alert>}
+          {idleNotice && !error && <Alert tone="amber">You were signed out after 3 minutes without activity. Please sign in again.</Alert>}
           <Field label="Mobile number" required hint="The number you gave your counsellor">
             {(id) => <Input id={id} type="tel" inputMode="tel" autoComplete="username" required value={phone} onChange={(e) => setPhone(e.target.value)} />}
           </Field>
