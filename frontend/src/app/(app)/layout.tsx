@@ -100,7 +100,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   const nav = (
-    <nav className="flex flex-1 flex-col gap-5 px-3 py-4" aria-label="Main">
+    // The menu scrolls on its own; reaching its end must not start scrolling the page behind it.
+    <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-3 py-4" aria-label="Main">
       {sections.map((s) => (
         <div key={s.section}>
           <p className="mb-1 px-2 text-[11px] font-semibold tracking-wider text-ink-faint uppercase">{s.section}</p>
@@ -129,7 +130,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   const account = (
-    <div className="border-t border-line p-3">
+    <div className="shrink-0 border-t border-line p-3">
       <Link href="/account" className="block rounded-lg px-2 py-1.5 hover:bg-muted">
         <p className="truncate text-sm font-medium text-ink">{user.fullName}</p>
         <p className="truncate text-xs text-ink-faint">
@@ -169,7 +170,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       {menuOpen && (
-        <div id="mobile-nav" className="fixed inset-x-0 top-[57px] bottom-0 z-10 flex flex-col overflow-y-auto bg-surface lg:hidden">
+        <div id="mobile-nav" className="fixed inset-x-0 top-[57px] bottom-0 z-10 flex flex-col overscroll-contain bg-surface lg:hidden">
           {nav}
           {account}
         </div>
