@@ -150,6 +150,12 @@ public class LeadService {
         return LeadResponse.of(loadVisible(id, requireLeadAccess()));
     }
 
+    /** Loads a lead the current user may see; anything else looks like "not found". */
+    @Transactional(readOnly = true)
+    public Lead requireVisible(Long id) {
+        return loadVisible(id, requireLeadAccess());
+    }
+
     @Transactional(readOnly = true)
     public List<DuplicateRef> findDuplicates(String phone, String neetRollNo) {
         requireLeadAccess();

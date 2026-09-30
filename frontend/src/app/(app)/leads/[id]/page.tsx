@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 
 import { LeadStatusBadge } from "@/components/badges";
+import { CallButton } from "@/components/call-button";
+import { LeadScoreBadge } from "@/components/score-badge";
 import { LeadForm } from "@/components/lead-form";
 import { StudentForm, emptyStudent } from "@/components/student-form";
 import {
@@ -54,6 +56,7 @@ export default function LeadDetailPage() {
   const [converting, setConverting] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [scoreVersion, setScoreVersion] = useState(0);
 
   if (lead.loading && !lead.data) return <Loading />;
   if (lead.error || !lead.data) return <Alert>{lead.error ?? "Lead not found"}</Alert>;
@@ -81,6 +84,7 @@ export default function LeadDetailPage() {
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <LeadStatusBadge status={l.status} />
+            <LeadScoreBadge leadId={id} version={scoreVersion} />
             <span>{l.phone}</span>
             <span>· {label(l.source)}</span>
             <span>· added {formatDate(l.createdAt)}</span>
@@ -89,6 +93,15 @@ export default function LeadDetailPage() {
         actions={
           !editing && (
             <>
+              <CallButton
+                target={{ leadId: l.id }}
+                phone={l.phone}
+                name={l.fullName}
+                onLogged={() => {
+                  activities.reload();
+                  setScoreVersion((n) => n + 1);
+                }}
+              />
               <Button variant="secondary" onClick={() => setStatusOpen(true)}>
                 Change stage
               </Button>

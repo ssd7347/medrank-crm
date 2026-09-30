@@ -3,10 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Alert, Badge, Button, Card, EmptyState, Field, Input, Loading, Modal, Select, Textarea, cx, type Tone } from "@/components/ui";
+import { Alert, Badge, Button, Card, Checkbox, EmptyState, Field, Input, Loading, Modal, Select, Textarea, cx, type Tone } from "@/components/ui";
 import { errorMessage } from "@/lib/api";
 import { formatDate, formatDateTime, formatNumber, formatRupees, label } from "@/lib/format";
-import { portalApi, usePortal, type PortalDocuments, type PortalMe, type PortalOverview, type PortalTicket } from "@/lib/portal";
+import { portalApi, usePortal, type PortalAgreement, type PortalDocuments, type PortalMe, type PortalOverview, type PortalTicket } from "@/lib/portal";
 import { useNow } from "@/lib/use-now";
 
 const DOC_TONE: Record<string, Tone> = { NOT_COLLECTED: "gray", COLLECTED: "amber", VERIFIED: "green", SUBMITTED: "green", REJECTED: "red" };
@@ -19,6 +19,14 @@ const DOC_LABEL: Record<string, string> = {
 };
 const TRACK_TONE: Record<string, Tone> = { NOT_REGISTERED: "gray", REGISTERED: "blue", CHOICES_FILLED: "indigo", ALLOTTED: "amber", ADMITTED: "green", EXITED: "gray" };
 const DECISION_LABEL: Record<string, string> = { FREEZE: "Accepted (final)", FLOAT: "Accepted, trying for a better seat", WITHDRAW: "Given up" };
+const LOAN_LABEL: Record<string, string> = {
+  DRAFT: "Being prepared",
+  SUBMITTED: "With the lender",
+  DOCS_PENDING: "Lender needs documents",
+  SANCTIONED: "Sanctioned",
+  DISBURSED: "Paid out",
+  REJECTED: "Not approved",
+};
 const QUESTION_TOPICS = ["GENERAL", "COUNSELLING", "DOCUMENTS", "FEES", "OTHER"];
 
 function timeLeft(iso: string, now: number): string {
@@ -199,6 +207,31 @@ function Overview({ data, onChanged, setData }: { data: PortalOverview; onChange
         </section>
       )}
 
+      <Agreements studentId={s.id} agreements={data.agreements} onChanged={onChanged} />
+
+      {data.sessions.length > 0 && (
+        <Card title="Upcoming sessions with your counsellor">
+          <ul className="divide-y divide-line">
+            {data.sessions.map((x) => (
+              <li key={x.id} className="flex items-center justify-between gap-3 py-2.5">
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">{x.topic}</span>
+                  <span className="text-xs text-ink-soft">
+                    {formatDateTime(x.scheduledAt)} · {x.durationMinutes} min · {x.mode === "VIDEO" ? "video call" : x.mode === "PHONE" ? "we will call you" : "at our office"}
+                    {x.hostName && ` · with ${x.hostName}`}
+                  </span>
+                </span>
+                {x.meetingUrl && (
+                  <a href={x.meetingUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
+                    Join
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card title="Counselling status">
         {!data.tracks.length ? (
           <EmptyState title="Not started yet">Your counsellor will register you for All India and State counselling.</EmptyState>
@@ -301,6 +334,28 @@ function Overview({ data, onChanged, setData }: { data: PortalOverview; onChange
           </>
         )}
       </Card>
+
+      {data.loans.length > 0 && (
+        <Card title="Education loan">
+          <ul className="divide-y divide-line">
+            {data.loans.map((l, n) => (
+              <li key={n} className="py-2.5 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{l.lender}</span>
+                  <Badge tone={l.status === "SANCTIONED" || l.status === "DISBURSED" ? "green" : l.status === "REJECTED" ? "red" : "amber"}>{LOAN_LABEL[l.status] ?? label(l.status)}</Badge>
+                </div>
+                <p className="mt-0.5 text-xs text-ink-soft">
+                  Asked for {formatRupees(l.amountRequested)}
+                  {l.amountSanctioned !== null && ` · sanctioned ${formatRupees(l.amountSanctioned)}`}
+                  {l.neededBy && ` · needed by ${formatDate(l.neededBy)}`}
+                </p>
+                {l.risk !== "NONE" && <p className="mt-1 text-xs font-medium text-red-700">Approval is running close to the deadline. Please stay in touch with your counsellor.</p>}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-ink-faint">The lender decides the loan and its terms. We help with the application and follow up.</p>
+        </Card>
+      )}
 
       {data.shortlist.length > 0 && (
         <Card title="Colleges shortlisted for you">
@@ -481,6 +536,86 @@ function QuestionForm({ studentId, onDone }: { studentId: number; onDone: () => 
       <Button type="submit" loading={saving}>
         Send
       </Button>
+    </form>
+  );
+}
+
+function Agreements({ studentId, agreements, onChanged }: { studentId: number; agreements: PortalAgreement[]; onChanged: () => void }) {
+  const [open, setOpen] = useState<PortalAgreement | null>(null);
+  if (!agreements.length) return null;
+  const pending = agreements.filter((a) => a.status === "PENDING");
+  return (
+    <section className={cx("rounded-xl border bg-surface p-4 shadow-sm", pending.length ? "border-amber-300" : "border-line")}>
+      <h2 className="text-sm font-semibold">{pending.length ? "Please read and accept" : "Your agreements"}</h2>
+      <ul className="mt-2 divide-y divide-line">
+        {agreements.map((a) => (
+          <li key={a.id} className="flex items-center justify-between gap-3 py-2.5">
+            <span className="min-w-0">
+              <span className="block text-sm">{a.title}</span>
+              <span className="text-xs text-ink-soft">{a.status === "SIGNED" ? `Accepted by ${a.signerName} on ${formatDateTime(a.signedAt)}` : "Waiting for you"}</span>
+            </span>
+            <Button size="sm" variant={a.status === "PENDING" ? "primary" : "ghost"} onClick={() => setOpen(a)} className="shrink-0">
+              {a.status === "PENDING" ? "Read & accept" : "View"}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <Modal open={open !== null} onClose={() => setOpen(null)} title={open?.title ?? ""} wide>
+        {open && (
+          <AcceptForm
+            studentId={studentId}
+            agreement={open}
+            onDone={() => {
+              setOpen(null);
+              onChanged();
+            }}
+          />
+        )}
+      </Modal>
+    </section>
+  );
+}
+
+function AcceptForm({ studentId, agreement, onDone }: { studentId: number; agreement: PortalAgreement; onDone: () => void }) {
+  const [typedName, setTypedName] = useState("");
+  const [agreed, setAgreed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        setError(null);
+        try {
+          await portalApi(`/api/portal/students/${studentId}/agreements/${agreement.id}/accept`, { body: { typedName, agreed } });
+          onDone();
+        } catch (err) {
+          setError(errorMessage(err));
+        } finally {
+          setSaving(false);
+        }
+      }}
+      className="space-y-4"
+    >
+      <div className="max-h-[45vh] overflow-y-auto rounded-lg border border-line bg-muted p-3 text-sm leading-relaxed whitespace-pre-wrap">{agreement.body}</div>
+      {agreement.status === "SIGNED" ? (
+        <p className="text-sm text-emerald-700">
+          Accepted by {agreement.signerName} on {formatDateTime(agreement.signedAt)}.
+        </p>
+      ) : (
+        <>
+          {error && <Alert>{error}</Alert>}
+          <Checkbox label="I have read this and I agree" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+          <Field label="Type your full name to accept" required hint="If the student is under 18, a parent or guardian must accept.">
+            {(id) => <Input id={id} required minLength={3} maxLength={120} autoComplete="name" value={typedName} onChange={(e) => setTypedName(e.target.value)} />}
+          </Field>
+          <Button type="submit" loading={saving} disabled={!agreed || typedName.trim().length < 3}>
+            Accept
+          </Button>
+          <p className="text-xs text-ink-faint">Your name, the time, and this login are recorded with the agreement. Ask your counsellor if anything is unclear before accepting.</p>
+        </>
+      )}
     </form>
   );
 }

@@ -41,8 +41,27 @@ manually (Razorpay later).
 - 4.23 Alumni directory: satisfaction surveys, testimonials (public use needs consent + admin approval),
   and past-student referral tracking on leads.
 
-Next: Phase 5 (DigiLocker, chatbot, predictive scoring, video, e-Sign, IVR, multi-language, loans) per spec
-section 12. Works on phones and laptops (tables turn into cards on small screens).
+**Phase 5 (advanced & integrations) — built to work without outside providers.** No provider account is
+connected yet, so each module does the useful part itself and leaves a slot for the provider. The admin page
+"Connected services" (`/admin/integrations`) lists what is and is not connected.
+- 4.18 Lead score and student drop-off risk from visible point rules (each score shows its reasons), and a
+  "What to do next" list on the dashboard and at `/priorities`. Not a trained model.
+- 4.26 Education loans: lender list, applications tracked against the date the money is needed by, urgent
+  alert when approval is still pending a week before it. No lender API.
+- 4.19 Counselling sessions with notes on the student record; video sessions get a Jitsi Meet link unless a
+  Zoom/Meet link is pasted. No automatic recordings.
+- 4.21 Call button (opens the dialer) with outcome logging on leads and students. No telephony provider.
+- 4.20 Agreements and consent forms: issued from editable wording, accepted by the family in the portal
+  (typed name, time, login) or recorded as signed on paper, stored with a fingerprint of the exact text.
+  This is **not** Aadhaar e-Sign. The starter wording is a draft and needs a lawyer's review.
+- 4.17 Website assistant at `/ask` (public, rate limited): answers only from the FAQ knowledge base by
+  keyword match and turns visitors into leads. No AI model and no WhatsApp bot.
+- 4.25 English / Tamil / Hindi for family alerts, the assistant and the FAQ. The Tamil and Hindi text was
+  machine-written and needs a native speaker's review.
+- 4.16 DigiLocker: not built (needs partner approval); documents carry a `source` column ready for it.
+
+Next: Phase 6 (AI voice calling agent, spec section 18), which needs a telephony and voice-AI provider.
+Works on phones and laptops (tables turn into cards on small screens).
 
 ## Stack
 

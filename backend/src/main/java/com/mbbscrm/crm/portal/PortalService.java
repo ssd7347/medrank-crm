@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.mbbscrm.crm.agreement.AgreementService;
+import com.mbbscrm.crm.agreement.AgreementService.AgreementView;
 import com.mbbscrm.crm.alert.AlertService;
 import com.mbbscrm.crm.alert.Priority;
 import com.mbbscrm.crm.audit.AuditService;
@@ -31,6 +33,10 @@ import com.mbbscrm.crm.counselling.Decision;
 import com.mbbscrm.crm.document.DocumentService;
 import com.mbbscrm.crm.document.DocumentService.Checklist;
 import com.mbbscrm.crm.document.DocumentStatus;
+import com.mbbscrm.crm.engagement.SessionService;
+import com.mbbscrm.crm.engagement.SessionService.SessionView;
+import com.mbbscrm.crm.loan.LoanService;
+import com.mbbscrm.crm.loan.LoanService.LoanView;
 import com.mbbscrm.crm.fee.FeeService;
 import com.mbbscrm.crm.fee.FeeService.InstallmentView;
 import com.mbbscrm.crm.fee.FeeService.PlanView;
@@ -70,12 +76,19 @@ public class PortalService {
     private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
     private final String orgName;
+    private final LoanService loans;
+    private final SessionService sessionService;
+    private final AgreementService agreements;
 
     public PortalService(PortalAccountRepository accounts, PortalAccountStudentRepository links,
                          PortalSessionService sessions, CounsellingService counselling, DocumentService documents,
                          FeeService fees, TicketService tickets, PredictorShortlistRepository shortlist,
                          AlertService alerts, PasswordEncoder passwordEncoder, AuditService audit,
-                         @Value("${app.org-name}") String orgName) {
+                         @Value("${app.org-name}") String orgName, LoanService loans,
+                         SessionService sessionService, AgreementService agreements) {
+        this.loans = loans;
+        this.sessionService = sessionService;
+        this.agreements = agreements;
         this.accounts = accounts;
         this.links = links;
         this.sessions = sessions;
@@ -138,9 +151,28 @@ public class PortalService {
                             String resolution) {
     }
 
+    public record LoanRow(String lender, BigDecimal amountRequested, BigDecimal amountSanctioned, String status,
+                          LocalDate neededBy, String risk) {
+    }
+
+    public record SessionRow(Long id, String topic, String mode, Instant scheduledAt, int durationMinutes,
+                             String meetingUrl, String hostName) {
+    }
+
+    public record AgreementRow(Long id, String title, String status, String body, String signerName,
+                               Instant signedAt) {
+        static AgreementRow of(AgreementView a) {
+            return new AgreementRow(a.id(), a.title(), a.status().name(), a.body(), a.signerName(), a.signedAt());
+        }
+    }
+
+    public record AcceptRequest(@NotBlank @Size(min = 3, max = 120) String typedName, boolean agreed) {
+    }
+
     public record Overview(StudentCard student, Deadline nextDeadline, List<TrackView> tracks,
                            List<ShortlistRow> shortlist, DocumentsView documents, FeesView fees,
-                           List<TicketRow> tickets) {
+                           List<TicketRow> tickets, List<LoanRow> loans, List<SessionRow> sessions,
+                           List<AgreementRow> agreements) {
     }
 
     public record QuestionRequest(@NotBlank @Size(max = 200) String subject, @Size(max = 4000) String description,
@@ -214,8 +246,22 @@ public class PortalService {
                 .map(t -> new TicketRow(t.id(), t.subject(), t.category(), t.status(), t.createdAt(), t.resolution()))
                 .toList();
 
+        List<LoanRow> loanRows = loans.forStudentUnchecked(s.getId()).stream()
+                .filter(l -> l.status() != com.mbbscrm.crm.loan.LoanApplication.Status.WITHDRAWN)
+                .map((LoanView l) -> new LoanRow(l.partnerName(), l.amountRequested(), l.amountSanctioned(),
+                        l.status().name(), l.neededBy(), l.risk())).toList();
+        List<SessionRow> sessionRows = sessionService.upcomingForStudentUnchecked(s.getId()).stream()
+                .map((SessionView v) -> new SessionRow(v.id(), v.topic(), v.mode().name(), v.scheduledAt(),
+                        v.durationMinutes(), v.meetingUrl(), v.host() == null ? null : v.host().fullName())).toList();
+        for (SessionRow r : sessionRows) {
+            add(upcoming, "Counselling session: " + r.topic(), r.hostName() == null ? "" : "With " + r.hostName() + ".",
+                    r.scheduledAt(), now);
+        }
+        List<AgreementRow> agreementRows = agreements.forPortal(s.getId()).stream().map(AgreementRow::of).toList();
+
         Deadline next = upcoming.stream().min(Comparator.comparing(Deadline::at)).orElse(null);
-        return new Overview(card, next, tracks, shortlisted, docs, feesView, ticketRows);
+        return new Overview(card, next, tracks, shortlisted, docs, feesView, ticketRows, loanRows, sessionRows,
+                agreementRows);
     }
 
     private FeesView fees(Student s, List<Deadline> upcoming, Instant now) {
@@ -274,6 +320,17 @@ public class PortalService {
         var t = tickets.createFromPortal(link.getStudent(), link.getAccount().getDisplayName(), req.subject(),
                 req.description(), req.category(), link.getAccount().getId());
         return new TicketRow(t.id(), t.subject(), t.category(), t.status(), t.createdAt(), t.resolution());
+    }
+
+    /** The family accepts an agreement from inside their own login (see AgreementService). */
+    @Transactional
+    public AgreementRow accept(Long studentId, Long agreementId, AcceptRequest req, String ip) {
+        if (!req.agreed()) {
+            throw ApiException.badRequest("Tick the box to confirm you have read and agree");
+        }
+        PortalAccountStudent link = linked(studentId);
+        return AgreementRow.of(agreements.signFromPortal(link.getStudent(), agreementId, req.typedName(),
+                link.getRelation().name(), ip, link.getAccount().getId()));
     }
 
     @Transactional

@@ -59,6 +59,7 @@ export const LEAD_SOURCES = [
   "SEMINAR",
   "WHATSAPP",
   "OTHER",
+  "WEBSITE_CHAT",
 ] as const;
 export type LeadSource = (typeof LEAD_SOURCES)[number];
 

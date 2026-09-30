@@ -18,6 +18,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     section: "Work",
     items: [
       { href: "/dashboard", label: "Dashboard" },
+      { href: "/priorities", label: "What to do next", roles: LEAD_ROLES },
       { href: "/leads", label: "Leads", roles: LEAD_ROLES },
       { href: "/follow-ups", label: "My follow-ups", roles: LEAD_ROLES },
       { href: "/students", label: "Students", roles: STUDENT_ROLES },
@@ -38,6 +39,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { href: "/documents", label: "Documents desk", roles: DOCUMENT_ROLES },
       { href: "/fees", label: "Fees & dues", roles: FEE_READ_ROLES.filter((r) => r !== "COUNSELLOR") },
       { href: "/commissions", label: "Commissions", roles: FEE_WRITE_ROLES },
+      { href: "/loans", label: "Loan desk", roles: ["SUPER_ADMIN", "LOAN_DESK", "COUNSELLOR"] },
       { href: "/grievances", label: "Grievances" },
     ],
   },
@@ -66,6 +68,9 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { href: "/admin/associates", label: "Associates & sub-agents", roles: ["SUPER_ADMIN", "ACCOUNTANT"] },
       { href: "/staff", label: "Team performance", roles: ["SUPER_ADMIN"] },
       { href: "/admin/document-types", label: "Document checklist", roles: ["SUPER_ADMIN"] },
+      { href: "/admin/agreements", label: "Agreement wording", roles: ["SUPER_ADMIN"] },
+      { href: "/admin/faq", label: "Assistant knowledge base", roles: ["SUPER_ADMIN"] },
+      { href: "/admin/integrations", label: "Connected services", roles: ["SUPER_ADMIN"] },
     ],
   },
 ];

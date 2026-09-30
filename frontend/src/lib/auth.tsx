@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // The family portal has its own session (see lib/portal.ts); staff auth stays out of its way.
-    if (window.location.pathname.startsWith("/portal")) {
+    if (window.location.pathname.startsWith("/portal") || window.location.pathname.startsWith("/ask")) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;

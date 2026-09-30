@@ -3,10 +3,12 @@
 import Link from "next/link";
 
 import { LeadStatusBadge } from "@/components/badges";
+import { LeadPriorityList } from "@/components/priorities";
 import { Alert, Card, EmptyState, Loading, PageHeader, cx } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { countdown, formatDateTime, formatNumber, label, relativeTime } from "@/lib/format";
 import { LEAD_SOURCES, LEAD_STATUSES, type DashboardSummary, type FollowUp } from "@/lib/types";
+import type { Priorities } from "@/lib/types-advanced";
 import type { Deadline } from "@/lib/types-counselling";
 import { useApi } from "@/lib/use-api";
 import { useNow } from "@/lib/use-now";
@@ -27,6 +29,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { data, error, loading } = useApi<DashboardSummary>("/api/dashboard");
   const followUps = useApi<FollowUp[]>(data?.showsLeads ? "/api/follow-ups/mine" : null, { days: 1 });
+  const priorities = useApi<Priorities>(data?.showsLeads ? "/api/priorities" : null);
 
   const firstName = user?.fullName.split(" ")[0];
 
@@ -54,6 +57,19 @@ export default function DashboardPage() {
           </div>
 
           <DeadlinesCard />
+
+          {data.showsLeads && !!priorities.data?.leads.length && (
+            <Card
+              title="What to do next"
+              actions={
+                <Link href="/priorities" className="text-xs font-medium text-brand-700 hover:underline">
+                  View all
+                </Link>
+              }
+            >
+              <LeadPriorityList leads={priorities.data.leads.slice(0, 5)} showAction />
+            </Card>
+          )}
 
           {data.showsLeads && (
             <div className="grid gap-6 lg:grid-cols-5">

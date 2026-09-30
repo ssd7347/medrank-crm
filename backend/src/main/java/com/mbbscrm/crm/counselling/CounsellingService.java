@@ -342,13 +342,13 @@ public class CounsellingService {
         String link = "/students/" + s.getId() + "?tab=counselling";
         if (college != null) {
             alerts.messageFamily(s, "ALLOTMENT_RESULT", Priority.URGENT,
-                    texts.allotted(s.getFullName(), round, college, req.quota(), a.getDecisionDeadline()), key);
+                    texts.allotted(s, round, college, req.quota(), a.getDecisionDeadline()), key);
             alerts.notifyStaffFor(s, "ALLOTMENT", Priority.URGENT,
                     s.getFullName() + ": seat at " + college.getName(),
                     round.label() + " - " + req.quota() + ". Decision (freeze / float / withdraw) needed by "
                             + AlertTexts.when(a.getDecisionDeadline()) + ".", link, key);
         } else {
-            alerts.messageFamily(s, "NO_ALLOTMENT", Priority.NORMAL, texts.notAllotted(s.getFullName(), round), key);
+            alerts.messageFamily(s, "NO_ALLOTMENT", Priority.NORMAL, texts.notAllotted(s, round), key);
             alerts.notifyStaffFor(s, "NO_ALLOTMENT", Priority.NORMAL, s.getFullName() + ": no seat in "
                     + round.label(), "Plan the next round's choices.", link, key);
         }

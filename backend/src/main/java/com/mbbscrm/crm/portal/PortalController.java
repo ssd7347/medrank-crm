@@ -53,6 +53,13 @@ public class PortalController {
         return service.ask(studentId, req);
     }
 
+    @PostMapping("/students/{studentId}/agreements/{agreementId}/accept")
+    public PortalService.AgreementRow accept(@PathVariable Long studentId, @PathVariable Long agreementId,
+                                             @Valid @RequestBody PortalService.AcceptRequest req,
+                                             jakarta.servlet.http.HttpServletRequest http) {
+        return service.accept(studentId, agreementId, req, http.getRemoteAddr());
+    }
+
     @PostMapping("/change-password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changePassword(@Valid @RequestBody PasswordRequest req) {

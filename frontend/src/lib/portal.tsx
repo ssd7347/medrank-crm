@@ -176,4 +176,9 @@ export type PortalOverview = {
     payments: { receiptNo: string; amount: number; paidOn: string; method: string }[];
   };
   tickets: PortalTicket[];
+  loans: { lender: string; amountRequested: number; amountSanctioned: number | null; status: string; neededBy: string | null; risk: string }[];
+  sessions: { id: number; topic: string; mode: string; scheduledAt: string; durationMinutes: number; meetingUrl: string | null; hostName: string | null }[];
+  agreements: PortalAgreement[];
 };
+
+export type PortalAgreement = { id: number; title: string; status: "PENDING" | "SIGNED"; body: string; signerName: string | null; signedAt: string | null };

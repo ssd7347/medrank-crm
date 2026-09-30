@@ -48,6 +48,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/portal/auth/login", "/api/portal/auth/activate",
                         "/api/portal/auth/refresh", "/api/portal/auth/logout").permitAll()
+                // Website assistant: open to visitors, rate limited in AssistantController.
+                .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/actuator/health", "/error").permitAll()
                 // Family portal logins can reach the portal API and nothing else; staff cannot use it either.
                 .requestMatchers("/api/portal/**").hasRole(TokenService.PORTAL_ROLE)

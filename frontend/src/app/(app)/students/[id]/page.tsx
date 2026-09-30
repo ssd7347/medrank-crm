@@ -9,7 +9,12 @@ import { DocumentsTab } from "@/components/documents-tab";
 import { FeesTab } from "@/components/fees-tab";
 import { StudentTickets } from "@/components/tickets";
 import { StudentForm } from "@/components/student-form";
+import { AgreementsTab } from "@/components/agreements-tab";
+import { CallButton } from "@/components/call-button";
+import { LOAN_ROLES, LoansTab } from "@/components/loans";
 import { PortalAlumniTab } from "@/components/portal-alumni-tab";
+import { RiskBadge } from "@/components/score-badge";
+import { SessionsTab } from "@/components/sessions-tab";
 import { MessagesTab, ShortlistTab } from "@/components/student-tabs";
 import { Alert, Badge, Button, ButtonLink, Card, DescList, Loading, PageHeader, cx } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -53,6 +58,9 @@ const TABS = [
   { key: "counselling", label: "Counselling" },
   { key: "documents", label: "Documents" },
   { key: "fees", label: "Fees" },
+  { key: "loans", label: "Loans" },
+  { key: "sessions", label: "Sessions & calls" },
+  { key: "agreements", label: "Agreements" },
   { key: "shortlist", label: "Shortlist" },
   { key: "tickets", label: "Tickets" },
   { key: "messages", label: "Messages" },
@@ -76,6 +84,7 @@ function StudentView() {
   const canEdit = hasRole("SUPER_ADMIN", "COUNSELLOR");
   const { data: s, error, loading, setData } = useApi<Student>(`/api/students/${id}`);
   const [editing, setEditing] = useState(false);
+  const [callsVersion, setCallsVersion] = useState(0);
 
   if (loading && !s) return <Loading />;
   if (error || !s) return <Alert>{error ?? "Student not found"}</Alert>;
@@ -95,6 +104,7 @@ function StudentView() {
             {s.pwd && <Badge tone="amber">PwD</Badge>}
             <span>{s.homeState}</span>
             <span>· {label(s.nationality)}</span>
+            <RiskBadge studentId={s.id} version={callsVersion} />
             {s.leadId && (
               <Link href={`/leads/${s.leadId}`} className="text-brand-700 hover:underline">
                 · view lead history
@@ -105,6 +115,7 @@ function StudentView() {
         actions={
           !editing && (
             <>
+              <CallButton target={{ studentId: s.id }} phone={s.phone} name={s.fullName} onLogged={() => setCallsVersion((n) => n + 1)} />
               <ButtonLink href={`/predictor?studentId=${id}`} variant="secondary">
                 Predict colleges
               </ButtonLink>
@@ -120,7 +131,7 @@ function StudentView() {
 
       {!editing && (
         <div role="tablist" className="-mx-4 mb-5 flex gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0">
-          {TABS.filter((t) => (t.key !== "documents" || hasRole(...DOCUMENT_ROLES)) && (t.key !== "fees" || hasRole(...FEE_READ_ROLES)) && (t.key !== "portal" || canEdit)).map((t) => (
+          {TABS.filter((t) => (t.key !== "documents" || hasRole(...DOCUMENT_ROLES)) && (t.key !== "fees" || hasRole(...FEE_READ_ROLES)) && (t.key !== "portal" || canEdit) && (t.key !== "loans" || hasRole(...LOAN_ROLES))).map((t) => (
             <button
               key={t.key}
               role="tab"
@@ -145,6 +156,12 @@ function StudentView() {
         <DocumentsTab studentId={s.id} />
       ) : tab === "fees" && !editing ? (
         <FeesTab studentId={s.id} />
+      ) : tab === "loans" && !editing && hasRole(...LOAN_ROLES) ? (
+        <LoansTab student={s} />
+      ) : tab === "sessions" && !editing ? (
+        <SessionsTab studentId={s.id} callsVersion={callsVersion} />
+      ) : tab === "agreements" && !editing ? (
+        <AgreementsTab studentId={s.id} />
       ) : tab === "tickets" && !editing ? (
         <StudentTickets studentId={s.id} />
       ) : tab === "messages" && !editing ? (

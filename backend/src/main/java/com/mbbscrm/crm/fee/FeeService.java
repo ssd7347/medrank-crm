@@ -412,6 +412,12 @@ public class FeeService {
         return computeDues(LocalDate.now(), me.branchScope());
     }
 
+    /** Every branch, no role check: for internal callers such as risk scoring. */
+    @Transactional(readOnly = true)
+    public DuesSummary duesUnchecked() {
+        return computeDues(LocalDate.now(), null);
+    }
+
     DuesSummary computeDues(LocalDate today) {
         return computeDues(today, null);
     }

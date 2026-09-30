@@ -67,7 +67,7 @@ public class DeadlineAlertJob {
                 Student s = t.getStudent();
                 String key = "CFC:" + round.getId() + ":" + t.getId();
                 int raised = alerts.messageFamily(s, "CHOICE_FILLING_CLOSING", Priority.URGENT,
-                        texts.choiceFillingClosing(s.getFullName(), round), key);
+                        texts.choiceFillingClosing(s, round), key);
                 raised += alerts.notifyStaffFor(s, "CHOICE_FILLING_CLOSING", Priority.URGENT,
                         s.getFullName() + ": choices not locked",
                         round.label() + " choice filling closes " + AlertTexts.when(round.getChoiceFillingEnd())
@@ -82,7 +82,7 @@ public class DeadlineAlertJob {
             Student s = a.getStudentCounselling().getStudent();
             String key = "DD:" + a.getId();
             int raised = alerts.messageFamily(s, "DECISION_DUE", Priority.URGENT,
-                    texts.decisionDue(s.getFullName(), a.getRound(), a.getCollege(), a.getDecisionDeadline()), key);
+                    texts.decisionDue(s, a.getRound(), a.getCollege(), a.getDecisionDeadline()), key);
             raised += alerts.notifyStaffFor(s, "DECISION_DUE", Priority.URGENT,
                     s.getFullName() + ": decision due on " + a.getCollege().getName(),
                     "Freeze / float / withdraw not recorded. Reporting closes "
