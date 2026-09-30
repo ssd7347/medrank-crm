@@ -79,9 +79,12 @@ Prerequisites: JDK 21, Maven, Node 20+, PostgreSQL.
 1. Create the database: `createdb -U postgres mbbs_crm`
 2. Backend settings: copy `backend/.env.example` to `backend/.env` and fill it in
    (DB password, a random `JWT_SECRET`, first admin email/password and `ADMIN_PHONE`, `PORT`).
-   Staff log in with their **mobile number and a one-time code**. No WhatsApp/SMS provider is connected, so
+   There is **one login page for everyone** (`/login`): a mobile number and a one-time code. The number
+   decides who you are. The single admin (`ADMIN_PHONE`) and staff open the CRM; students and parents open
+   their portal. Staff IDs are created only by the admin (Admin → Staff users); only students can use
+   "Register" on the login page. No WhatsApp/SMS provider is connected, so
    set `OTP_SHOW_ON_SCREEN=true` for local use: the code is then shown on the login page. **While that is on,
-   anyone who knows a staff mobile number can log in, so never enable it on a site others can reach.**
+   anyone who knows a registered mobile number can log in as that person, so never enable it on a site others can reach.**
    Sessions end after 3 minutes without activity (`SESSION_IDLE_TIMEOUT`).
 3. Start the backend (from `backend/`): `mvn spring-boot:run`
    Flyway creates the tables; the first super admin is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD`.

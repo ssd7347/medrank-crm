@@ -59,7 +59,7 @@ public class PortalSessionService {
             throw invalid();
         }
         PortalAccount account = accounts.findById(existing.getAccountId())
-                .filter(a -> a.isActive() && a.isActivated()).orElseThrow(PortalSessionService::invalid);
+                .filter(PortalAccount::isActive).orElseThrow(PortalSessionService::invalid);
         existing.revoke();
         return new Rotation(account, create(account.getId()));
     }

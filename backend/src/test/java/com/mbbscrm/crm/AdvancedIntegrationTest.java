@@ -202,13 +202,10 @@ class AdvancedIntegrationTest {
                 .andExpect(status().isConflict());
 
         // The family signs in to the portal and accepts it.
-        MvcResult granted = mvc.perform(auth(post("/api/students/" + student + "/portal-access"), counsellor)
+        mvc.perform(auth(post("/api/students/" + student + "/portal-access"), counsellor)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"relation\":\"STUDENT\"}"))
-                .andExpect(status().isOk()).andReturn();
-        String code = JsonPath.read(granted.getResponse().getContentAsString(), "$.activationCode");
-        String portal = JsonPath.read(mvc.perform(post("/api/portal/auth/activate").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"phone\":\"" + studentPhone + "\",\"code\":\"" + code + "\",\"password\":\"FamilyPass1\"}"))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.accessToken");
+                .andExpect(status().isOk());
+        String portal = portalLogin(studentPhone);
         mvc.perform(auth(get("/api/portal/students/" + student), portal)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.agreements[0].status").value("PENDING"))
                 .andExpect(jsonPath("$.loans").isArray())
@@ -283,6 +280,18 @@ class AdvancedIntegrationTest {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /** Signs a student/parent number in through the common login page's two steps. */
+    private String portalLogin(String phone) throws Exception {
+        String code = JsonPath.read(mvc.perform(post("/api/auth/otp/request").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"phone\":\"" + phone + "\"}")).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString(), "$.codeOnScreen");
+        return JsonPath.read(mvc.perform(post("/api/auth/otp/verify").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"phone\":\"" + phone + "\",\"code\":\"" + code + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.kind").value("PORTAL"))
+                .andReturn().getResponse().getContentAsString(), "$.accessToken");
+    }
 
     private long student(String token) throws Exception {
         return id(mvc.perform(auth(post("/api/students"), token).contentType(MediaType.APPLICATION_JSON)

@@ -11,7 +11,7 @@ import type { Branch } from "@/lib/types-growth";
 import { useApi } from "@/lib/use-api";
 
 const ROLE_HELP: Record<Role, string> = {
-  SUPER_ADMIN: "Everything, including staff accounts and data approvals",
+  SUPER_ADMIN: "The one admin: everything, including creating staff IDs",
   COUNSELLOR: "Own leads and students; converts leads",
   TELECALLER: "Own leads and unassigned leads; no student profiles",
   DOCUMENTATION_EXEC: "Document checklists, uploads and verification",
@@ -29,7 +29,7 @@ export default function UsersPage() {
 
   return (
     <>
-      <PageHeader title="Staff users" subtitle="Each person logs in with their own mobile number and a one-time code; never share accounts." actions={<Button onClick={() => setEditing("new")}>Add staff</Button>} />
+      <PageHeader title="Staff users" subtitle="You create every staff ID here. Each person then logs in with their own mobile number and a one-time code." actions={<Button onClick={() => setEditing("new")}>Add staff</Button>} />
       {notice && (
         <div className="mb-4">
           <Alert tone="green">{notice}</Alert>
@@ -49,7 +49,7 @@ export default function UsersPage() {
           ) : (
             <Table head={["Staff ID", "Name", "Mobile (login)", "Email", "Role", "Branch", "Status", "Since", ""]}>
               {data.map((u) => (
-                <tr key={u.id} className={u.pendingApproval ? "bg-amber-50/60" : undefined}>
+                <tr key={u.id}>
                   <Td className="font-mono text-xs">STF-{String(u.id).padStart(4, "0")}</Td>
                   <Td className="font-medium">
                     {u.fullName}
@@ -59,36 +59,12 @@ export default function UsersPage() {
                   <Td>{u.email}</Td>
                   <Td>{label(u.role)}</Td>
                   <Td>{u.branch?.name ?? <span className="text-ink-faint">Head office</span>}</Td>
-                  <Td>{u.pendingApproval ? <Badge tone="amber">Waiting for approval</Badge> : u.active ? <Badge tone="green">Active</Badge> : <Badge>Deactivated</Badge>}</Td>
+                  <Td>{u.active ? <Badge tone="green">Active</Badge> : <Badge>Deactivated</Badge>}</Td>
                   <Td className="whitespace-nowrap text-ink-soft">{formatDate(u.createdAt)}</Td>
                   <Td className="text-right whitespace-nowrap">
-                    {u.pendingApproval ? (
-                      <>
-                        <Button size="sm" onClick={() => setEditing(u)}>
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={async () => {
-                            if (!confirm(`Reject and remove the registration of ${u.fullName}?`)) return;
-                            try {
-                              await api(`/api/users/${u.id}/registration`, { method: "DELETE" });
-                              setNotice(`Rejected the registration of ${u.fullName}.`);
-                              reload();
-                            } catch (e) {
-                              setNotice(errorMessage(e));
-                            }
-                          }}
-                        >
-                          Reject
-                        </Button>
-                      </>
-                    ) : (
-                      <Button size="sm" variant="ghost" onClick={() => setEditing(u)}>
-                        Edit
-                      </Button>
-                    )}
+                    <Button size="sm" variant="ghost" onClick={() => setEditing(u)}>
+                      Edit
+                    </Button>
                   </Td>
                 </tr>
               ))}
@@ -97,7 +73,7 @@ export default function UsersPage() {
         </div>
       </Card>
 
-      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add staff" : editing?.pendingApproval ? "Approve registration" : "Edit staff"}>
+      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add staff" : "Edit staff"}>
         {editing !== null && (
           <UserForm
             user={editing === "new" ? undefined : editing}
@@ -120,8 +96,7 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
     email: user?.email ?? "",
     phone: user?.phone ?? "",
     role: (user?.role ?? "COUNSELLOR") as Role,
-    // Opening a registration that is waiting means approving it, so "Active" starts ticked.
-    active: user ? user.active || user.pendingApproval : true,
+    active: user?.active ?? true,
     branchId: user?.branch?.id.toString() ?? "",
   });
   const branches = useApi<Branch[]>("/api/branches");
@@ -137,7 +112,7 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
     try {
       if (user) {
         await api(`/api/users/${user.id}`, { method: "PUT", body: { fullName: v.fullName, phone: v.phone, role: v.role, active: v.active, branchId: v.branchId ? Number(v.branchId) : null } });
-        onDone(user.pendingApproval && v.active ? `Approved ${v.fullName}. They can now log in with ${v.phone}.` : `Saved ${v.fullName}.`);
+        onDone(`Saved ${v.fullName}.`);
       } else {
         await api("/api/users", { body: { fullName: v.fullName, email: v.email, phone: v.phone, role: v.role, branchId: v.branchId ? Number(v.branchId) : null } });
         onDone(`Created ${v.fullName}. They can now log in with ${v.phone}.`);
@@ -153,7 +128,6 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
   return (
     <form onSubmit={save} className="space-y-4">
       {error && <Alert>{error}</Alert>}
-      {user?.pendingApproval && <Alert tone="amber">This person registered from the login page. Check that you know them, confirm the role and branch, then approve.</Alert>}
       <Field label="Full name" required error={fieldErrors.fullName}>
         {(id) => <Input id={id} required maxLength={120} value={v.fullName} onChange={(e) => setV({ ...v, fullName: e.target.value })} />}
       </Field>
@@ -164,7 +138,7 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
         {(id) => <Input id={id} type="email" required disabled={!!user} value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />}
       </Field>
       <Field label="Role" required hint={ROLE_HELP[v.role]}>
-        {(id) => <Select id={id} disabled={isSelf} value={v.role} onChange={(e) => setV({ ...v, role: e.target.value as Role })} options={ROLES} labelFor={label} />}
+        {(id) => <Select id={id} disabled={isSelf} value={v.role} onChange={(e) => setV({ ...v, role: e.target.value as Role })} options={isSelf ? ROLES : ROLES.filter((r) => r !== "SUPER_ADMIN")} labelFor={label} />}
       </Field>
       {!!branches.data?.length && (
         <Field label="Branch" hint="Staff with a branch only see that branch's leads and students. Admins always see everything.">
@@ -181,7 +155,7 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
       )}
       {user && !isSelf && <Checkbox label="Active (can log in)" checked={v.active} onChange={(e) => setV({ ...v, active: e.target.checked })} />}
       <Button type="submit" loading={saving}>
-        {user?.pendingApproval ? "Approve" : user ? "Save" : "Create account"}
+        {user ? "Save" : "Create ID"}
       </Button>
     </form>
   );

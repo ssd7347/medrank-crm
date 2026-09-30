@@ -6,11 +6,11 @@ import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { formatDateTime, label } from "@/lib/format";
 import type { Student } from "@/lib/types";
-import type { AlumniDetail, PortalAccess, PortalGranted, PortalRelation } from "@/lib/types-growth";
+import type { AlumniDetail, PortalAccess, PortalRelation } from "@/lib/types-growth";
 import { useApi } from "@/lib/use-api";
 
 import { AlumniForm } from "./alumni-form";
-import { Alert, Badge, Button, ButtonLink, Card, EmptyState, Loading, Modal } from "./ui";
+import { Alert, Badge, Button, ButtonLink, Card, EmptyState, Loading } from "./ui";
 
 export function PortalAlumniTab({ student }: { student: Student }) {
   return (
@@ -24,16 +24,17 @@ export function PortalAlumniTab({ student }: { student: Student }) {
 function PortalAccessCard({ student }: { student: Student }) {
   const base = `/api/students/${student.id}/portal-access`;
   const { data, error, loading, reload } = useApi<PortalAccess[]>(base);
-  const [issued, setIssued] = useState<PortalGranted | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  async function run(key: string, fn: () => Promise<PortalGranted | PortalAccess>) {
+  async function run(key: string, fn: () => Promise<PortalAccess>, done?: (a: PortalAccess) => string) {
     setBusy(key);
     setActionError(null);
+    setNotice(null);
     try {
-      const r = await fn();
-      if ("access" in r) setIssued(r);
+      const a = await fn();
+      if (done) setNotice(done(a));
       reload();
     } catch (e) {
       setActionError(errorMessage(e));
@@ -43,19 +44,26 @@ function PortalAccessCard({ student }: { student: Student }) {
   }
 
   const has = (r: PortalRelation) => data?.some((a) => a.relation === r);
-  const portalUrl = typeof window === "undefined" ? "/portal" : `${window.location.origin}/portal`;
+  const grant = (relation: PortalRelation) =>
+    run(
+      relation,
+      () => api<PortalAccess>(base, { body: { relation } }),
+      (a) => `${a.displayName} can now log in on the login page with ${a.phone} and a one-time code.`,
+    );
 
   return (
-    <Card title="Student & parent portal">
+    <Card title="Student & parent login">
       <div className="space-y-4">
         <p className="text-sm text-ink-soft">
-          Lets the family see round status, deadlines, documents and fees on their own phone, and upload documents, instead of calling to ask.
+          Lets the family see round status, deadlines, documents and fees on their own phone, and upload documents. They use the same login page as everyone
+          else, with their mobile number and a one-time code.
         </p>
         {(error || actionError) && <Alert>{error ?? actionError}</Alert>}
+        {notice && <Alert tone="green">{notice}</Alert>}
         {loading && !data ? (
           <Loading />
         ) : !data?.length ? (
-          <EmptyState title="No portal login yet">Give access below, then pass the one-time code to the family.</EmptyState>
+          <EmptyState title="No login yet">Give access below, or the student can create their own ID with Register on the login page.</EmptyState>
         ) : (
           <ul className="divide-y divide-line rounded-lg border border-line">
             {data.map((a) => (
@@ -63,48 +71,29 @@ function PortalAccessCard({ student }: { student: Student }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium">{a.displayName}</span>
                   <Badge tone="indigo">{label(a.relation)}</Badge>
-                  {!a.active ? (
-                    <Badge tone="red">Switched off</Badge>
-                  ) : a.activated ? (
-                    <Badge tone="green">Active</Badge>
-                  ) : a.codePending ? (
-                    <Badge tone="amber">Waiting for first sign-in</Badge>
-                  ) : (
-                    <Badge tone="red">Code expired</Badge>
-                  )}
+                  {a.active ? <Badge tone="green">Can log in</Badge> : <Badge tone="red">Switched off</Badge>}
+                  {a.selfRegistered && <Badge>Registered themselves</Badge>}
                 </div>
                 <p className="mt-0.5 text-xs text-ink-soft tabular-nums">
-                  Signs in with {a.phone}
-                  {a.lastLoginAt ? ` · last seen ${formatDateTime(a.lastLoginAt)}` : a.activated ? " · has not signed in since" : ""}
+                  Logs in with {a.phone}
+                  {a.lastLoginAt ? ` · last logged in ${formatDateTime(a.lastLoginAt)}` : " · has not logged in yet"}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    loading={busy === `reset${a.accountId}`}
-                    onClick={() => {
-                      if (a.activated && !confirm("This signs them out and their current password stops working. Issue a new code?")) return;
-                      run(`reset${a.accountId}`, () => api<PortalGranted>(`${base}/${a.accountId}/reset`, { method: "POST" }));
-                    }}
-                  >
-                    {a.activated ? "Forgot password: new code" : "New code"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    loading={busy === `toggle${a.accountId}`}
-                    onClick={() => run(`toggle${a.accountId}`, () => api<PortalAccess>(`${base}/${a.accountId}/${a.active ? "disable" : "enable"}`, { method: "POST" }))}
-                  >
-                    {a.active ? "Switch off" : "Switch on"}
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="mt-2"
+                  loading={busy === `toggle${a.accountId}`}
+                  onClick={() => run(`toggle${a.accountId}`, () => api<PortalAccess>(`${base}/${a.accountId}/${a.active ? "disable" : "enable"}`, { method: "POST" }))}
+                >
+                  {a.active ? "Switch off" : "Switch on"}
+                </Button>
               </li>
             ))}
           </ul>
         )}
         <div className="flex flex-wrap gap-2">
           {!has("STUDENT") && (
-            <Button loading={busy === "STUDENT"} onClick={() => run("STUDENT", () => api<PortalGranted>(base, { body: { relation: "STUDENT" } }))}>
+            <Button loading={busy === "STUDENT"} onClick={() => grant("STUDENT")}>
               Give student access
             </Button>
           )}
@@ -114,7 +103,7 @@ function PortalAccessCard({ student }: { student: Student }) {
               loading={busy === "PARENT"}
               disabled={!student.parentPhone || student.parentPhone === student.phone}
               title={!student.parentPhone ? "Add the parent's phone number to the profile first" : student.parentPhone === student.phone ? "The parent uses the same phone number as the student" : undefined}
-              onClick={() => run("PARENT", () => api<PortalGranted>(base, { body: { relation: "PARENT" } }))}
+              onClick={() => grant("PARENT")}
             >
               Give parent access
             </Button>
@@ -122,38 +111,6 @@ function PortalAccessCard({ student }: { student: Student }) {
         </div>
         {!student.parentPhone && <p className="text-xs text-ink-faint">To give the parent their own login, add the parent&apos;s phone number to the profile.</p>}
       </div>
-
-      <Modal open={issued !== null} onClose={() => setIssued(null)} title="Portal access">
-        {issued &&
-          (issued.activationCode ? (
-            <div className="space-y-4">
-              <Alert tone="amber">This code is shown only once. Give it to {issued.access.displayName} by phone or WhatsApp now.</Alert>
-              <dl className="space-y-3 rounded-lg bg-muted p-4 text-sm">
-                <div>
-                  <dt className="text-xs text-ink-faint">1. Open</dt>
-                  <dd className="font-medium break-all">{portalUrl}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-ink-faint">2. Choose “First time here” and enter this phone number</dt>
-                  <dd className="font-medium tabular-nums">{issued.access.phone}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-ink-faint">3. One-time code (valid 7 days)</dt>
-                  <dd className="font-mono text-2xl font-semibold tracking-[0.2em]">{issued.activationCode}</dd>
-                </div>
-              </dl>
-              <p className="text-xs text-ink-soft">They will choose their own password. If the code is lost or expires, use “New code”.</p>
-              <Button onClick={() => setIssued(null)}>Done</Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <Alert tone="green">
-                {issued.access.displayName} already has a working portal login on {issued.access.phone}. This student now appears in it; no new code is needed.
-              </Alert>
-              <Button onClick={() => setIssued(null)}>Done</Button>
-            </div>
-          ))}
-      </Modal>
     </Card>
   );
 }

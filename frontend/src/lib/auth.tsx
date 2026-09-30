@@ -4,11 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter } from "next/navigation";
 
 import { api, refreshSession, setAccessToken, setSessionLostHandler } from "./api";
-import type { AuthResponse, Role, User } from "./types";
+import type { Role, User } from "./types";
 import { IdleWarning, useIdleLogout } from "./use-idle";
 
 /** `codeOnScreen` is filled only while codes are shown on the login page instead of being sent (temporary). */
 export type OtpSent = { validForSeconds: number; codeOnScreen: string | null; shownOnScreen: boolean };
+
+export type LoginKind = "STAFF" | "PORTAL";
+type LoginResult = { kind: LoginKind; accessToken: string; expiresIn: number; user: User | null; displayName: string | null };
 
 type AuthState = {
   user: User | null;
@@ -16,8 +19,8 @@ type AuthState = {
   loading: boolean;
   /** Step 1 of sign-in: asks for a one-time code for this mobile number. */
   requestOtp: (phone: string) => Promise<OtpSent>;
-  /** Step 2 of sign-in. */
-  verifyOtp: (phone: string, code: string) => Promise<void>;
+  /** Step 2 of sign-in. Tells the caller whether a staff member or a student/parent signed in. */
+  verifyOtp: (phone: string, code: string) => Promise<LoginKind>;
   logout: () => Promise<void>;
   hasRole: (...roles: Role[]) => boolean;
 };
@@ -50,9 +53,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const requestOtp = useCallback((phone: string) => api<OtpSent>("/api/auth/otp/request", { body: { phone } }), []);
 
   const verifyOtp = useCallback(async (phone: string, code: string) => {
-    const res = await api<AuthResponse>("/api/auth/otp/verify", { body: { phone, code } });
-    setAccessToken(res.accessToken);
-    setUser(res.user);
+    const res = await api<LoginResult>("/api/auth/otp/verify", { body: { phone, code } });
+    // A student or parent gets a portal session (its own cookie); the portal pages pick it up themselves.
+    if (res.kind === "STAFF" && res.user) {
+      setAccessToken(res.accessToken);
+      setUser(res.user);
+    }
+    return res.kind;
   }, []);
 
   const logout = useCallback(async () => {
@@ -76,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .finally(() => {
           setAccessToken(null);
           try {
-            window.sessionStorage.setItem("crm:staff:idle", "1");
+            window.sessionStorage.setItem("crm:idle", "1");
           } catch {
             // The login page just will not show the reason.
           }

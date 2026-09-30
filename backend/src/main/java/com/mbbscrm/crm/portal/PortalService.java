@@ -9,7 +9,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -73,7 +72,6 @@ public class PortalService {
     private final TicketService tickets;
     private final PredictorShortlistRepository shortlist;
     private final AlertService alerts;
-    private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
     private final String orgName;
     private final LoanService loans;
@@ -83,7 +81,7 @@ public class PortalService {
     public PortalService(PortalAccountRepository accounts, PortalAccountStudentRepository links,
                          PortalSessionService sessions, CounsellingService counselling, DocumentService documents,
                          FeeService fees, TicketService tickets, PredictorShortlistRepository shortlist,
-                         AlertService alerts, PasswordEncoder passwordEncoder, AuditService audit,
+                         AlertService alerts, AuditService audit,
                          @Value("${app.org-name}") String orgName, LoanService loans,
                          SessionService sessionService, AgreementService agreements) {
         this.loans = loans;
@@ -98,7 +96,6 @@ public class PortalService {
         this.tickets = tickets;
         this.shortlist = shortlist;
         this.alerts = alerts;
-        this.passwordEncoder = passwordEncoder;
         this.audit = audit;
         this.orgName = orgName;
     }
@@ -177,11 +174,6 @@ public class PortalService {
 
     public record QuestionRequest(@NotBlank @Size(max = 200) String subject, @Size(max = 4000) String description,
                                   @NotNull TicketCategory category) {
-    }
-
-    public record PasswordRequest(@NotBlank String currentPassword,
-                                  @NotBlank @Size(min = 8, max = 72, message = "must be 8-72 characters")
-                                  String newPassword) {
     }
 
     // ------------------------------------------------------------------ reads
@@ -331,17 +323,6 @@ public class PortalService {
         PortalAccountStudent link = linked(studentId);
         return AgreementRow.of(agreements.signFromPortal(link.getStudent(), agreementId, req.typedName(),
                 link.getRelation().name(), ip, link.getAccount().getId()));
-    }
-
-    @Transactional
-    public void changePassword(PasswordRequest req) {
-        PortalAccount account = account();
-        if (!passwordEncoder.matches(req.currentPassword(), account.getPasswordHash())) {
-            throw ApiException.badRequest("Current password is incorrect");
-        }
-        account.setPasswordHash(passwordEncoder.encode(req.newPassword()));
-        sessions.revokeAll(account.getId());
-        audit.record(null, "PORTAL_PASSWORD_CHANGED", "PORTAL_ACCOUNT", account.getId(), null);
     }
 
     // ------------------------------------------------------------------ helpers

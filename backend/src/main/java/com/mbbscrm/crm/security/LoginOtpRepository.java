@@ -8,9 +8,10 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface LoginOtpRepository extends JpaRepository<LoginOtp, Long> {
 
-    Optional<LoginOtp> findFirstByUserIdAndUsedFalseOrderByCreatedAtDesc(Long userId);
+    Optional<LoginOtp> findFirstBySubjectTypeAndSubjectIdAndUsedFalseOrderByCreatedAtDesc(LoginOtp.Subject subjectType,
+                                                                                          Long subjectId);
 
     @Modifying
-    @Query("update LoginOtp o set o.used = true where o.userId = :userId and o.used = false")
-    void cancelAllForUser(Long userId);
+    @Query("update LoginOtp o set o.used = true where o.subjectType = :type and o.subjectId = :id and o.used = false")
+    void cancelAllFor(LoginOtp.Subject type, Long id);
 }

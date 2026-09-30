@@ -2,6 +2,7 @@
 
 // Session and API client for the student & parent portal. Deliberately separate from the staff client in
 // api.ts: its own in-memory token, its own refresh cookie, and it only ever calls /api/portal/*.
+// Signing in happens on the common /login page, which leaves the portal refresh cookie behind.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
@@ -70,8 +71,6 @@ type PortalState = {
   displayName: string | null;
   /** True until the first silent refresh has finished. */
   loading: boolean;
-  login: (phone: string, password: string) => Promise<void>;
-  activate: (phone: string, code: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -92,15 +91,6 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const open = useCallback((s: Session) => {
-    token = s.accessToken;
-    setDisplayName(s.displayName);
-  }, []);
-  const login = useCallback(async (phone: string, password: string) => open(await portalApi<Session>("/api/portal/auth/login", { body: { phone, password } })), [open]);
-  const activate = useCallback(
-    async (phone: string, code: string, password: string) => open(await portalApi<Session>("/api/portal/auth/activate", { body: { phone, code, password } })),
-    [open],
-  );
   const logout = useCallback(async () => {
     try {
       await portalApi("/api/portal/auth/logout", { method: "POST" });
@@ -121,7 +111,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
         .finally(() => {
           token = null;
           try {
-            window.sessionStorage.setItem("crm:portal:idle", "1");
+            window.sessionStorage.setItem("crm:idle", "1");
           } catch {
             // The login page just will not show the reason.
           }
@@ -131,7 +121,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
-  const value = useMemo(() => ({ displayName, loading, login, activate, logout }), [displayName, loading, login, activate, logout]);
+  const value = useMemo(() => ({ displayName, loading, logout }), [displayName, loading, logout]);
   return (
     <PortalContext.Provider value={value}>
       {children}

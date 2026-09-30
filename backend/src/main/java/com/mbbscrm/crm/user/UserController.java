@@ -45,6 +45,8 @@ public class UserController {
     private final AuditService audit;
     private final BranchRepository branches;
 
+    private static final String ONE_ADMIN = "There is only one admin account. Staff can be given any other role.";
+
     public UserController(AppUserRepository users, PasswordEncoder passwordEncoder,
                           RefreshTokenService refreshTokens, AuditService audit, BranchRepository branches) {
         this.branches = branches;
@@ -71,6 +73,9 @@ public class UserController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Transactional
     public UserResponse create(@Valid @RequestBody CreateUserRequest req) {
+        if (req.role() == Role.SUPER_ADMIN) {
+            throw ApiException.badRequest(ONE_ADMIN);
+        }
         String email = req.email().trim().toLowerCase(Locale.ROOT);
         if (users.existsByEmailIgnoreCase(email)) {
             throw ApiException.conflict("A user with this email already exists");
@@ -101,15 +106,15 @@ public class UserController {
         if (u.getId().equals(me.id()) && (!req.active() || req.role() != Role.SUPER_ADMIN)) {
             throw ApiException.badRequest("You cannot deactivate or demote your own account");
         }
+        // There is exactly one admin: nobody else can be promoted, and the admin stays the admin.
+        if ((req.role() == Role.SUPER_ADMIN) != (u.getRole() == Role.SUPER_ADMIN)) {
+            throw ApiException.badRequest(ONE_ADMIN);
+        }
         String before = "role=" + u.getRole() + ", active=" + u.isActive();
         u.setFullName(req.fullName().trim());
         u.setPhone(phone(req.phone(), u.getId()));
         u.setRole(req.role());
         u.setActive(req.active());
-        if (u.isActive() && u.isPendingApproval()) {
-            u.setPendingApproval(false);
-            audit.record(me.id(), "REGISTRATION_APPROVED", "USER", u.getId(), "role=" + req.role());
-        }
         u.setBranch(branch(req.branchId()));
         if (!u.isActive()) {
             refreshTokens.revokeAllForUser(u.getId());
@@ -117,20 +122,6 @@ public class UserController {
         audit.record(me.id(), "USER_UPDATED", "USER", u.getId(),
                 before + " -> role=" + u.getRole() + ", active=" + u.isActive());
         return UserResponse.of(u);
-    }
-
-    /** Turns down a registration request. Only accounts that were never approved can be removed. */
-    @org.springframework.web.bind.annotation.DeleteMapping("/{id}/registration")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Transactional
-    public void rejectRegistration(@PathVariable Long id) {
-        AppUser u = users.findById(id).orElseThrow(() -> ApiException.notFound("User"));
-        if (!u.isPendingApproval() || u.isActive()) {
-            throw ApiException.conflict("Only a registration that is still waiting for approval can be rejected");
-        }
-        audit.record(CurrentUser.get().id(), "REGISTRATION_REJECTED", "USER", null, u.getFullName() + " " + u.getPhone());
-        users.delete(u);
     }
 
     @PostMapping("/{id}/reset-password")

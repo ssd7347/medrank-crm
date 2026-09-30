@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.mbbscrm.crm.portal.PortalAccessService.AccessRow;
 import com.mbbscrm.crm.portal.PortalAccessService.GrantRequest;
-import com.mbbscrm.crm.portal.PortalAccessService.Granted;
 
 import jakarta.validation.Valid;
 
@@ -32,13 +31,8 @@ public class PortalAccessController {
     }
 
     @PostMapping
-    public Granted grant(@PathVariable Long studentId, @Valid @RequestBody GrantRequest req) {
+    public AccessRow grant(@PathVariable Long studentId, @Valid @RequestBody GrantRequest req) {
         return service.grant(studentId, req.relation());
-    }
-
-    @PostMapping("/{accountId}/reset")
-    public Granted reset(@PathVariable Long studentId, @PathVariable Long accountId) {
-        return service.reset(studentId, accountId);
     }
 
     @PostMapping("/{accountId}/disable")

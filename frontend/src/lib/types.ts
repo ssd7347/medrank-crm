@@ -60,6 +60,7 @@ export const LEAD_SOURCES = [
   "WHATSAPP",
   "OTHER",
   "WEBSITE_CHAT",
+  "SELF_REGISTERED",
 ] as const;
 export type LeadSource = (typeof LEAD_SOURCES)[number];
 
@@ -81,8 +82,6 @@ export type User = {
   active: boolean;
   branch: BranchRef | null;
   createdAt: string;
-  /** Registered from the login page and not yet approved by an admin. */
-  pendingApproval: boolean;
 };
 
 export type AuthResponse = { accessToken: string; expiresIn: number; user: User };

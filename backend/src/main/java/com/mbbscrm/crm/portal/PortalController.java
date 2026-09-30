@@ -14,7 +14,6 @@ import org.springframework.web.multipart.MultipartFile;
 import com.mbbscrm.crm.portal.PortalService.DocumentsView;
 import com.mbbscrm.crm.portal.PortalService.Me;
 import com.mbbscrm.crm.portal.PortalService.Overview;
-import com.mbbscrm.crm.portal.PortalService.PasswordRequest;
 import com.mbbscrm.crm.portal.PortalService.QuestionRequest;
 import com.mbbscrm.crm.portal.PortalService.TicketRow;
 
@@ -60,9 +59,4 @@ public class PortalController {
         return service.accept(studentId, agreementId, req, http.getRemoteAddr());
     }
 
-    @PostMapping("/change-password")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void changePassword(@Valid @RequestBody PasswordRequest req) {
-        service.changePassword(req);
-    }
 }

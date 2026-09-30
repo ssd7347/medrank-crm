@@ -48,10 +48,9 @@ export default function PortalHome() {
   const [studentId, setStudentId] = useState<number | null>(null);
   const [data, setData] = useState<PortalOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-    if (!loading && !displayName) router.replace("/portal/login");
+    if (!loading && !displayName) router.replace("/login");
   }, [loading, displayName, router]);
 
   useEffect(() => {
@@ -94,10 +93,7 @@ export default function PortalHome() {
             <p className="truncate text-xs text-ink-soft">{displayName}</p>
           </div>
           <div className="flex shrink-0 gap-1.5">
-            <Button size="sm" variant="ghost" onClick={() => setChangingPassword(true)}>
-              Password
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => logout().then(() => router.replace("/portal/login"))}>
+            <Button size="sm" variant="secondary" onClick={() => logout().then(() => router.replace("/login"))}>
               Sign out
             </Button>
           </div>
@@ -136,17 +132,6 @@ export default function PortalHome() {
         )}
       </main>
 
-      <Modal open={changingPassword} onClose={() => setChangingPassword(false)} title="Change password">
-        {changingPassword && (
-          <PasswordForm
-            onDone={() => {
-              setChangingPassword(false);
-              // Changing the password signs out every device, including this one.
-              logout().then(() => router.replace("/portal/login"));
-            }}
-          />
-        )}
-      </Modal>
     </div>
   );
 }
@@ -620,39 +605,3 @@ function AcceptForm({ studentId, agreement, onDone }: { studentId: number; agree
   );
 }
 
-function PasswordForm({ onDone }: { onDone: () => void }) {
-  const [v, setV] = useState({ currentPassword: "", newPassword: "" });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setSaving(true);
-        setError(null);
-        try {
-          await portalApi("/api/portal/change-password", { body: v });
-          onDone();
-        } catch (err) {
-          setError(errorMessage(err));
-        } finally {
-          setSaving(false);
-        }
-      }}
-      className="space-y-4"
-    >
-      {error && <Alert>{error}</Alert>}
-      <Field label="Current password" required>
-        {(id) => <Input id={id} type="password" autoComplete="current-password" required value={v.currentPassword} onChange={(e) => setV({ ...v, currentPassword: e.target.value })} />}
-      </Field>
-      <Field label="New password" required hint="At least 8 characters. You will be asked to sign in again.">
-        {(id) => (
-          <Input id={id} type="password" autoComplete="new-password" required minLength={8} maxLength={72} value={v.newPassword} onChange={(e) => setV({ ...v, newPassword: e.target.value })} />
-        )}
-      </Field>
-      <Button type="submit" loading={saving}>
-        Change password
-      </Button>
-    </form>
-  );
-}

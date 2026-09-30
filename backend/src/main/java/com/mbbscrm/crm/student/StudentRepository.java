@@ -17,5 +17,7 @@ public interface StudentRepository extends JpaRepository<Student, Long>, JpaSpec
 
     Optional<Student> findByNeetRollNo(String neetRollNo);
 
+    java.util.List<Student> findByPhone(String phone);
+
     long countByAssignedCounsellorId(Long counsellorId);
 }

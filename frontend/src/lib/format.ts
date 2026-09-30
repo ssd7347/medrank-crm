@@ -143,6 +143,7 @@ const LABELS: Record<string, string> = {
   ASSIGNED: "Assigned",
   REFUND_RULE: "Refund rule",
   WEBSITE_CHAT: "Website assistant",
+  SELF_REGISTERED: "Registered online",
   CONNECTED: "Connected",
   NO_ANSWER: "No answer",
   BUSY: "Busy",

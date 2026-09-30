@@ -216,36 +216,20 @@ class GrowthIntegrationTest {
         mvc.perform(auth(post("/api/students/" + student + "/portal-access"), otherCounsellor)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"relation\":\"STUDENT\"}"))
                 .andExpect(status().isNotFound());
+        // Before access is given, the number is unknown to the login page.
+        mvc.perform(post("/api/auth/otp/request").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"phone\":\"" + studentPhone + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.codeOnScreen").value(Matchers.nullValue()));
         MvcResult granted = mvc.perform(auth(post("/api/students/" + student + "/portal-access"), counsellor)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"relation\":\"STUDENT\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.access.activated").value(false))
-                .andExpect(jsonPath("$.activationCode").value(Matchers.matchesPattern("[A-Z2-9]{8}")))
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.selfRegistered").value(false))
                 .andReturn();
-        String code = JsonPath.read(granted.getResponse().getContentAsString(), "$.activationCode");
-        int account = JsonPath.read(granted.getResponse().getContentAsString(), "$.access.accountId");
-
-        // Cannot log in before activating; a wrong code is refused; a short password is refused.
-        mvc.perform(post("/api/portal/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"phone\":\"" + studentPhone + "\",\"password\":\"whatever123\"}"))
-                .andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/portal/auth/activate").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"phone\":\"" + studentPhone + "\",\"code\":\"AAAAAAAA\",\"password\":\"FamilyPass1\"}"))
-                .andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/portal/auth/activate").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"phone\":\"" + studentPhone + "\",\"code\":\"" + code + "\",\"password\":\"short\"}"))
-                .andExpect(status().isBadRequest());
-        MvcResult session = mvc.perform(post("/api/portal/auth/activate").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"phone\":\"" + studentPhone + "\",\"code\":\"" + code.toLowerCase()
-                                + "\",\"password\":\"FamilyPass1\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.displayName").value("Portal Student"))
-                .andReturn();
-        String portal = JsonPath.read(session.getResponse().getContentAsString(), "$.accessToken");
-        // The code works once only.
-        mvc.perform(post("/api/portal/auth/activate").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"phone\":\"" + studentPhone + "\",\"code\":\"" + code + "\",\"password\":\"FamilyPass2\"}"))
-                .andExpect(status().isUnauthorized());
+        int account = JsonPath.read(granted.getResponse().getContentAsString(), "$.accountId");
+        // The family then signs in on the common login page with that number and a one-time code.
+        String portal = portalLogin(studentPhone);
 
         // A portal login cannot use staff endpoints, and staff cannot use the portal API.
         mvc.perform(auth(get("/api/students/" + student), portal)).andExpect(status().isForbidden());
@@ -294,20 +278,32 @@ class GrowthIntegrationTest {
                 .andExpect(jsonPath("$.raisedVia").value("PORTAL"))
                 .andExpect(jsonPath("$.assignedTo.fullName").isNotEmpty());
 
-        // Password login works; resetting access from the staff side kills the password.
-        mvc.perform(post("/api/portal/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"phone\":\"" + studentPhone + "\",\"password\":\"FamilyPass1\"}"))
-                .andExpect(status().isOk());
-        mvc.perform(auth(post("/api/students/" + student + "/portal-access/" + account + "/reset"), counsellor))
+        // Switching the login off from the staff side ends access; switching it on restores it.
+        mvc.perform(auth(post("/api/students/" + student + "/portal-access/" + account + "/disable"), counsellor))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.activationCode").isNotEmpty())
-                .andExpect(jsonPath("$.access.activated").value(false));
-        mvc.perform(post("/api/portal/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"phone\":\"" + studentPhone + "\",\"password\":\"FamilyPass1\"}"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(jsonPath("$.active").value(false));
+        mvc.perform(auth(get("/api/portal/me"), portal)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/auth/otp/request").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"phone\":\"" + studentPhone + "\"}"))
+                .andExpect(jsonPath("$.codeOnScreen").value(Matchers.nullValue()));
+        mvc.perform(auth(post("/api/students/" + student + "/portal-access/" + account + "/enable"), counsellor))
+                .andExpect(status().isOk());
+        portalLogin(studentPhone);
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /** Signs a student/parent number in through the common login page's two steps. */
+    private String portalLogin(String phone) throws Exception {
+        String code = JsonPath.read(mvc.perform(post("/api/auth/otp/request").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"phone\":\"" + phone + "\"}")).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString(), "$.codeOnScreen");
+        return JsonPath.read(mvc.perform(post("/api/auth/otp/verify").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"phone\":\"" + phone + "\",\"code\":\"" + code + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.kind").value("PORTAL"))
+                .andReturn().getResponse().getContentAsString(), "$.accessToken");
+    }
 
     private long branch(String admin, String name) throws Exception {
         return id(mvc.perform(auth(post("/api/branches"), admin).contentType(MediaType.APPLICATION_JSON)

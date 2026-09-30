@@ -175,11 +175,8 @@ export type PortalAccess = {
   phone: string;
   displayName: string;
   relation: PortalRelation;
-  activated: boolean;
   active: boolean;
-  codePending: boolean;
-  codeExpiresAt: string | null;
   lastLoginAt: string | null;
+  /** The student created this login themselves with Register on the login page. */
+  selfRegistered: boolean;
 };
-
-export type PortalGranted = { access: PortalAccess; activationCode: string | null };
