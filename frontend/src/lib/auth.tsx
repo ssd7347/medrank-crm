@@ -7,11 +7,17 @@ import { api, refreshSession, setAccessToken, setSessionLostHandler } from "./ap
 import type { AuthResponse, Role, User } from "./types";
 import { IdleWarning, useIdleLogout } from "./use-idle";
 
+/** `codeOnScreen` is filled only while codes are shown on the login page instead of being sent (temporary). */
+export type OtpSent = { validForSeconds: number; codeOnScreen: string | null; shownOnScreen: boolean };
+
 type AuthState = {
   user: User | null;
   /** True until the initial silent refresh has finished. */
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /** Step 1 of sign-in: asks for a one-time code for this mobile number. */
+  requestOtp: (phone: string) => Promise<OtpSent>;
+  /** Step 2 of sign-in. */
+  verifyOtp: (phone: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   hasRole: (...roles: Role[]) => boolean;
 };
@@ -41,8 +47,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, [router]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await api<AuthResponse>("/api/auth/login", { body: { email, password } });
+  const requestOtp = useCallback((phone: string) => api<OtpSent>("/api/auth/otp/request", { body: { phone } }), []);
+
+  const verifyOtp = useCallback(async (phone: string, code: string) => {
+    const res = await api<AuthResponse>("/api/auth/otp/verify", { body: { phone, code } });
     setAccessToken(res.accessToken);
     setUser(res.user);
   }, []);
@@ -80,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasRole = useCallback((...roles: Role[]) => !!user && roles.includes(user.role), [user]);
 
-  const value = useMemo(() => ({ user, loading, login, logout, hasRole }), [user, loading, login, logout, hasRole]);
+  const value = useMemo(() => ({ user, loading, requestOtp, verifyOtp, logout, hasRole }), [user, loading, requestOtp, verifyOtp, logout, hasRole]);
   return (
     <AuthContext.Provider value={value}>
       {children}

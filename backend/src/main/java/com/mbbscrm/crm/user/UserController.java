@@ -78,9 +78,14 @@ public class UserController {
         AppUser u = new AppUser();
         u.setFullName(req.fullName().trim());
         u.setEmail(email);
-        u.setPhone(blankToNull(req.phone()));
+        u.setPhone(phone(req.phone(), null));
         u.setRole(req.role());
-        u.setPasswordHash(passwordEncoder.encode(req.password()));
+        String password = req.password() == null || req.password().isBlank()
+                ? java.util.UUID.randomUUID().toString() : req.password();
+        if (password.length() < 10) {
+            throw ApiException.badRequest("The password must be at least 10 characters");
+        }
+        u.setPasswordHash(passwordEncoder.encode(password));
         u.setBranch(branch(req.branchId()));
         users.save(u);
         audit.record(CurrentUser.get().id(), "USER_CREATED", "USER", u.getId(), "role=" + u.getRole());
@@ -98,7 +103,7 @@ public class UserController {
         }
         String before = "role=" + u.getRole() + ", active=" + u.isActive();
         u.setFullName(req.fullName().trim());
-        u.setPhone(blankToNull(req.phone()));
+        u.setPhone(phone(req.phone(), u.getId()));
         u.setRole(req.role());
         u.setActive(req.active());
         u.setBranch(branch(req.branchId()));
@@ -123,6 +128,21 @@ public class UserController {
 
     private Branch branch(Long id) {
         return id == null ? null : branches.findById(id).orElseThrow(() -> ApiException.badRequest("Branch not found"));
+    }
+
+    /** Staff sign in with this number, so it is stored in one form and must belong to one person. */
+    private String phone(String raw, Long selfId) {
+        String phone = com.mbbscrm.crm.common.Phones.normalize(blankToNull(raw));
+        if (phone == null) {
+            return null;
+        }
+        if (!phone.matches("[0-9]{10}")) {
+            throw ApiException.badRequest("Enter a 10-digit mobile number");
+        }
+        users.findByPhone(phone).filter(other -> !other.getId().equals(selfId)).ifPresent(other -> {
+            throw ApiException.conflict("Another staff member already uses this mobile number");
+        });
+        return phone;
     }
 
     private static String blankToNull(String s) {

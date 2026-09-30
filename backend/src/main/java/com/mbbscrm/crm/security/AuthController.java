@@ -40,10 +40,15 @@ public class AuthController {
     private final LoginAttemptService loginAttempts;
     private final AuditService audit;
     private final AppProperties props;
+    private final OtpService otps;
+    private final com.mbbscrm.crm.assistant.RateLimiter limiter;
 
     public AuthController(AppUserRepository users, PasswordEncoder passwordEncoder, TokenService tokenService,
                           RefreshTokenService refreshTokens, LoginAttemptService loginAttempts,
-                          AuditService audit, AppProperties props) {
+                          AuditService audit, AppProperties props, OtpService otps,
+                          com.mbbscrm.crm.assistant.RateLimiter limiter) {
+        this.otps = otps;
+        this.limiter = limiter;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
@@ -77,6 +82,52 @@ public class AuthController {
         }
         loginAttempts.recordSuccess(email);
         audit.recordStandalone(user.getId(), "LOGIN", "USER", user.getId(), null);
+        return withSession(user, refreshTokens.create(user));
+    }
+
+    public record OtpRequest(@NotBlank String phone) {
+    }
+
+    public record OtpVerify(@NotBlank String phone, @NotBlank String code) {
+    }
+
+    /** {@code codeOnScreen} is set only in the temporary show-on-screen mode (see OtpService). */
+    public record OtpSent(int validForSeconds, String codeOnScreen, boolean shownOnScreen) {
+    }
+
+    /**
+     * Step 1 of sign-in. The reply is the same whether or not the number belongs to a staff member, except
+     * in show-on-screen mode where the code itself is returned.
+     */
+    @PostMapping("/otp/request")
+    public OtpSent requestOtp(@Valid @RequestBody OtpRequest req) {
+        String phone = com.mbbscrm.crm.common.Phones.normalize(req.phone().trim());
+        if (phone == null || !phone.matches("[0-9]{10}")) {
+            throw ApiException.badRequest("Enter your 10-digit mobile number");
+        }
+        if (!limiter.allow("otp:" + phone, 5, java.time.Duration.ofMinutes(10))) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "Too many codes requested. Try again in 10 minutes.");
+        }
+        String code = otps.issue(phone);
+        return new OtpSent((int) OtpService.VALIDITY.toSeconds(), code, otps.showsOnScreen());
+    }
+
+    /** Step 2 of sign-in: the code opens a session exactly like a password login used to. */
+    @PostMapping("/otp/verify")
+    public ResponseEntity<AuthResponse> verifyOtp(@Valid @RequestBody OtpVerify req) {
+        String phone = com.mbbscrm.crm.common.Phones.normalize(req.phone().trim());
+        String key = "otp:" + phone;
+        if (loginAttempts.isLocked(key)) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "Too many failed attempts. Try again in 15 minutes.");
+        }
+        AppUser user = otps.verify(phone, req.code().replaceAll("\\s", ""));
+        if (user == null) {
+            loginAttempts.recordFailure(key);
+            audit.recordStandalone(null, "LOGIN_FAILED", "USER", null, "otp");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "That code is wrong or has expired. Request a new one.");
+        }
+        loginAttempts.recordSuccess(key);
+        audit.recordStandalone(user.getId(), "LOGIN", "USER", user.getId(), "otp");
         return withSession(user, refreshTokens.create(user));
     }
 

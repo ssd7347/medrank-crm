@@ -14,6 +14,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     boolean existsByEmailIgnoreCase(String email);
 
+    Optional<AppUser> findByPhone(String phone);
+
     List<AppUser> findByActiveTrueAndRoleInOrderByFullName(Collection<Role> roles);
 
     List<AppUser> findAllByOrderByFullName();

@@ -25,12 +25,11 @@ export default function UsersPage() {
   const { user: me } = useAuth();
   const { data, error, loading, reload } = useApi<User[]>("/api/users");
   const [editing, setEditing] = useState<User | "new" | null>(null);
-  const [resetting, setResetting] = useState<User | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   return (
     <>
-      <PageHeader title="Staff users" subtitle="Each person gets their own login; never share accounts." actions={<Button onClick={() => setEditing("new")}>Add staff</Button>} />
+      <PageHeader title="Staff users" subtitle="Each person logs in with their own mobile number and a one-time code; never share accounts." actions={<Button onClick={() => setEditing("new")}>Add staff</Button>} />
       {notice && (
         <div className="mb-4">
           <Alert tone="green">{notice}</Alert>
@@ -48,15 +47,15 @@ export default function UsersPage() {
           ) : !data?.length ? (
             <EmptyState title="No users" />
           ) : (
-            <Table head={["Name", "Email", "Phone", "Role", "Branch", "Status", "Since", ""]}>
+            <Table head={["Name", "Mobile (login)", "Email", "Role", "Branch", "Status", "Since", ""]}>
               {data.map((u) => (
                 <tr key={u.id}>
                   <Td className="font-medium">
                     {u.fullName}
                     {u.id === me?.id && <span className="ml-2 text-xs text-ink-faint">(you)</span>}
                   </Td>
+                  <Td className="tabular-nums">{u.phone ?? <span className="text-red-700">Missing: cannot log in</span>}</Td>
                   <Td>{u.email}</Td>
-                  <Td className="tabular-nums">{u.phone ?? "—"}</Td>
                   <Td>{label(u.role)}</Td>
                   <Td>{u.branch?.name ?? <span className="text-ink-faint">Head office</span>}</Td>
                   <Td>{u.active ? <Badge tone="green">Active</Badge> : <Badge>Deactivated</Badge>}</Td>
@@ -64,9 +63,6 @@ export default function UsersPage() {
                   <Td className="text-right whitespace-nowrap">
                     <Button size="sm" variant="ghost" onClick={() => setEditing(u)}>
                       Edit
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setResetting(u)}>
-                      Reset password
                     </Button>
                   </Td>
                 </tr>
@@ -89,17 +85,6 @@ export default function UsersPage() {
           />
         )}
       </Modal>
-      <Modal open={resetting !== null} onClose={() => setResetting(null)} title={`Reset password · ${resetting?.fullName ?? ""}`}>
-        {resetting && (
-          <ResetForm
-            user={resetting}
-            onDone={() => {
-              setResetting(null);
-              setNotice(`Password reset for ${resetting.fullName}. They have been logged out everywhere.`);
-            }}
-          />
-        )}
-      </Modal>
     </>
   );
 }
@@ -111,7 +96,6 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
     phone: user?.phone ?? "",
     role: (user?.role ?? "COUNSELLOR") as Role,
     active: user?.active ?? true,
-    password: "",
     branchId: user?.branch?.id.toString() ?? "",
   });
   const branches = useApi<Branch[]>("/api/branches");
@@ -129,8 +113,8 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
         await api(`/api/users/${user.id}`, { method: "PUT", body: { fullName: v.fullName, phone: v.phone, role: v.role, active: v.active, branchId: v.branchId ? Number(v.branchId) : null } });
         onDone(`Saved ${v.fullName}.`);
       } else {
-        await api("/api/users", { body: { fullName: v.fullName, email: v.email, phone: v.phone, role: v.role, password: v.password, branchId: v.branchId ? Number(v.branchId) : null } });
-        onDone(`Created ${v.fullName}. Share the password with them privately and ask them to change it after first login.`);
+        await api("/api/users", { body: { fullName: v.fullName, email: v.email, phone: v.phone, role: v.role, branchId: v.branchId ? Number(v.branchId) : null } });
+        onDone(`Created ${v.fullName}. They can now log in with ${v.phone}.`);
       }
     } catch (err) {
       if (err instanceof ApiError && err.body.errors) setFieldErrors(err.body.errors);
@@ -146,11 +130,11 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
       <Field label="Full name" required error={fieldErrors.fullName}>
         {(id) => <Input id={id} required maxLength={120} value={v.fullName} onChange={(e) => setV({ ...v, fullName: e.target.value })} />}
       </Field>
-      <Field label="Email (login)" required error={fieldErrors.email}>
-        {(id) => <Input id={id} type="email" required disabled={!!user} value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />}
+      <Field label="Mobile number (used to log in)" required error={fieldErrors.phone} hint="10 digits. Each person needs their own number.">
+        {(id) => <Input id={id} type="tel" inputMode="numeric" required value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} />}
       </Field>
-      <Field label="Phone" error={fieldErrors.phone}>
-        {(id) => <Input id={id} type="tel" value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} />}
+      <Field label="Email" required error={fieldErrors.email}>
+        {(id) => <Input id={id} type="email" required disabled={!!user} value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />}
       </Field>
       <Field label="Role" required hint={ROLE_HELP[v.role]}>
         {(id) => <Select id={id} disabled={isSelf} value={v.role} onChange={(e) => setV({ ...v, role: e.target.value as Role })} options={ROLES} labelFor={label} />}
@@ -168,46 +152,9 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
           )}
         </Field>
       )}
-      {!user && (
-        <Field label="Initial password" required hint="At least 10 characters" error={fieldErrors.password}>
-          {(id) => <Input id={id} type="password" autoComplete="new-password" required minLength={10} maxLength={72} value={v.password} onChange={(e) => setV({ ...v, password: e.target.value })} />}
-        </Field>
-      )}
       {user && !isSelf && <Checkbox label="Active (can log in)" checked={v.active} onChange={(e) => setV({ ...v, active: e.target.checked })} />}
       <Button type="submit" loading={saving}>
         {user ? "Save" : "Create account"}
-      </Button>
-    </form>
-  );
-}
-
-function ResetForm({ user, onDone }: { user: User; onDone: () => void }) {
-  const [password, setPassword] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setSaving(true);
-        setError(null);
-        try {
-          await api(`/api/users/${user.id}/reset-password`, { body: { password } });
-          onDone();
-        } catch (err) {
-          setError(errorMessage(err));
-        } finally {
-          setSaving(false);
-        }
-      }}
-      className="space-y-4"
-    >
-      {error && <Alert>{error}</Alert>}
-      <Field label="New password" required hint="At least 10 characters. This logs them out of every device.">
-        {(id) => <Input id={id} type="password" autoComplete="new-password" required minLength={10} maxLength={72} value={password} onChange={(e) => setPassword(e.target.value)} />}
-      </Field>
-      <Button type="submit" loading={saving}>
-        Reset password
       </Button>
     </form>
   );

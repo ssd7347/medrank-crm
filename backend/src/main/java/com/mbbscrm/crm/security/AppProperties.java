@@ -15,6 +15,6 @@ public record AppProperties(Jwt jwt, Cookie cookie, Bootstrap bootstrap) {
     }
 
     /** First-run super admin, created only when the user table is empty. */
-    public record Bootstrap(String adminEmail, String adminPassword, String adminName) {
+    public record Bootstrap(String adminEmail, String adminPassword, String adminName, String adminPhone) {
     }
 }

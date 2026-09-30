@@ -36,7 +36,8 @@ public final class UserDtos {
             @NotBlank @Email @Size(max = 160) String email,
             @Pattern(regexp = "^[0-9+ -]{0,20}$", message = "invalid phone") String phone,
             @NotNull Role role,
-            @NotBlank @Size(min = 10, max = 72, message = "must be 10-72 characters") String password,
+            /** No longer used to sign in (that is by mobile number and code); a random one is set if empty. */
+            @Size(max = 72) String password,
             Long branchId) {
     }
 
