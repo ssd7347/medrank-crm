@@ -18,8 +18,15 @@ bulk CSV), 4.9 alert pipeline (in-app notifications, WhatsApp/SMS queue with esc
 WhatsApp/SMS runs in **simulated mode** (messages are logged, not delivered) until a provider such as
 Gupshup/Interakt or MSG91 is connected by adding a `MessageSender` implementation.
 
-Next: Phase 3 (documents, fees, staff management, helpdesk, refund rules engine, grievance register) per spec
-section 12. Works on phones and laptops (tables turn into cards on small screens).
+**Phase 3 (operations & compliance) — built.** Spec 4.7 document vault (per-student checklist, upload with
+file-type sniffing, verification queue, audited downloads), 4.8 fee plans, instalments, payments, printable
+receipts, refunds and commissions, 4.11 staff performance & reassignment, 4.14 helpdesk tickets with SLA,
+4.27 refund rules engine (used in the freeze/float/withdraw preview), 4.28 grievance register with escalation.
+Documents are stored under `data/uploads` until Cloudflare R2 keys (`R2_*`) are set. Payments are recorded
+manually (Razorpay later).
+
+Next: Phase 4 (4.10 student/parent portal, 4.12 marketing, 4.13 analytics, 4.15 multi-branch, 4.22 sub-agents,
+4.23 alumni) per spec section 12. Works on phones and laptops (tables turn into cards on small screens).
 
 ## Stack
 
