@@ -4,9 +4,11 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Logo } from "@/components/logo";
-import { Alert, Button, Field, Input, Loading } from "@/components/ui";
-import { errorMessage } from "@/lib/api";
+import { Alert, Button, Field, Input, Loading, Select, cx } from "@/components/ui";
+import { ApiError, api, errorMessage } from "@/lib/api";
 import { useAuth, type OtpSent } from "@/lib/auth";
+import { label } from "@/lib/format";
+import { ROLES, type Role } from "@/lib/types";
 
 function LoginForm() {
   const { user, loading, requestOtp, verifyOtp } = useAuth();
@@ -101,7 +103,7 @@ function LoginForm() {
               <p className="text-xs">Shown here only until WhatsApp delivery is connected. It works once, for {Math.round(sent.validForSeconds / 60)} minutes.</p>
             </div>
           ) : sent.shownOnScreen ? (
-            <Alert tone="amber">This number is not registered for staff login. Check the number or ask your admin to add it.</Alert>
+            <Alert tone="amber">This number is not registered, or its ID is still waiting for an admin to approve it. Check the number, or use Register to create your ID.</Alert>
           ) : (
             <Alert tone="blue">If this number is registered, a one-time code has been sent to it.</Alert>
           )}
@@ -150,7 +152,82 @@ function LoginForm() {
   );
 }
 
+type Registered = { id: number | null; staffId: string | null; fullName: string; pendingApproval: boolean };
+
+function RegisterForm({ onLogin }: { onLogin: () => void }) {
+  const [v, setV] = useState({ fullName: "", phone: "", email: "", role: "COUNSELLOR" as Role, website: "" });
+  const [done, setDone] = useState<Registered | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setFieldErrors({});
+    setSubmitting(true);
+    try {
+      setDone(await api<Registered>("/api/auth/register", { body: v }));
+    } catch (err) {
+      if (err instanceof ApiError && err.body.errors) setFieldErrors(err.body.errors);
+      setError(errorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="space-y-4">
+        <Alert tone="green">
+          <p className="font-medium">Your ID has been created, {done.fullName}.</p>
+          {done.staffId && (
+            <p className="mt-1">
+              Staff ID: <span className="font-mono font-semibold">{done.staffId}</span>
+            </p>
+          )}
+        </Alert>
+        <Alert tone="amber">An admin has to approve your ID before you can log in. They have been notified. After that, log in with your mobile number.</Alert>
+        <Button variant="secondary" className="w-full" onClick={onLogin}>
+          Go to login
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      {error && <Alert>{error}</Alert>}
+      <Field label="Full name" required error={fieldErrors.fullName}>
+        {(id) => <Input id={id} required maxLength={120} autoComplete="name" value={v.fullName} onChange={(e) => setV({ ...v, fullName: e.target.value })} />}
+      </Field>
+      <Field label="Mobile number" required error={fieldErrors.phone} hint="10 digits. You will log in with this number.">
+        {(id) => <Input id={id} type="tel" inputMode="numeric" autoComplete="tel" required maxLength={16} value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} />}
+      </Field>
+      <Field label="Email" required error={fieldErrors.email}>
+        {(id) => <Input id={id} type="email" autoComplete="email" required maxLength={160} value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />}
+      </Field>
+      <Field label="Your role" required hint="The admin confirms this when approving your ID.">
+        {(id) => (
+          <Select id={id} value={v.role} onChange={(e) => setV({ ...v, role: e.target.value as Role })} options={ROLES.filter((r) => r !== "SUPER_ADMIN")} labelFor={label} />
+        )}
+      </Field>
+      {/* Hidden from people; bots that fill every field give themselves away. */}
+      <div className="hidden" aria-hidden>
+        <label>
+          Website
+          <input tabIndex={-1} autoComplete="off" value={v.website} onChange={(e) => setV({ ...v, website: e.target.value })} />
+        </label>
+      </div>
+      <Button type="submit" loading={submitting} className="w-full">
+        Create my ID
+      </Button>
+    </form>
+  );
+}
+
 export default function LoginPage() {
+  const [mode, setMode] = useState<"login" | "register">("login");
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       <div className="hidden flex-col justify-between bg-brand-800 p-10 text-brand-50 lg:flex">
@@ -170,11 +247,35 @@ export default function LoginPage() {
           <div className="mb-8 lg:hidden">
             <Logo />
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">Log in</h1>
-          <p className="mt-1 mb-6 text-sm text-ink-soft">Enter your mobile number to get a one-time code.</p>
-          <Suspense fallback={<Loading />}>
-            <LoginForm />
-          </Suspense>
+          <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-sm" role="tablist">
+            {(["login", "register"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => setMode(m)}
+                className={cx("rounded-md px-2 py-1.5", mode === m ? "bg-surface font-medium shadow-sm" : "text-ink-soft hover:text-ink")}
+              >
+                {m === "login" ? "Login" : "Register"}
+              </button>
+            ))}
+          </div>
+          {mode === "login" ? (
+            <>
+              <h1 className="text-xl font-semibold tracking-tight">Log in</h1>
+              <p className="mt-1 mb-6 text-sm text-ink-soft">Enter your mobile number to get a one-time code.</p>
+              <Suspense fallback={<Loading />}>
+                <LoginForm />
+              </Suspense>
+            </>
+          ) : (
+            <>
+              <h1 className="text-xl font-semibold tracking-tight">Register</h1>
+              <p className="mt-1 mb-6 text-sm text-ink-soft">New staff member? Fill in your details to create your ID.</p>
+              <RegisterForm onLogin={() => setMode("login")} />
+            </>
+          )}
         </div>
       </div>
     </main>

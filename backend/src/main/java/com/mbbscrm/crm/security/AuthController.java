@@ -41,13 +41,16 @@ public class AuthController {
     private final AuditService audit;
     private final AppProperties props;
     private final OtpService otps;
+    private final com.mbbscrm.crm.alert.AlertService alerts;
     private final com.mbbscrm.crm.assistant.RateLimiter limiter;
 
     public AuthController(AppUserRepository users, PasswordEncoder passwordEncoder, TokenService tokenService,
                           RefreshTokenService refreshTokens, LoginAttemptService loginAttempts,
                           AuditService audit, AppProperties props, OtpService otps,
+                          com.mbbscrm.crm.alert.AlertService alerts,
                           com.mbbscrm.crm.assistant.RateLimiter limiter) {
         this.otps = otps;
+        this.alerts = alerts;
         this.limiter = limiter;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
@@ -129,6 +132,76 @@ public class AuthController {
         loginAttempts.recordSuccess(key);
         audit.recordStandalone(user.getId(), "LOGIN", "USER", user.getId(), "otp");
         return withSession(user, refreshTokens.create(user));
+    }
+
+    public record RegisterRequest(
+            @NotBlank @jakarta.validation.constraints.Size(max = 120) String fullName,
+            @NotBlank String phone,
+            @NotBlank @jakarta.validation.constraints.Email @jakarta.validation.constraints.Size(max = 160) String email,
+            @jakarta.validation.constraints.NotNull com.mbbscrm.crm.common.Role role,
+            /** Hidden from people; only bots fill it in. */
+            @jakarta.validation.constraints.Size(max = 200) String website) {
+    }
+
+    /** {@code staffId} is the new account's ID, e.g. "STF-0007". */
+    public record Registered(Long id, String staffId, String fullName, boolean pendingApproval) {
+    }
+
+    /**
+     * Self-registration from the login page: the person enters their own details and an account (staff ID)
+     * is created for them. It cannot be used to sign in until an admin approves it, because a staff account
+     * opens students' personal data; the admin can also change the role that was asked for. Nobody can
+     * register themselves as a Super Admin.
+     */
+    @PostMapping("/register")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
+    @Transactional
+    public Registered register(@Valid @RequestBody RegisterRequest req, jakarta.servlet.http.HttpServletRequest http) {
+        String phone = com.mbbscrm.crm.common.Phones.normalize(req.phone().trim());
+        if (phone == null || !phone.matches("[0-9]{10}")) {
+            throw ApiException.badRequest("Enter your 10-digit mobile number");
+        }
+        if (req.role() == com.mbbscrm.crm.common.Role.SUPER_ADMIN) {
+            throw ApiException.badRequest("An admin account can only be created by an existing admin");
+        }
+        String forwarded = http.getHeader("X-Forwarded-For");
+        String client = forwarded == null || forwarded.isBlank() ? http.getRemoteAddr() : forwarded.split(",")[0].trim();
+        if (!limiter.allow("register:" + client, 5, java.time.Duration.ofHours(1))
+                || !limiter.allow("register:all", 100, java.time.Duration.ofHours(24))) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Please try again later.");
+        }
+        if (req.website() != null && !req.website().isBlank()) {
+            // A bot filled the hidden field: pretend it worked and create nothing.
+            return new Registered(null, null, req.fullName().trim(), true);
+        }
+        String email = req.email().trim().toLowerCase(java.util.Locale.ROOT);
+        if (users.findByPhone(phone).isPresent()) {
+            throw ApiException.conflict("This mobile number already has an account. Use Log in instead.");
+        }
+        if (users.existsByEmailIgnoreCase(email)) {
+            throw ApiException.conflict("This email already has an account");
+        }
+        AppUser u = new AppUser();
+        u.setFullName(req.fullName().trim());
+        u.setPhone(phone);
+        u.setEmail(email);
+        u.setRole(req.role());
+        u.setActive(false);
+        u.setPendingApproval(true);
+        u.setPasswordHash(passwordEncoder.encode(java.util.UUID.randomUUID().toString()));
+        users.save(u);
+        audit.record(null, "REGISTRATION_REQUESTED", "USER", u.getId(), "role=" + u.getRole());
+        for (AppUser admin : users.findByActiveTrueAndRoleInOrderByFullName(
+                java.util.List.of(com.mbbscrm.crm.common.Role.SUPER_ADMIN))) {
+            alerts.notifyUser(admin.getId(), null, "STAFF_REGISTRATION", com.mbbscrm.crm.alert.Priority.NORMAL,
+                    "New staff registration: " + u.getFullName(), "Asked to join as " + u.getRole()
+                            + ". Approve or reject it under Staff users.", "/admin/users", "REGISTRATION:" + u.getId());
+        }
+        return new Registered(u.getId(), staffId(u.getId()), u.getFullName(), true);
+    }
+
+    public static String staffId(Long id) {
+        return String.format("STF-%04d", id);
     }
 
     @PostMapping("/refresh")

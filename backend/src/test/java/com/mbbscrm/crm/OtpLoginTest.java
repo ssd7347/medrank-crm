@@ -79,6 +79,70 @@ class OtpLoginTest {
         mvc.perform(verify("9840012345", second)).andExpect(status().isOk());
     }
 
+    @Test
+    void registrationWaitsForAdminApproval() throws Exception {
+        String admin = JsonPath.read(mvc.perform(verify("9000000000", requestCode("9000000000"))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(), "$.accessToken");
+        String body = "{\"fullName\":\"New Joiner\",\"phone\":\"9777700001\",\"email\":\"new.joiner@otp.test\","
+                + "\"role\":\"COUNSELLOR\"}";
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.staffId").value(Matchers.matchesPattern("STF-[0-9]{4}")))
+                .andExpect(jsonPath("$.pendingApproval").value(true));
+        // The same number cannot register twice, details must be valid, and nobody can make themselves admin.
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isConflict());
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"X\",\"phone\":\"123\",\"email\":\"x@otp.test\",\"role\":\"TELECALLER\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"X\",\"phone\":\"9777700009\",\"email\":\"x@otp.test\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Sneaky\",\"phone\":\"9777700009\",\"email\":\"sneaky@otp.test\","
+                                + "\"role\":\"SUPER_ADMIN\"}"))
+                .andExpect(status().isBadRequest());
+
+        // Not usable yet: no code is issued for it.
+        mvc.perform(post("/api/auth/otp/request").contentType(MediaType.APPLICATION_JSON).content("{\"phone\":\"9777700001\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.codeOnScreen").value(Matchers.nullValue()));
+
+        MvcResult list = mvc.perform(get("/api/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.phone == '9777700001')].pendingApproval").value(true))
+                .andExpect(jsonPath("$[?(@.phone == '9777700001')].active").value(false))
+                .andExpect(jsonPath("$[?(@.phone == '9777700001')].length()").value(Matchers.hasSize(1)))
+                .andReturn();
+        int id = ((java.util.List<Integer>) JsonPath.read(list.getResponse().getContentAsString(),
+                "$[?(@.phone == '9777700001')].id")).get(0);
+
+        // The admin approves it and chooses the role; then the person can sign in.
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/users/" + id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"New Joiner\",\"phone\":\"9777700001\",\"role\":\"COUNSELLOR\",\"active\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendingApproval").value(false));
+        mvc.perform(verify("9777700001", requestCode("9777700001"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.role").value("COUNSELLOR"));
+        // An approved account can no longer be removed as a "registration".
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/users/" + id + "/registration")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin)).andExpect(status().isConflict());
+
+        // A rejected registration disappears.
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Stranger\",\"phone\":\"9777700002\",\"email\":\"stranger@otp.test\","
+                                + "\"role\":\"TELECALLER\"}"))
+                .andExpect(status().isCreated());
+        MvcResult again = mvc.perform(get("/api/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + admin)).andReturn();
+        int stranger = ((java.util.List<Integer>) JsonPath.read(again.getResponse().getContentAsString(),
+                "$[?(@.phone == '9777700002')].id")).get(0);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/users/" + stranger + "/registration")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin)).andExpect(status().isNoContent());
+        mvc.perform(get("/api/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+                .andExpect(jsonPath("$[?(@.phone == '9777700002')]").isEmpty());
+    }
+
     private String requestCode(String phone) throws Exception {
         MvcResult r = mvc.perform(post("/api/auth/otp/request").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"phone\":\"" + phone + "\"}"))

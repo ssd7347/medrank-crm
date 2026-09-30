@@ -17,10 +17,10 @@ public final class UserDtos {
     }
 
     public record UserResponse(Long id, String fullName, String email, String phone, Role role,
-                               boolean active, BranchRef branch, Instant createdAt) {
+                               boolean active, BranchRef branch, Instant createdAt, boolean pendingApproval) {
         public static UserResponse of(AppUser u) {
             return new UserResponse(u.getId(), u.getFullName(), u.getEmail(), u.getPhone(), u.getRole(),
-                    u.isActive(), BranchRef.of(u.getBranch()), u.getCreatedAt());
+                    u.isActive(), BranchRef.of(u.getBranch()), u.getCreatedAt(), u.isPendingApproval());
         }
     }
 

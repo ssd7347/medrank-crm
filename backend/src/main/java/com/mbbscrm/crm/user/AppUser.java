@@ -44,6 +44,9 @@ public class AppUser {
 
     private boolean active = true;
 
+    /** Asked for an account from the login page and is waiting for an admin to approve it. */
+    private boolean pendingApproval;
+
     /** Null for head-office staff, who are not confined to one branch (spec 4.15). */
     @ManyToOne
     @JoinColumn(name = "branch_id")
@@ -75,6 +78,8 @@ public class AppUser {
     public void setRole(Role role) { this.role = role; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public boolean isPendingApproval() { return pendingApproval; }
+    public void setPendingApproval(boolean pendingApproval) { this.pendingApproval = pendingApproval; }
     public Branch getBranch() { return branch; }
     public void setBranch(Branch branch) { this.branch = branch; }
     public Instant getCreatedAt() { return createdAt; }

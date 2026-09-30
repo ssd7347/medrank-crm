@@ -46,7 +46,7 @@ public class SecurityConfig {
                 .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/logout",
-                        "/api/auth/otp/request", "/api/auth/otp/verify").permitAll()
+                        "/api/auth/otp/request", "/api/auth/otp/verify", "/api/auth/register").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/portal/auth/login", "/api/portal/auth/activate",
                         "/api/portal/auth/refresh", "/api/portal/auth/logout").permitAll()
                 // Website assistant: open to visitors, rate limited in AssistantController.

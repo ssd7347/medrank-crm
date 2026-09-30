@@ -47,9 +47,10 @@ export default function UsersPage() {
           ) : !data?.length ? (
             <EmptyState title="No users" />
           ) : (
-            <Table head={["Name", "Mobile (login)", "Email", "Role", "Branch", "Status", "Since", ""]}>
+            <Table head={["Staff ID", "Name", "Mobile (login)", "Email", "Role", "Branch", "Status", "Since", ""]}>
               {data.map((u) => (
-                <tr key={u.id}>
+                <tr key={u.id} className={u.pendingApproval ? "bg-amber-50/60" : undefined}>
+                  <Td className="font-mono text-xs">STF-{String(u.id).padStart(4, "0")}</Td>
                   <Td className="font-medium">
                     {u.fullName}
                     {u.id === me?.id && <span className="ml-2 text-xs text-ink-faint">(you)</span>}
@@ -58,12 +59,36 @@ export default function UsersPage() {
                   <Td>{u.email}</Td>
                   <Td>{label(u.role)}</Td>
                   <Td>{u.branch?.name ?? <span className="text-ink-faint">Head office</span>}</Td>
-                  <Td>{u.active ? <Badge tone="green">Active</Badge> : <Badge>Deactivated</Badge>}</Td>
+                  <Td>{u.pendingApproval ? <Badge tone="amber">Waiting for approval</Badge> : u.active ? <Badge tone="green">Active</Badge> : <Badge>Deactivated</Badge>}</Td>
                   <Td className="whitespace-nowrap text-ink-soft">{formatDate(u.createdAt)}</Td>
                   <Td className="text-right whitespace-nowrap">
-                    <Button size="sm" variant="ghost" onClick={() => setEditing(u)}>
-                      Edit
-                    </Button>
+                    {u.pendingApproval ? (
+                      <>
+                        <Button size="sm" onClick={() => setEditing(u)}>
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={async () => {
+                            if (!confirm(`Reject and remove the registration of ${u.fullName}?`)) return;
+                            try {
+                              await api(`/api/users/${u.id}/registration`, { method: "DELETE" });
+                              setNotice(`Rejected the registration of ${u.fullName}.`);
+                              reload();
+                            } catch (e) {
+                              setNotice(errorMessage(e));
+                            }
+                          }}
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(u)}>
+                        Edit
+                      </Button>
+                    )}
                   </Td>
                 </tr>
               ))}
@@ -72,7 +97,7 @@ export default function UsersPage() {
         </div>
       </Card>
 
-      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add staff" : "Edit staff"}>
+      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add staff" : editing?.pendingApproval ? "Approve registration" : "Edit staff"}>
         {editing !== null && (
           <UserForm
             user={editing === "new" ? undefined : editing}
@@ -95,7 +120,8 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
     email: user?.email ?? "",
     phone: user?.phone ?? "",
     role: (user?.role ?? "COUNSELLOR") as Role,
-    active: user?.active ?? true,
+    // Opening a registration that is waiting means approving it, so "Active" starts ticked.
+    active: user ? user.active || user.pendingApproval : true,
     branchId: user?.branch?.id.toString() ?? "",
   });
   const branches = useApi<Branch[]>("/api/branches");
@@ -111,7 +137,7 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
     try {
       if (user) {
         await api(`/api/users/${user.id}`, { method: "PUT", body: { fullName: v.fullName, phone: v.phone, role: v.role, active: v.active, branchId: v.branchId ? Number(v.branchId) : null } });
-        onDone(`Saved ${v.fullName}.`);
+        onDone(user.pendingApproval && v.active ? `Approved ${v.fullName}. They can now log in with ${v.phone}.` : `Saved ${v.fullName}.`);
       } else {
         await api("/api/users", { body: { fullName: v.fullName, email: v.email, phone: v.phone, role: v.role, branchId: v.branchId ? Number(v.branchId) : null } });
         onDone(`Created ${v.fullName}. They can now log in with ${v.phone}.`);
@@ -127,6 +153,7 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
   return (
     <form onSubmit={save} className="space-y-4">
       {error && <Alert>{error}</Alert>}
+      {user?.pendingApproval && <Alert tone="amber">This person registered from the login page. Check that you know them, confirm the role and branch, then approve.</Alert>}
       <Field label="Full name" required error={fieldErrors.fullName}>
         {(id) => <Input id={id} required maxLength={120} value={v.fullName} onChange={(e) => setV({ ...v, fullName: e.target.value })} />}
       </Field>
@@ -154,7 +181,7 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
       )}
       {user && !isSelf && <Checkbox label="Active (can log in)" checked={v.active} onChange={(e) => setV({ ...v, active: e.target.checked })} />}
       <Button type="submit" loading={saving}>
-        {user ? "Save" : "Create account"}
+        {user?.pendingApproval ? "Approve" : user ? "Save" : "Create account"}
       </Button>
     </form>
   );
