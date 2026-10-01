@@ -136,10 +136,6 @@ public class SimulatedBrain {
             return out;
         }
 
-        if (s.awaitingVerification) {
-            verify(callId, s, said, out);
-            return out;
-        }
         // "No" to "Am I speaking with ...?" is a wrong person; later in the call it just means "nothing else".
         if (WRONG_PERSON.matcher(text).find() || (!s.delivered && text.matches("^(no|nope)\\b.*"))) {
             end(callId, s, "WRONG_PERSON", null, "I'm sorry to have troubled you. Goodbye.", out);
@@ -166,6 +162,12 @@ public class SimulatedBrain {
                     Map.of("preferred_time_text", "soon", "reason", "Interested; wants the next step."), out);
             out.add(Line.agent("Wonderful. " + (r.ok() ? r.speakHint() : "Someone will call you.") + " Goodbye."));
             s.over = true;
+            return out;
+        }
+        // Anything else said while the identity question is open is taken as the answer to it, so a promise to
+        // pay or a request for a call-back above is never wasted as a failed attempt.
+        if (s.awaitingVerification) {
+            verify(callId, s, said, out);
             return out;
         }
         if (DETAILS.matcher(text).find()) {

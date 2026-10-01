@@ -1,0 +1,11 @@
+Customer Name,Mobile No,Email,Plan,Amount Due,Due Date,Customer ID,Remarks
+Asha Menon,9876500101,asha.menon@example.com,Gold,"₹ 12,500",05/10/2026,CUST-10231,Prefers morning calls
+Ravi Kumar,9876500102,ravi.k@example.com,Silver,4000,2026-10-03,CUST-10232,
+Priya Shankar,9876500103,,Gold,"7,250",28/09/2026,CUST-10233,Paid half last month
+Mohammed Irfan,9876500104,irfan@example.com,Basic,0,,CUST-10234,
+Lakshmi Narayanan,9876500105,lakshmi.n@example.com,Silver,2200,10/10/2026,CUST-10235,
+Arjun Reddy,9876500106,,Gold,15000,02/10/2026,CUST-10236,Asked for a payment plan
+Fatima Begum,9876500107,fatima.b@example.com,Basic,999,15/10/2026,CUST-10237,
+Karthik S,9876500108,karthik.s@example.com,Silver,3500,01/10/2026,CUST-10238,
+Deepa Iyer,9876500109,,Gold,0,,CUST-10239,Renewed early
+Suresh Babu,not-a-number,suresh@example.com,Basic,500,04/10/2026,CUST-10240,

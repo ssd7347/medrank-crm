@@ -77,7 +77,7 @@ public class VoiceHooksController {
         return out;
     }
 
-    /** {@code { "caller_number": "...", "provider_call_id": "..." }} when someone rings the consultancy. */
+    /** {@code { "caller_number": "...", "provider_call_id": "..." }} when someone rings the company. */
     @PostMapping("/inbound/lookup")
     public Map<String, Object> inbound(@RequestBody(required = false) String raw,
                                        @RequestHeader(value = VoiceSignatures.SIGNATURE_HEADER, required = false) String sig,

@@ -134,6 +134,19 @@ class VoiceRulesTest {
     }
 
     @Test
+    void callersMayGiveAReferenceTheWayTheyWouldSayIt() {
+        FieldDefinition ref = new FieldDefinition("customer_id", "Customer ID", FieldDefinition.Type.TEXT);
+        assertThat(VoiceTools.answerMatches(ref, "CUST-10231", "cust 10231")).isTrue();
+        assertThat(VoiceTools.answerMatches(ref, "CUST-10231", "10231")).isTrue();
+        assertThat(VoiceTools.answerMatches(ref, "CUST-10231", "0231")).isTrue();
+        assertThat(VoiceTools.answerMatches(ref, "CUST-10231", "10232")).isFalse();
+        assertThat(VoiceTools.answerMatches(ref, "CUST-10231", "231")).isFalse();
+        assertThat(VoiceTools.answerMatches(ref, "CUST-10231", "")).isFalse();
+        FieldDefinition dob = new FieldDefinition("dob", "Date of birth", FieldDefinition.Type.DATE);
+        assertThat(VoiceTools.answerMatches(dob, "2001-04-09", "9/4/2001")).isTrue();
+    }
+
+    @Test
     void spreadsheetValuesAreNormalisedWhateverTheirFormat() {
         assertThat(FieldService.normalise(FieldDefinition.Type.AMOUNT, "₹ 12,500.00")).isEqualTo("12500");
         assertThat(FieldService.normalise(FieldDefinition.Type.AMOUNT, "Rs. 1,250.50")).isEqualTo("1250.5");

@@ -27,7 +27,7 @@ public record VoiceProperties(
         @DefaultValue("365") int retentionDays,
         @DefaultValue("claude-haiku-4-5-20251001") String defaultModel,
         @DefaultValue("claude-sonnet-5-5") String richModel,
-        /** Counsellor desk number for a live transfer. Blank: every handoff becomes a callback task. */
+        /** Staff desk number for a live transfer. Blank: every handoff becomes a callback task. */
         @DefaultValue("") String deskTransferNumber,
         @DefaultValue("09:30") LocalTime deskOpen,
         @DefaultValue("18:30") LocalTime deskClose,

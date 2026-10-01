@@ -247,7 +247,17 @@ public class VoiceTools {
                 return false;
             }
         }
-        return s.equals(v) || (v.length() >= 6 && s.length() == 4 && v.endsWith(s));
+        if (s.equals(v)) {
+            return true;
+        }
+        // "10231" for CUST-10231: callers say the number part of a reference.
+        String storedDigits = stored.replaceAll("\\D", "");
+        String saidDigits = said.replaceAll("\\D", "");
+        if (storedDigits.length() >= 4 && saidDigits.equals(storedDigits)) {
+            return true;
+        }
+        // The last four characters of a long reference, as on most phone lines.
+        return v.length() >= 6 && s.length() == 4 && v.endsWith(s);
     }
 
     private static Set<String> words(String name) {
