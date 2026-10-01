@@ -19,5 +19,8 @@ public interface StudentRepository extends JpaRepository<Student, Long>, JpaSpec
 
     java.util.List<Student> findByPhone(String phone);
 
+    /** Whoever this number belongs to, as the student or as the parent (used to recognise an incoming call). */
+    java.util.List<Student> findByPhoneOrParentPhone(String phone, String parentPhone);
+
     long countByAssignedCounsellorId(Long counsellorId);
 }

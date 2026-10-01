@@ -74,6 +74,18 @@ public class CallLog {
         this.calledAt = Instant.now();
     }
 
+    /** A call made or answered by the AI voice agent; {@code voiceCallId} links to its transcript. */
+    public static CallLog byAgent(Long leadId, Long studentId, String phone, Direction direction, Outcome outcome,
+                                  Integer durationSeconds, String notes, String voiceCallId) {
+        CallLog c = new CallLog(leadId, studentId, phone, direction, outcome, durationSeconds, notes, null);
+        c.provider = AI_AGENT;
+        c.providerCallId = voiceCallId;
+        return c;
+    }
+
+    public static final String AI_AGENT = "AI_AGENT";
+
+    public String getProviderCallId() { return providerCallId; }
     public Long getId() { return id; }
     public Long getLeadId() { return leadId; }
     public Long getStudentId() { return studentId; }

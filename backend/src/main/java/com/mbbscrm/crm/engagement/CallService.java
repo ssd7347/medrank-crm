@@ -58,10 +58,13 @@ public class CallService {
     }
 
     public record CallView(Long id, String phone, Direction direction, Outcome outcome, Integer durationSeconds,
-                           String notes, String provider, String recordingUrl, UserRef calledBy, Instant calledAt) {
+                           String notes, String provider, String recordingUrl, UserRef calledBy, Instant calledAt,
+                           /** Set for calls made by the AI agent: opens the transcript. */
+                           String voiceCallId) {
         static CallView of(CallLog c) {
             return new CallView(c.getId(), c.getPhone(), c.getDirection(), c.getOutcome(), c.getDurationSeconds(),
-                    c.getNotes(), c.getProvider(), c.getRecordingUrl(), UserRef.of(c.getCalledBy()), c.getCalledAt());
+                    c.getNotes(), c.getProvider(), c.getRecordingUrl(), UserRef.of(c.getCalledBy()), c.getCalledAt(),
+                    CallLog.AI_AGENT.equals(c.getProvider()) ? c.getProviderCallId() : null);
         }
     }
 

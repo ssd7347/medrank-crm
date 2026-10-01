@@ -50,6 +50,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/portal/auth/refresh", "/api/portal/auth/logout").permitAll()
                 // Website assistant: open to visitors, rate limited in AssistantController.
                 .requestMatchers("/api/public/**").permitAll()
+                // Called by the voice platform, not by staff: each request is checked by its HMAC signature
+                // in VoiceHooksController instead of a login.
+                .requestMatchers(HttpMethod.POST, "/api/voice/hooks/**").permitAll()
                 .requestMatchers("/actuator/health", "/error").permitAll()
                 // Family portal logins can reach the portal API and nothing else; staff cannot use it either.
                 .requestMatchers("/api/portal/**").hasRole(TokenService.PORTAL_ROLE)

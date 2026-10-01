@@ -30,8 +30,12 @@ public class IntegrationController {
     private final MessageSender sender;
     private final boolean r2;
 
+    private final com.mbbscrm.crm.voice.VoicePlatforms voice;
+
     public IntegrationController(MessageSender sender, @Value("${app.storage.r2.endpoint:}") String r2Endpoint,
-                                 @Value("${app.storage.r2.bucket:}") String r2Bucket) {
+                                 @Value("${app.storage.r2.bucket:}") String r2Bucket,
+                                 com.mbbscrm.crm.voice.VoicePlatforms voice) {
+        this.voice = voice;
         this.sender = sender;
         this.r2 = !r2Endpoint.isBlank() && !r2Bucket.isBlank();
     }
@@ -64,6 +68,12 @@ public class IntegrationController {
                         State.NOT_CONNECTED,
                         "The assistant answers only from the FAQ entries you write, matched by keywords.",
                         "An Anthropic API key, plus a WhatsApp provider to run the same assistant on WhatsApp."),
+                new Integration("VOICE_AGENT", "AI voice calling agent", "AI voice agent (4.29)",
+                        voice.live() ? State.CONNECTED : State.NOT_CONNECTED,
+                        "Consent, campaigns, scripts, the callback queue and the test console all work, but no "
+                                + "phone rings: campaign calls are recorded as simulated.",
+                        "A voice-AI platform (e.g. Retell, Vapi, Bolna) with an Anthropic API key, and an Indian "
+                                + "telephony provider (Exotel or Knowlarity) with DLT registration."),
                 new Integration("LOANS", "Loan partner systems", "Education loans (4.26)", State.NOT_CONNECTED,
                         "Applications are tracked here and updated by the loan desk after talking to the lender.",
                         "API access agreed with each lender."),

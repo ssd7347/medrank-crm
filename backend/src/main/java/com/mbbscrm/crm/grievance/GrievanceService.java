@@ -154,6 +154,35 @@ public class GrievanceService {
         return get(g.getId(), true);
     }
 
+    /**
+     * Opened by the AI voice agent when a caller raises a refund or dispute (spec 18.13). Nobody is logged in,
+     * so there is no creator; the officer confirms the details with the family before acting on it.
+     */
+    @Transactional
+    public String openFromVoiceCall(Student student, String complainantName, String phone, String summary) {
+        Grievance g = new Grievance();
+        g.setStudent(student);
+        g.setComplainantName(complainantName);
+        g.setComplainantPhone(phone);
+        g.setCategory(GrievanceCategory.OTHER);
+        g.setDescription("Raised on an AI call. Confirm the details with the family before acting.\n" + summary);
+        g.setReceivedVia(Channel.PHONE);
+        g.setReceivedAt(Instant.now());
+        g.setTargetResolutionDate(LocalDate.now().plusDays(DEFAULT_TARGET_DAYS));
+        g.setAssignedOfficer(defaultOfficer());
+        g.setCreatedAt(Instant.now());
+        g.setReferenceNo(nextReference());
+        grievances.save(g);
+        trail(g, null, GrievanceActionType.CREATED, "Opened automatically from an AI call");
+        audit.record(null, "GRIEVANCE_CREATED", "GRIEVANCE", g.getId(), g.getReferenceNo() + " (AI call)");
+        if (g.getAssignedOfficer() != null) {
+            alerts.notifyUser(g.getAssignedOfficer().getId(), student == null ? null : student.getId(),
+                    "GRIEVANCE_NEW", Priority.URGENT, "New grievance " + g.getReferenceNo() + " from an AI call",
+                    g.getComplainantName(), "/grievances/" + g.getId(), "GRV:" + g.getId() + ":NEW");
+        }
+        return g.getReferenceNo();
+    }
+
     @Transactional(readOnly = true)
     public List<GrievanceView> list(boolean openOnly) {
         CurrentUser me = CurrentUser.get();

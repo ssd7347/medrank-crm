@@ -12,4 +12,6 @@ public interface CallLogRepository extends JpaRepository<CallLog, Long> {
 
     @EntityGraph(attributePaths = "calledBy")
     List<CallLog> findByStudentIdOrderByCalledAtDesc(Long studentId);
+
+    List<CallLog> findByCalledAtGreaterThanEqualOrderByCalledAtAsc(java.time.Instant since);
 }
