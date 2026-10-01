@@ -86,6 +86,8 @@ export type Call = {
   recordingUrl: string | null;
   calledBy: UserRef | null;
   calledAt: string;
+  /** Set for calls made by the AI agent: opens its transcript. */
+  voiceCallId: string | null;
 };
 
 export type LeadScore = { score: number; band: "HOT" | "WARM" | "COLD"; reasons: string[]; nextAction: string | null };

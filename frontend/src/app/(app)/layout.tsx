@@ -23,6 +23,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { href: "/follow-ups", label: "My follow-ups", roles: LEAD_ROLES },
       { href: "/students", label: "Students", roles: STUDENT_ROLES },
       { href: "/tickets", label: "Helpdesk" },
+      { href: "/voice", label: "AI voice agent" },
     ],
   },
   {

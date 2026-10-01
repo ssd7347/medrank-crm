@@ -9,6 +9,7 @@ import { CallButton } from "@/components/call-button";
 import { LeadScoreBadge } from "@/components/score-badge";
 import { LeadForm } from "@/components/lead-form";
 import { StudentForm, emptyStudent } from "@/components/student-form";
+import { ConsentCard, VoiceCallList } from "@/components/voice";
 import {
   Alert,
   Badge,
@@ -162,6 +163,8 @@ export default function LeadDetailPage() {
           </div>
 
           <div className="space-y-6">
+            <ConsentCard path={`/api/leads/${id}/voice-consent`} canEdit />
+            <VoiceCallList path={`/api/leads/${id}/voice-calls`} />
             <Card title="Assigned to">
               <p className="text-sm">
                 {l.assignedCounsellor ? (

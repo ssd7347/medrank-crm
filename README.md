@@ -33,7 +33,7 @@ manually (Razorpay later).
 - 4.12 Marketing: campaigns, spend, and cost per lead / per confirmed admission by channel and campaign
   (associate commission counts as the cost of the referral channel).
 - 4.13 Analytics (round-day numbers, funnel, revenue, outcomes by category and state) and a report builder
-  with column selection, CSV download for Excel and print-to-PDF. Voice-agent metrics arrive with Phase 6.
+  with column selection, CSV download for Excel and print-to-PDF. Voice-agent metrics are on the AI voice agent page.
 - 4.15 Branches: staff with a branch only see that branch's leads, students, documents queue, dues and
   tickets; admins and head-office staff see everything, with a branch filter and a branch comparison.
   The round desk and dashboard counters are not yet split by branch.
@@ -60,7 +60,15 @@ connected yet, so each module does the useful part itself and leaves a slot for 
   machine-written and needs a native speaker's review.
 - 4.16 DigiLocker: not built (needs partner approval); documents carry a `source` column ready for it.
 
-Next: Phase 6 (AI voice calling agent, spec section 18), which needs a telephony and voice-AI provider.
+**Phase 6 (AI voice calling agent, spec 4.29 and section 18) — built in simulated mode.** Everything except the
+live phone call: consent and opt-out per number, a do-not-disturb check, versioned call scripts that an admin
+approves, campaigns (who to call, a preview of who cannot be called and why, calling hours in Indian time,
+retries, a "Pause all" switch), a signed Tool API with 14 tools and server-side identity verification, call
+webhooks, incoming-call lookup, handoff to a person (live transfer or a callback task, plus a grievance draft for
+refund disputes), transcripts with the agent's look-ups, metrics and a cost estimate, and a test console. No
+telephony or voice-AI provider is connected yet, so campaign calls are recorded as simulated and no phone rings;
+the test console uses a rule-based stand-in for the AI. Connecting a provider is one adapter class plus settings:
+see [docs/voice-agent.md](docs/voice-agent.md). The starter scripts are drafts and must be read and approved first.
 Works on phones and laptops (tables turn into cards on small screens).
 
 ## Stack

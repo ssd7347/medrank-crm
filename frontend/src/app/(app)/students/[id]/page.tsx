@@ -16,6 +16,7 @@ import { PortalAlumniTab } from "@/components/portal-alumni-tab";
 import { RiskBadge } from "@/components/score-badge";
 import { SessionsTab } from "@/components/sessions-tab";
 import { MessagesTab, ShortlistTab } from "@/components/student-tabs";
+import { ConsentCard, VoiceCallList } from "@/components/voice";
 import { Alert, Badge, Button, ButtonLink, Card, DescList, Loading, PageHeader, cx } from "@/components/ui";
 import { api } from "@/lib/api";
 import { DOCUMENT_ROLES, FEE_READ_ROLES, useAuth } from "@/lib/auth";
@@ -64,6 +65,7 @@ const TABS = [
   { key: "shortlist", label: "Shortlist" },
   { key: "tickets", label: "Tickets" },
   { key: "messages", label: "Messages" },
+  { key: "voice", label: "AI calls" },
   { key: "portal", label: "Portal & alumni" },
 ] as const;
 
@@ -166,6 +168,11 @@ function StudentView() {
         <StudentTickets studentId={s.id} />
       ) : tab === "messages" && !editing ? (
         <MessagesTab studentId={s.id} />
+      ) : tab === "voice" && !editing ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ConsentCard path={`/api/students/${s.id}/voice-consent`} canEdit={canEdit} />
+          <VoiceCallList path={`/api/students/${s.id}/voice-calls`} />
+        </div>
       ) : tab === "portal" && !editing && canEdit ? (
         <PortalAlumniTab student={s} />
       ) : editing ? (

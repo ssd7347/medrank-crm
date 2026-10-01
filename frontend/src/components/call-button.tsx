@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { api, errorMessage } from "@/lib/api";
@@ -142,11 +143,16 @@ export function CallHistory({ studentId, version }: { studentId: number; version
                 <Badge tone={OUTCOME_TONE[c.outcome]}>{label(c.outcome)}</Badge>
                 <span className="text-xs text-ink-soft">
                   {c.direction === "INBOUND" ? "They called" : "We called"} · {formatDateTime(c.calledAt)}
-                  {c.calledBy && ` · ${c.calledBy.fullName}`}
+                  {c.calledBy ? ` · ${c.calledBy.fullName}` : c.provider === "AI_AGENT" ? " · AI agent" : ""}
                   {c.durationSeconds ? ` · ${Math.round(c.durationSeconds / 60)} min` : ""}
                 </span>
               </div>
               {c.notes && <p className="mt-1 whitespace-pre-wrap">{c.notes}</p>}
+              {c.voiceCallId && (
+                <Link href={`/voice/calls/${c.voiceCallId}`} className="mt-1 inline-block text-xs font-medium text-brand-800 hover:underline">
+                  Open transcript
+                </Link>
+              )}
             </li>
           ))}
         </ul>
