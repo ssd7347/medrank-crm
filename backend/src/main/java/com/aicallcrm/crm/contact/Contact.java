@@ -34,8 +34,7 @@ public class Contact {
     private String phone;
     private String altPhone;
     private String email;
-    @Enumerated(EnumType.STRING)
-    private ContactStatus status = ContactStatus.NEW;
+    private String status = ContactStatus.NEW;
     private String source;
     private String notes;
     /** JSON object of custom field values, keyed by field key. Read and written through {@link ContactFields}. */
@@ -78,8 +77,8 @@ public class Contact {
     public void setAltPhone(String altPhone) { this.altPhone = altPhone; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
-    public ContactStatus getStatus() { return status; }
-    public void setStatus(ContactStatus status) { this.status = status; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
     public String getNotes() { return notes; }

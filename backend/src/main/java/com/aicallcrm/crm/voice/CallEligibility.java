@@ -68,7 +68,7 @@ public class CallEligibility {
             }
         }
         Contact contact = contacts.findById(target.getContactId()).orElse(null);
-        if (contact == null || contact.getStatus() == ContactStatus.DO_NOT_CALL) {
+        if (contact == null || ContactStatus.DO_NOT_CALL.equals(contact.getStatus())) {
             return Verdict.never(SkipReason.DO_NOT_CALL);
         }
         if (dnd.check(target.getPhone()) == DndResult.BLOCKED) {

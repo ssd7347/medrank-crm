@@ -7,12 +7,14 @@ import { Alert, ButtonLink, Card, Loading, PageHeader, cx } from "@/components/u
 import { MANAGER_ROLES, useAuth } from "@/lib/auth";
 import { useBranding } from "@/lib/branding";
 import { formatNumber } from "@/lib/format";
-import { CONTACT_STATUSES, type DashboardSummary } from "@/lib/types";
+import { useStages } from "@/lib/stages";
+import { type DashboardSummary } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
 
 export default function DashboardPage() {
   const { user, hasRole } = useAuth();
-  const { plural, agentName } = useBranding();
+  const { plural, agentName, has } = useBranding();
+  const { stages } = useStages();
   const manager = hasRole(...MANAGER_ROLES);
   const { data, error, loading } = useApi<DashboardSummary>("/api/dashboard");
 
@@ -27,7 +29,7 @@ export default function DashboardPage() {
         title={`Hello, ${user?.fullName.split(" ")[0] ?? ""}`}
         subtitle={manager ? "The whole company at a glance." : `Your ${plural.toLowerCase()} and calls.`}
         actions={
-          manager && data.totalContacts === 0 ? (
+          manager && data.totalContacts === 0 && has("IMPORT") ? (
             <ButtonLink href="/import">Import your first Excel sheet</ButtonLink>
           ) : undefined
         }
@@ -36,15 +38,15 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label={manager ? `${plural}` : `My ${plural.toLowerCase()}`} value={formatNumber(data.totalContacts)} href="/contacts" />
         {manager && <Stat label="Added this week" value={formatNumber(data.newThisWeek)} href="/contacts" />}
-        <Stat label="My follow-ups due" value={formatNumber(data.myFollowUpsDue)} href="/follow-ups" tone={data.myFollowUpsDue > 0 ? "amber" : undefined} />
-        <Stat label="Call-backs waiting" value={formatNumber(data.openCallbacks)} href="/voice/callbacks" tone={data.openCallbacks > 0 ? "red" : undefined} />
-        {!manager && <Stat label="AI calls today" value={formatNumber(data.aiCallsToday)} href="/voice/calls" />}
+        {has("FOLLOW_UPS") && <Stat label="My follow-ups due" value={formatNumber(data.myFollowUpsDue)} href="/follow-ups" tone={data.myFollowUpsDue > 0 ? "amber" : undefined} />}
+        {has("AI_CALLS") && <Stat label="Call-backs waiting" value={formatNumber(data.openCallbacks)} href="/voice/callbacks" tone={data.openCallbacks > 0 ? "red" : undefined} />}
+        {!manager && has("AI_CALLS") && <Stat label="AI calls today" value={formatNumber(data.aiCallsToday)} href="/voice/calls" />}
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card title={`${plural} by status`}>
           <ul className="space-y-2">
-            {CONTACT_STATUSES.map((s) => (
+            {stages.map(({ key: s }) => (
               <li key={s}>
                 <div className="flex items-center justify-between gap-2 text-sm">
                   <ContactStatusBadge status={s} />
@@ -57,6 +59,7 @@ export default function DashboardPage() {
             ))}
           </ul>
         </Card>
+        {has("AI_CALLS") && (
         <Card title={`${agentName}, the AI agent, today`}>
           <div className="grid grid-cols-2 gap-3">
             <Stat label="Calls made" value={formatNumber(data.aiCallsToday)} href="/voice/calls" />
@@ -70,6 +73,7 @@ export default function DashboardPage() {
             .{manager && " Campaigns, scripts and the test console are under AI voice agent."}
           </p>
         </Card>
+        )}
       </div>
     </>
   );

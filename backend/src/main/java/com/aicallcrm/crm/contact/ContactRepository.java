@@ -11,6 +11,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 /** Used by the voice agent and the campaign engine as well as the contact screens. */
@@ -31,4 +32,11 @@ public interface ContactRepository extends JpaRepository<Contact, Long>, JpaSpec
     List<Object[]> countByStatus();
 
     long countByCreatedAtGreaterThanEqual(Instant since);
+
+    @Query("select count(c) from Contact c where c.status = :stageKey")
+    long countInStage(String stageKey);
+
+    @Modifying
+    @Query("update Contact c set c.status = :to where c.status = :from")
+    int moveStage(String from, String to);
 }

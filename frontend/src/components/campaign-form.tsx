@@ -5,7 +5,8 @@ import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { useBranding } from "@/lib/branding";
 import { label } from "@/lib/format";
-import { CONTACT_STATUSES, type ContactStatus, type FieldDef, type ImportBatch } from "@/lib/types";
+import { useStages } from "@/lib/stages";
+import { type ContactStatus, type FieldDef, type ImportBatch } from "@/lib/types";
 import { FIELD_OPS, FIELD_OP_LABEL, type Campaign, type CampaignDetail, type CampaignStatus, type FieldOp } from "@/lib/types-voice";
 import { useApi } from "@/lib/use-api";
 
@@ -31,6 +32,7 @@ export function describeFilter(c: Campaign, fields: FieldDef[], uploads?: Import
 /** Create a campaign, or change one that is not running. */
 export function CampaignForm({ existing, onSaved, onCancel }: { existing?: Campaign; onSaved: (d: CampaignDetail) => void; onCancel: () => void }) {
   const { plural } = useBranding();
+  const { stages } = useStages();
   const scripts = useApi<string[]>("/api/voice/script-names");
   const fields = useApi<FieldDef[]>("/api/fields");
   const uploads = useApi<ImportBatch[]>("/api/contacts/imports");
@@ -97,10 +99,10 @@ export function CampaignForm({ existing, onSaved, onCancel }: { existing?: Campa
         <div>
           <p className="mb-1.5 text-xs font-medium text-ink-soft">Status (none ticked = any status except &ldquo;Do not call&rdquo;)</p>
           <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {CONTACT_STATUSES.filter((s) => s !== "DO_NOT_CALL").map((s) => (
+            {stages.filter((st) => st.key !== "DO_NOT_CALL").map(({ key: s, label: stageLabel }) => (
               <Checkbox
                 key={s}
-                label={label(s)}
+                label={stageLabel}
                 checked={statuses.includes(s)}
                 onChange={(e) => setStatuses((old) => (e.target.checked ? [...old, s] : old.filter((x) => x !== s)))}
               />

@@ -32,7 +32,7 @@ const NEW_FIELD: { value: string; label: string }[] = [
  */
 export default function ImportPage() {
   const { hasRole } = useAuth();
-  const { plural } = useBranding();
+  const { plural, has } = useBranding();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
@@ -220,6 +220,7 @@ export default function ImportPage() {
                   />
                 )}
               </Field>
+              {has("AI_CALLS") && (
               <div className="rounded-lg border border-line p-3">
                 <Checkbox label="Everyone in this file agreed to AI-assisted calls" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
                 {consent && (
@@ -232,6 +233,7 @@ export default function ImportPage() {
                 )}
                 {!consent && <p className="mt-1 pl-6 text-xs text-ink-faint">Without consent the AI agent will not call them. You can record consent later, person by person.</p>}
               </div>
+              )}
             </div>
           </Card>
 

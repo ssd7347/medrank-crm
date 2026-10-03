@@ -51,7 +51,7 @@ public class SecurityConfig {
                 // in VoiceHooksController instead of a login.
                 .requestMatchers(HttpMethod.POST, "/api/voice/hooks/**").permitAll()
                 // The company name and colour, for the login page.
-                .requestMatchers(HttpMethod.GET, "/api/public/branding").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/public/branding", "/api/public/logo").permitAll()
                 .requestMatchers("/actuator/health", "/error").permitAll()
                 .requestMatchers("/api/**").hasAnyRole(STAFF_ROLES)
                 .anyRequest().denyAll())

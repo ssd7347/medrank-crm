@@ -153,15 +153,15 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-  const { companyName, agentName } = useBranding();
+  const { companyName, agentName, loginHeadline, loginText } = useBranding();
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       <div className="hidden flex-col justify-between bg-brand-800 p-10 text-brand-50 lg:flex">
         <Logo light />
         <div className="max-w-md">
-          <p className="text-3xl leading-tight font-semibold tracking-tight">Every customer reached, every call followed up.</p>
+          <p className="text-3xl leading-tight font-semibold tracking-tight">{loginHeadline || "Every customer reached, every call followed up."}</p>
           <p className="mt-4 text-brand-200">
-            {agentName}, the AI assistant of {companyName}, makes the routine calls. Your team takes over whenever a person is needed.
+            {loginText || `${agentName}, the AI assistant of ${companyName}, makes the routine calls. Your team takes over whenever a person is needed.`}
           </p>
         </div>
         <p className="text-xs text-brand-300">All actions are logged.</p>

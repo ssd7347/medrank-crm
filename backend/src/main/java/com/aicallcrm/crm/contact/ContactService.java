@@ -49,7 +49,7 @@ public class ContactService {
             @NotBlank @Pattern(regexp = "^[0-9+ ()-]{8,20}$", message = "invalid phone") String phone,
             @Pattern(regexp = "^([0-9+ ()-]{8,20})?$", message = "invalid phone") String altPhone,
             @Email @Size(max = 160) String email,
-            ContactStatus status,
+            @Size(max = 20) String status,
             @Size(max = 60) String source,
             @Size(max = 2000) String notes,
             Long assignedToId,
@@ -57,17 +57,17 @@ public class ContactService {
             Map<String, String> fields) {
     }
 
-    public record ContactListItem(Long id, String fullName, String phone, String email, ContactStatus status,
+    public record ContactListItem(Long id, String fullName, String phone, String email, String status,
                                   String source, UserRef assignedTo, BranchRef branch, Map<String, String> fields,
                                   Instant createdAt) {
     }
 
     public record ContactView(Long id, String fullName, String phone, String altPhone, String email,
-                              ContactStatus status, String source, String notes, UserRef assignedTo, BranchRef branch,
+                              String status, String source, String notes, UserRef assignedTo, BranchRef branch,
                               Long importBatchId, Map<String, String> fields, Instant createdAt, Instant updatedAt) {
     }
 
-    public record StatusRequest(@NotNull ContactStatus status, @Size(max = 1000) String note) {
+    public record StatusRequest(@NotBlank @Size(max = 20) String status, @Size(max = 1000) String note) {
     }
 
     public record AssignRequest(Long userId) {
@@ -98,7 +98,7 @@ public class ContactService {
     }
 
     /** Filters for the list, the CSV export and campaign audiences. All optional. */
-    public record Filter(String q, ContactStatus status, Long assignedToId, boolean unassignedOnly, Long importBatchId,
+    public record Filter(String q, String status, Long assignedToId, boolean unassignedOnly, Long importBatchId,
                          Long branchId) {
     }
 
@@ -108,17 +108,19 @@ public class ContactService {
     private final FieldService fields;
     private final AppUserRepository users;
     private final BranchRepository branches;
+    private final StageService stages;
     private final AuditService audit;
 
     public ContactService(ContactRepository contacts, ContactActivityRepository activities,
                           FollowUpRepository followUps, FieldService fields, AppUserRepository users,
-                          BranchRepository branches, AuditService audit) {
+                          BranchRepository branches, StageService stages, AuditService audit) {
         this.contacts = contacts;
         this.activities = activities;
         this.followUps = followUps;
         this.fields = fields;
         this.users = users;
         this.branches = branches;
+        this.stages = stages;
         this.audit = audit;
     }
 
@@ -225,9 +227,9 @@ public class ContactService {
             throw ApiException.conflict("Another contact already has this phone number")
                     .with("existingContactId", other.getId());
         });
-        ContactStatus before = c.getStatus();
+        String before = c.getStatus();
         apply(c, req, phone, me);
-        if (before != c.getStatus()) {
+        if (!before.equals(c.getStatus())) {
             activities.save(new ContactActivity(c.getId(), ActivityType.STATUS_CHANGE,
                     label(before) + " → " + label(c.getStatus()), null, users.getReferenceById(me.id())));
         }
@@ -240,8 +242,8 @@ public class ContactService {
         c.setPhone(phone);
         c.setAltPhone(req.altPhone() == null || req.altPhone().isBlank() ? null : phone(req.altPhone()));
         c.setEmail(blankToNull(req.email()));
-        if (req.status() != null) {
-            c.setStatus(req.status());
+        if (req.status() != null && !req.status().isBlank()) {
+            c.setStatus(stages.require(req.status()));
         }
         c.setSource(blankToNull(req.source()));
         c.setNotes(blankToNull(req.notes()));
@@ -269,20 +271,21 @@ public class ContactService {
     public ContactView changeStatus(Long id, StatusRequest req) {
         CurrentUser me = CurrentUser.get();
         Contact c = requireVisible(id);
-        if (c.getStatus() != req.status()) {
+        String to = stages.require(req.status());
+        if (!c.getStatus().equals(to)) {
             activities.save(new ContactActivity(c.getId(), ActivityType.STATUS_CHANGE,
-                    label(c.getStatus()) + " → " + label(req.status()), blankToNull(req.note()),
+                    label(c.getStatus()) + " → " + label(to), blankToNull(req.note()),
                     users.getReferenceById(me.id())));
-            c.setStatus(req.status());
-            audit.record(me.id(), "CONTACT_STATUS", "CONTACT", c.getId(), req.status().name());
+            c.setStatus(to);
+            audit.record(me.id(), "CONTACT_STATUS", "CONTACT", c.getId(), to);
         }
         return view(c);
     }
 
     /** Used by the voice agent: "interested", "do not call" and so on, said on an AI call. */
     @Transactional
-    public void statusFromCall(Long contactId, ContactStatus status, String why) {
-        contacts.findById(contactId).filter(c -> c.getStatus() != status).ifPresent(c -> {
+    public void statusFromCall(Long contactId, String status, String why) {
+        contacts.findById(contactId).filter(c -> !c.getStatus().equals(status)).ifPresent(c -> {
             activities.save(new ContactActivity(c.getId(), ActivityType.STATUS_CHANGE,
                     label(c.getStatus()) + " → " + label(status), why, null));
             c.setStatus(status);
@@ -395,9 +398,8 @@ public class ContactService {
         return p;
     }
 
-    private static String label(ContactStatus s) {
-        String t = s.name().toLowerCase(Locale.ROOT).replace('_', ' ');
-        return Character.toUpperCase(t.charAt(0)) + t.substring(1);
+    private String label(String stageKey) {
+        return stages.label(stageKey);
     }
 
     private static String blankToNull(String s) {

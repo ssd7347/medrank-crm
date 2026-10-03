@@ -3,8 +3,18 @@
 export const ROLES = ["SUPER_ADMIN", "MANAGER", "AGENT"] as const;
 export type Role = (typeof ROLES)[number];
 
-export const CONTACT_STATUSES = ["NEW", "CONTACTED", "INTERESTED", "CUSTOMER", "NOT_INTERESTED", "DO_NOT_CALL"] as const;
-export type ContactStatus = (typeof CONTACT_STATUSES)[number];
+/** A stage key. Stages are named by each customer (see /api/stages); these five always exist. */
+export type ContactStatus = string;
+export const BUILT_IN_STAGES = ["NEW", "CONTACTED", "INTERESTED", "NOT_INTERESTED", "DO_NOT_CALL"] as const;
+
+export type StageCategory = "OPEN" | "WON" | "LOST";
+export type Stage = { id: number; key: string; label: string; color: string; category: StageCategory; sortOrder: number; builtIn: boolean };
+
+export const FEATURES = ["AI_CALLS", "IMPORT", "EXPORT", "FOLLOW_UPS"] as const;
+export type Feature = (typeof FEATURES)[number];
+
+export type StarterPack = { id: string; name: string; description: string; contactLabel: string; stages: string[]; fields: string[]; scripts: string[]; faqs: number };
+export type PackApplied = { id: string; stagesAdded: number; fieldsAdded: number; scriptsAdded: number; faqsAdded: number };
 
 export const MANUAL_ACTIVITY_TYPES = ["NOTE", "CALL", "WHATSAPP", "EMAIL", "MEETING"] as const;
 export type ActivityType = (typeof MANUAL_ACTIVITY_TYPES)[number] | "STATUS_CHANGE" | "ASSIGNMENT" | "IMPORT";
@@ -156,7 +166,18 @@ export type ImportBatch = { id: number; fileName: string; totalRows: number; cre
 
 // ------------------------------------------------------------------ everything else
 
-export type Branding = { companyName: string; agentName: string; brandColor: string; supportPhone: string | null; contactLabel: string };
+export type Branding = {
+  companyName: string;
+  agentName: string;
+  brandColor: string;
+  supportPhone: string | null;
+  contactLabel: string;
+  loginHeadline: string | null;
+  loginText: string | null;
+  logoUrl: string | null;
+  industryPack: string | null;
+  features: Feature[];
+};
 
 export type AppNotification = {
   id: number;

@@ -1,0 +1,34 @@
+{
+  "id": "clinic",
+  "name": "Clinic or hospital",
+  "description": "Appointment reminders, missed-visit follow-ups and check-up recalls for patients.",
+  "contactLabel": "Patient",
+  "stages": [
+    {"label": "Appointment booked", "color": "#7c3aed", "category": "OPEN"},
+    {"label": "Visited", "color": "#16a34a", "category": "WON"},
+    {"label": "Missed appointment", "color": "#ea580c", "category": "OPEN"}
+  ],
+  "fields": [
+    {"label": "Patient ID", "type": "TEXT", "agentAccess": "NONE", "verifyWith": true},
+    {"label": "Date of birth", "type": "DATE", "agentAccess": "NONE", "verifyWith": true},
+    {"label": "Doctor", "type": "TEXT", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Department", "type": "TEXT", "agentAccess": "ANYONE", "verifyWith": false},
+    {"label": "Appointment date", "type": "DATE", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Appointment time", "type": "TEXT", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Next check-up", "type": "DATE", "agentAccess": "AFTER_VERIFY", "verifyWith": false}
+  ],
+  "scripts": [
+    {"name": "Clinic appointment reminder", "kind": "OUTBOUND",
+     "purpose": "Remind the patient of their appointment. After verification, use get_contact_details for the doctor, date and time and confirm they can attend. If they cannot, offer a call-back from the front desk to rebook. Never discuss symptoms, test results, diagnoses or medicines; for any health question, say a member of staff will call back.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}? I am calling about your upcoming appointment."},
+    {"name": "Check-up recall", "kind": "OUTBOUND",
+     "purpose": "Let the patient know their routine check-up is due and ask whether they would like the front desk to call back and book it. If yes, log INTERESTED and schedule a call-back. Never discuss health details.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}? I am calling because your check-up is due."}
+  ],
+  "faqs": [
+    {"question": "What are your timings?", "answer": "We are open [days] from [opening time] to [closing time].", "keywords": "timing, hours, open, close, time"},
+    {"question": "Where are you located?", "answer": "We are at [full address], near [landmark].", "keywords": "address, location, where, directions"},
+    {"question": "Do I need to bring anything?", "answer": "Please bring your previous prescriptions, reports and a photo ID.", "keywords": "bring, documents, reports, prescription"},
+    {"question": "Is it an emergency?", "answer": "If this is a medical emergency, please call 108 or go to the nearest emergency department straight away.", "keywords": "emergency, urgent, pain, ambulance"}
+  ]
+}

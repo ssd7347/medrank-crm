@@ -6,7 +6,8 @@ import { ApiError, api, errorMessage } from "@/lib/api";
 import { MANAGER_ROLES, useAuth } from "@/lib/auth";
 import { useBranding } from "@/lib/branding";
 import { label } from "@/lib/format";
-import { CONTACT_STATUSES, type Branch, type Contact, type ContactRequest, type FieldDef, type UserRef } from "@/lib/types";
+import { useStages } from "@/lib/stages";
+import { type Branch, type Contact, type ContactRequest, type FieldDef, type UserRef } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
 
 import { Alert, Button, Field, Input, Select, Textarea } from "./ui";
@@ -23,6 +24,7 @@ export function FieldInput({ field, value, onChange, id }: { field: FieldDef; va
 export function ContactForm({ existing, onSaved, onCancel }: { existing?: Contact; onSaved: (c: Contact) => void; onCancel?: () => void }) {
   const { hasRole, user } = useAuth();
   const { contactLabel } = useBranding();
+  const { stages } = useStages();
   const manager = hasRole(...MANAGER_ROLES);
   const fields = useApi<FieldDef[]>("/api/fields");
   const staff = useApi<UserRef[]>(manager ? "/api/users/assignable" : null);
@@ -89,7 +91,7 @@ export function ContactForm({ existing, onSaved, onCancel }: { existing?: Contac
           {(id) => <Input id={id} type="email" maxLength={160} value={v.email ?? ""} onChange={set("email")} />}
         </Field>
         <Field label="Status">
-          {(id) => <Select id={id} value={v.status ?? "NEW"} options={[...CONTACT_STATUSES]} labelFor={label} onChange={set("status")} />}
+          {(id) => <Select id={id} value={v.status ?? "NEW"} options={stages.map((s) => ({ value: s.key, label: s.label }))} onChange={set("status")} />}
         </Field>
         <Field label="Source" hint="Where this person came from">
           {(id) => <Input id={id} maxLength={60} value={v.source ?? ""} onChange={set("source")} placeholder="e.g. Walk-in, Website, Referral" />}

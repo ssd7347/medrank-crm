@@ -1,0 +1,33 @@
+{
+  "id": "education",
+  "name": "School, college or coaching",
+  "description": "Admission enquiry follow-ups, demo-class invitations and fee reminders for students and parents.",
+  "contactLabel": "Student",
+  "stages": [
+    {"label": "Demo attended", "color": "#7c3aed", "category": "OPEN"},
+    {"label": "Application submitted", "color": "#0891b2", "category": "OPEN"},
+    {"label": "Enrolled", "color": "#16a34a", "category": "WON"}
+  ],
+  "fields": [
+    {"label": "Course", "type": "TEXT", "agentAccess": "ANYONE", "verifyWith": false},
+    {"label": "Parent name", "type": "TEXT", "agentAccess": "NONE", "verifyWith": false},
+    {"label": "Student ID", "type": "TEXT", "agentAccess": "NONE", "verifyWith": true},
+    {"label": "Fee due", "type": "AMOUNT", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Fee due date", "type": "DATE", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Batch start date", "type": "DATE", "agentAccess": "ANYONE", "verifyWith": false}
+  ],
+  "scripts": [
+    {"name": "Admission enquiry follow-up", "kind": "OUTBOUND",
+     "purpose": "Follow up an admission enquiry. Ask which course they are interested in and whether they would like to attend a free demo class or speak to a counsellor. If yes, log INTERESTED and schedule a call-back. Answer course questions only from search_faq. If you are speaking with a minor, ask to speak with a parent.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}? You recently enquired about admission with us."},
+    {"name": "Fee reminder", "kind": "OUTBOUND",
+     "purpose": "Remind the student or parent that a fee is due. After verification, share the amount and date from get_contact_details. If they say when they will pay, log WILL_ACT with the date. Never threaten or mention exclusion from classes.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"}
+  ],
+  "faqs": [
+    {"question": "What courses do you offer?", "answer": "We offer [courses]. Our counsellor can explain which suits you best.", "keywords": "course, program, subject, offer"},
+    {"question": "What are the fees?", "answer": "Fees for [course] are [amount], payable [in instalments / at once].", "keywords": "fee, fees, cost, price, instalment"},
+    {"question": "When does the next batch start?", "answer": "The next batch starts on [date].", "keywords": "batch, start, when, date, join"},
+    {"question": "Where are classes held?", "answer": "Classes are at [address], and [online classes are also available].", "keywords": "where, address, online, location"}
+  ]
+}

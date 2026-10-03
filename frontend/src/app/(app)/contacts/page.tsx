@@ -9,8 +9,9 @@ import { Alert, Button, ButtonLink, Card, EmptyState, Input, Loading, PageHeader
 import { downloadProtected, errorMessage } from "@/lib/api";
 import { MANAGER_ROLES, useAuth } from "@/lib/auth";
 import { useBranding } from "@/lib/branding";
-import { formatDate, formatRupees, label } from "@/lib/format";
-import { CONTACT_STATUSES, type ContactListItem, type FieldDef, type Page } from "@/lib/types";
+import { formatDate, formatRupees } from "@/lib/format";
+import { useStages } from "@/lib/stages";
+import { type ContactListItem, type FieldDef, type Page } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
 
 export default function ContactsPage() {
@@ -24,7 +25,8 @@ export default function ContactsPage() {
 function Contacts() {
   const params = useSearchParams();
   const { hasRole, user } = useAuth();
-  const { plural, contactLabel } = useBranding();
+  const { plural, contactLabel, has } = useBranding();
+  const { stages } = useStages();
   const manager = hasRole(...MANAGER_ROLES);
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
@@ -86,12 +88,16 @@ function Contacts() {
           <>
             {manager && (
               <>
-                <Button variant="secondary" loading={exporting} onClick={exportCsv}>
-                  Export
-                </Button>
-                <ButtonLink href="/import" variant="secondary">
-                  Import from Excel
-                </ButtonLink>
+                {has("EXPORT") && (
+                  <Button variant="secondary" loading={exporting} onClick={exportCsv}>
+                    Export
+                  </Button>
+                )}
+                {has("IMPORT") && (
+                  <ButtonLink href="/import" variant="secondary">
+                    Import from Excel
+                  </ButtonLink>
+                )}
               </>
             )}
             <ButtonLink href="/contacts/new">Add {contactLabel.toLowerCase()}</ButtonLink>
@@ -104,8 +110,7 @@ function Contacts() {
           aria-label="Status"
           value={status}
           placeholder="Any status"
-          options={[...CONTACT_STATUSES]}
-          labelFor={label}
+          options={stages.map((s) => ({ value: s.key, label: s.label }))}
           onChange={(e) => {
             setStatus(e.target.value);
             setPage(0);
@@ -129,7 +134,7 @@ function Contacts() {
             <Loading />
           ) : !data?.items.length ? (
             <EmptyState title={q || status || owner ? "Nothing matches" : `No ${plural.toLowerCase()} yet`}>
-              {!q && !status && !owner && manager && (
+              {!q && !status && !owner && manager && has("IMPORT") && (
                 <>
                   Add one, or{" "}
                   <Link href="/import" className="text-brand-700 hover:underline">

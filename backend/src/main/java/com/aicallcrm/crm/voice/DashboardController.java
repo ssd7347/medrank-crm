@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.aicallcrm.crm.contact.ContactRepository;
 import com.aicallcrm.crm.contact.ContactService;
-import com.aicallcrm.crm.contact.ContactStatus;
+import com.aicallcrm.crm.contact.StageService;
 import com.aicallcrm.crm.security.CurrentUser;
 import com.aicallcrm.crm.voice.Voice.CallStatus;
 import com.aicallcrm.crm.voice.Voice.CallbackStatus;
@@ -32,9 +32,11 @@ public class DashboardController {
     private final ContactService contactService;
     private final CallbackRequestRepository callbacks;
     private final VoiceCallRepository calls;
+    private final StageService stages;
 
     public DashboardController(ContactRepository contacts, ContactService contactService,
-                               CallbackRequestRepository callbacks, VoiceCallRepository calls) {
+                               CallbackRequestRepository callbacks, VoiceCallRepository calls, StageService stages) {
+        this.stages = stages;
         this.contacts = contacts;
         this.contactService = contactService;
         this.callbacks = callbacks;
@@ -46,20 +48,21 @@ public class DashboardController {
     public Summary summary() {
         CurrentUser me = CurrentUser.get();
         Map<String, Long> byStatus = new LinkedHashMap<>();
-        for (ContactStatus s : ContactStatus.values()) {
-            byStatus.put(s.name(), 0L);
+        List<String> keys = stages.keys();
+        for (String k : keys) {
+            byStatus.put(k, 0L);
         }
         long total = 0;
         if (me.seesAllContacts()) {
             for (Object[] row : contacts.countByStatus()) {
-                byStatus.put(((ContactStatus) row[0]).name(), (Long) row[1]);
+                byStatus.put((String) row[0], (Long) row[1]);
                 total += (Long) row[1];
             }
         } else {
-            for (ContactStatus s : ContactStatus.values()) {
-                long n = contactService.search(new ContactService.Filter(null, s, me.id(), false, null, null), 0, 1)
+            for (String k : keys) {
+                long n = contactService.search(new ContactService.Filter(null, k, me.id(), false, null, null), 0, 1)
                         .totalItems();
-                byStatus.put(s.name(), n);
+                byStatus.put(k, n);
                 total += n;
             }
         }

@@ -20,6 +20,7 @@ import com.aicallcrm.crm.contact.Contact;
 import com.aicallcrm.crm.contact.ContactRepository;
 import com.aicallcrm.crm.contact.ContactStatus;
 import com.aicallcrm.crm.contact.FieldService;
+import com.aicallcrm.crm.contact.StageService;
 import com.aicallcrm.crm.security.CurrentUser;
 import com.aicallcrm.crm.voice.CallEligibility.Verdict;
 import com.aicallcrm.crm.voice.Voice.CampaignStatus;
@@ -43,7 +44,7 @@ public class CampaignService {
     private static final int PREVIEW_LIMIT = 2000;
 
     public record CampaignRequest(@NotBlank @Size(max = 120) String name, @NotBlank @Size(max = 80) String scriptName,
-                                  List<ContactStatus> statuses, Long importBatchId,
+                                  List<String> statuses, Long importBatchId,
                                   @Size(max = 40) String fieldKey, FieldOp fieldOp, @Size(max = 200) String fieldValue,
                                   LocalTime windowStart, LocalTime windowEnd,
                                   @Min(1) @Max(20) Integer maxConcurrent, @Min(1) @Max(5) Integer maxAttempts,
@@ -84,12 +85,14 @@ public class CampaignService {
     private final DndService dnd;
     private final VoiceScriptService scripts;
     private final VoiceProperties props;
+    private final StageService stages;
     private final AuditService audit;
 
     public CampaignService(VoiceCampaignRepository campaigns, VoiceCampaignTargetRepository targets,
                            ContactRepository contacts, ContactFacts facts, FieldService fields,
                            CallEligibility eligibility, DndService dnd, VoiceScriptService scripts,
-                           VoiceProperties props, AuditService audit) {
+                           VoiceProperties props, StageService stages, AuditService audit) {
+        this.stages = stages;
         this.campaigns = campaigns;
         this.targets = targets;
         this.contacts = contacts;
@@ -213,7 +216,7 @@ public class CampaignService {
         c.setName(req.name().trim());
         c.setScriptName(script);
         c.setFilterStatuses(req.statuses() == null || req.statuses().isEmpty() ? null
-                : req.statuses().stream().filter(s -> s != ContactStatus.DO_NOT_CALL).map(Enum::name).distinct()
+                : req.statuses().stream().map(stages::require).filter(s -> !s.equals(ContactStatus.DO_NOT_CALL)).distinct()
                         .collect(Collectors.joining(",")));
         c.setFilterImportId(req.importBatchId());
         boolean hasField = req.fieldKey() != null && !req.fieldKey().isBlank();

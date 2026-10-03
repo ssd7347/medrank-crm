@@ -1,0 +1,34 @@
+{
+  "id": "real_estate",
+  "name": "Real estate",
+  "description": "Follow up property enquiries, book site visits and remind buyers of visits.",
+  "contactLabel": "Lead",
+  "stages": [
+    {"label": "Site visit booked", "color": "#7c3aed", "category": "OPEN"},
+    {"label": "Site visited", "color": "#0891b2", "category": "OPEN"},
+    {"label": "Negotiation", "color": "#ca8a04", "category": "OPEN"},
+    {"label": "Booked", "color": "#16a34a", "category": "WON"}
+  ],
+  "fields": [
+    {"label": "Project", "type": "TEXT", "agentAccess": "ANYONE", "verifyWith": false},
+    {"label": "Budget", "type": "AMOUNT", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Preferred location", "type": "TEXT", "agentAccess": "ANYONE", "verifyWith": false},
+    {"label": "Property type", "type": "TEXT", "agentAccess": "ANYONE", "verifyWith": false},
+    {"label": "Site visit date", "type": "DATE", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Enquiry ID", "type": "TEXT", "agentAccess": "NONE", "verifyWith": true}
+  ],
+  "scripts": [
+    {"name": "Property enquiry follow-up", "kind": "OUTBOUND",
+     "purpose": "The lead enquired about a property. Ask whether they are still looking, what type of property and location they prefer, and whether they would like a site visit. If interested, log INTERESTED and schedule a call-back from the sales team to fix the visit. Never quote prices or availability unless search_faq returns them.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}? You recently enquired about a property with us."},
+    {"name": "Site visit reminder", "kind": "OUTBOUND",
+     "purpose": "Remind the lead of their site visit. After verification, use get_contact_details for the project and date and confirm they are coming. If they want to change it, schedule a call-back.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}? I am calling about your site visit."}
+  ],
+  "faqs": [
+    {"question": "Where is the project?", "answer": "[Project name] is at [address], near [landmark].", "keywords": "where, location, address, project"},
+    {"question": "What sizes are available?", "answer": "We have [1/2/3 BHK, plot sizes] available. Our team can share the latest availability.", "keywords": "size, bhk, sqft, available, plot"},
+    {"question": "Is it RERA approved?", "answer": "Yes, the RERA number is [number].", "keywords": "rera, approved, legal, registration"},
+    {"question": "Do you help with home loans?", "answer": "We work with [banks] and our team can guide you. Shall I arrange a call-back?", "keywords": "loan, bank, finance, emi"}
+  ]
+}

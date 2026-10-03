@@ -1,0 +1,28 @@
+{
+  "id": "insurance",
+  "name": "Insurance",
+  "description": "Policy renewal reminders, premium due calls and lead follow-ups for policyholders.",
+  "contactLabel": "Policyholder",
+  "stages": [
+    {"label": "Quote shared", "color": "#7c3aed", "category": "OPEN"},
+    {"label": "Renewed", "color": "#16a34a", "category": "WON"},
+    {"label": "Lapsed", "color": "#9ca3af", "category": "LOST"}
+  ],
+  "fields": [
+    {"label": "Policy number", "type": "TEXT", "agentAccess": "NONE", "verifyWith": true},
+    {"label": "Date of birth", "type": "DATE", "agentAccess": "NONE", "verifyWith": true},
+    {"label": "Policy type", "type": "TEXT", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Premium amount", "type": "AMOUNT", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Renewal date", "type": "DATE", "agentAccess": "AFTER_VERIFY", "verifyWith": false}
+  ],
+  "scripts": [
+    {"name": "Policy renewal reminder", "kind": "OUTBOUND",
+     "purpose": "Remind the policyholder that their policy is due for renewal. After verification, share the policy type, premium and renewal date from get_contact_details. If they want to renew or have questions about cover, log INTERESTED and schedule a call-back from an advisor. Never advise on which policy to buy or explain claim eligibility.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}? I am calling about your policy renewal."}
+  ],
+  "faqs": [
+    {"question": "How do I renew my policy?", "answer": "You can renew through [payment link / app / branch]. Please keep your policy number ready.", "keywords": "renew, renewal, pay, how"},
+    {"question": "What happens if I miss the renewal date?", "answer": "There is a grace period of [days]. An advisor can explain what it means for your policy.", "keywords": "miss, late, grace, lapse"},
+    {"question": "How do I make a claim?", "answer": "I will arrange for an advisor to call you back and help with the claim.", "keywords": "claim, hospital, accident, cashless"}
+  ]
+}

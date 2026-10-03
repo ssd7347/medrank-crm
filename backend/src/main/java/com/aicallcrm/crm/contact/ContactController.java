@@ -54,8 +54,11 @@ public class ContactController {
     private final ContactService contacts;
     private final FieldService fields;
     private final ImportService imports;
+    private final StageService stages;
 
-    public ContactController(ContactService contacts, FieldService fields, ImportService imports) {
+    public ContactController(ContactService contacts, FieldService fields, ImportService imports,
+                             StageService stages) {
+        this.stages = stages;
         this.contacts = contacts;
         this.fields = fields;
         this.imports = imports;
@@ -65,7 +68,7 @@ public class ContactController {
 
     @GetMapping("/contacts")
     public PageResponse<ContactListItem> search(@RequestParam(required = false) String q,
-                                                @RequestParam(required = false) ContactStatus status,
+                                                @RequestParam(required = false) String status,
                                                 @RequestParam(required = false) Long assignedToId,
                                                 @RequestParam(defaultValue = "false") boolean unassignedOnly,
                                                 @RequestParam(required = false) Long importBatchId,
@@ -78,7 +81,7 @@ public class ContactController {
     /** Download what is on screen as a spreadsheet (CSV opens in Excel), custom fields included. */
     @GetMapping("/contacts/export")
     public ResponseEntity<byte[]> export(@RequestParam(required = false) String q,
-                                         @RequestParam(required = false) ContactStatus status,
+                                         @RequestParam(required = false) String status,
                                          @RequestParam(required = false) Long assignedToId,
                                          @RequestParam(defaultValue = "false") boolean unassignedOnly,
                                          @RequestParam(required = false) Long importBatchId,
@@ -90,12 +93,13 @@ public class ContactController {
         List<String> head = new ArrayList<>(List.of("Name", "Phone", "Alternate phone", "Email", "Status", "Source",
                 "Assigned to", "Notes"));
         defs.forEach(d -> head.add(d.getLabel()));
+        Map<String, String> stageNames = stages.labels();
         StringWriter out = new StringWriter();
         try (CSVPrinter csv = new CSVPrinter(out, CSVFormat.DEFAULT.builder().setHeader(head.toArray(String[]::new)).get())) {
             for (Contact c : contacts.all(new Filter(q, status, assignedToId, unassignedOnly, importBatchId, branchId))) {
                 Map<String, String> values = fields.read(c);
                 List<String> row = new ArrayList<>(List.of(c.getFullName(), c.getPhone(), nz(c.getAltPhone()),
-                        nz(c.getEmail()), c.getStatus().name(), nz(c.getSource()),
+                        nz(c.getEmail()), stageNames.getOrDefault(c.getStatus(), c.getStatus()), nz(c.getSource()),
                         c.getAssignedTo() == null ? "" : c.getAssignedTo().getFullName(), nz(c.getNotes())));
                 defs.forEach(d -> row.add(values.getOrDefault(d.getFieldKey(), "")));
                 csv.printRecord(row);

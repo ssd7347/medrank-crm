@@ -88,11 +88,11 @@ public class ContactFacts {
     /** Whether a contact is (still) someone this campaign should call. Do-not-call contacts never are. */
     @Transactional(readOnly = true)
     public boolean matches(VoiceCampaign campaign, Contact c) {
-        if (c.getStatus() == ContactStatus.DO_NOT_CALL) {
+        if (ContactStatus.DO_NOT_CALL.equals(c.getStatus())) {
             return false;
         }
         Set<String> statuses = statuses(campaign.getFilterStatuses());
-        if (!statuses.isEmpty() && !statuses.contains(c.getStatus().name())) {
+        if (!statuses.isEmpty() && !statuses.contains(c.getStatus())) {
             return false;
         }
         if (campaign.getFilterImportId() != null && !campaign.getFilterImportId().equals(c.getImportBatchId())) {

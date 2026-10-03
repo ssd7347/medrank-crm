@@ -12,9 +12,9 @@ import { ConsentCard, VoiceCallList } from "@/components/voice";
 import { api, errorMessage } from "@/lib/api";
 import { MANAGER_ROLES, useAuth } from "@/lib/auth";
 import { useBranding } from "@/lib/branding";
+import { useStages } from "@/lib/stages";
 import { formatDate, formatDateTime, formatRupees, label, relativeTime } from "@/lib/format";
 import {
-  CONTACT_STATUSES,
   MANUAL_ACTIVITY_TYPES,
   type Activity,
   type Contact,
@@ -28,12 +28,13 @@ import { useApi } from "@/lib/use-api";
 export default function ContactPage() {
   const { id } = useParams<{ id: string }>();
   const { hasRole } = useAuth();
-  const { plural } = useBranding();
+  const { plural, has } = useBranding();
+  const { stages } = useStages();
   const manager = hasRole(...MANAGER_ROLES);
   const { data: c, error, loading, setData } = useApi<Contact>(`/api/contacts/${id}`);
   const fields = useApi<FieldDef[]>("/api/fields");
   const activities = useApi<Activity[]>(`/api/contacts/${id}/activities`);
-  const followUps = useApi<FollowUp[]>(`/api/contacts/${id}/follow-ups`);
+  const followUps = useApi<FollowUp[]>(has("FOLLOW_UPS") ? `/api/contacts/${id}/follow-ups` : null);
   const staff = useApi<UserRef[]>(manager ? "/api/users/assignable" : null);
   const [editing, setEditing] = useState(false);
   const [callsVersion, setCallsVersion] = useState(0);
@@ -149,7 +150,7 @@ export default function ContactPage() {
           <div className="min-w-0 space-y-6">
             <Card title="Status and owner">
               <div className="space-y-3">
-                <Select aria-label="Status" value={c.status} options={[...CONTACT_STATUSES]} labelFor={label} onChange={(e) => changeStatus(e.target.value as ContactStatus)} />
+                <Select aria-label="Status" value={c.status} options={stages.map((s) => ({ value: s.key, label: s.label }))} onChange={(e) => changeStatus(e.target.value as ContactStatus)} />
                 {manager ? (
                   <Select
                     aria-label="Assigned to"
@@ -165,9 +166,13 @@ export default function ContactPage() {
                 )}
               </div>
             </Card>
-            <FollowUpCard contactId={c.id} followUps={followUps.data} loading={followUps.loading} onChanged={followUps.reload} />
-            <ConsentCard path={`/api/contacts/${c.id}/voice-consent`} canEdit />
-            <VoiceCallList path={`/api/contacts/${c.id}/voice-calls`} />
+            {has("FOLLOW_UPS") && <FollowUpCard contactId={c.id} followUps={followUps.data} loading={followUps.loading} onChanged={followUps.reload} />}
+            {has("AI_CALLS") && (
+              <>
+                <ConsentCard path={`/api/contacts/${c.id}/voice-consent`} canEdit />
+                <VoiceCallList path={`/api/contacts/${c.id}/voice-calls`} />
+              </>
+            )}
           </div>
         </div>
       )}

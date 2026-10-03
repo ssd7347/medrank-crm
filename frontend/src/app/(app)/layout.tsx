@@ -10,9 +10,11 @@ import { Loading, cx } from "@/components/ui";
 import { MANAGER_ROLES, useAuth } from "@/lib/auth";
 import { useBranding } from "@/lib/branding";
 import { label } from "@/lib/format";
-import type { Role } from "@/lib/types";
+import { StagesProvider } from "@/lib/stages";
+import type { Feature, Role } from "@/lib/types";
 
-type NavItem = { href: string; label: string; roles?: Role[] };
+// feature: shown only when this installation has bought that module.
+type NavItem = { href: string; label: string; roles?: Role[]; feature?: Feature };
 
 const NAV: { section: string; items: NavItem[] }[] = [
   {
@@ -20,13 +22,13 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard", label: "Dashboard" },
       { href: "/contacts", label: "CONTACTS" },
-      { href: "/follow-ups", label: "My follow-ups" },
-      { href: "/import", label: "Import from Excel", roles: MANAGER_ROLES },
+      { href: "/follow-ups", label: "My follow-ups", feature: "FOLLOW_UPS" },
+      { href: "/import", label: "Import from Excel", roles: MANAGER_ROLES, feature: "IMPORT" },
     ],
   },
   {
     section: "AI calling",
-    items: [{ href: "/voice", label: "AI voice agent" }],
+    items: [{ href: "/voice", label: "AI voice agent", feature: "AI_CALLS" }],
   },
   {
     section: "Admin",
@@ -34,8 +36,10 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { href: "/admin/users", label: "Staff users", roles: ["SUPER_ADMIN"] },
       { href: "/admin/branches", label: "Branches", roles: ["SUPER_ADMIN"] },
       { href: "/admin/fields", label: "Custom fields", roles: ["SUPER_ADMIN"] },
-      { href: "/admin/faq", label: "AI knowledge base", roles: MANAGER_ROLES },
+      { href: "/admin/stages", label: "Stages", roles: ["SUPER_ADMIN"] },
+      { href: "/admin/faq", label: "AI knowledge base", roles: MANAGER_ROLES, feature: "AI_CALLS" },
       { href: "/admin/settings", label: "Company settings", roles: ["SUPER_ADMIN"] },
+      { href: "/admin/starter-packs", label: "Industry starter packs", roles: ["SUPER_ADMIN"] },
       { href: "/admin/integrations", label: "Connected services", roles: ["SUPER_ADMIN"] },
     ],
   },
@@ -43,7 +47,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout, hasRole } = useAuth();
-  const { plural } = useBranding();
+  const { plural, has } = useBranding();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -69,7 +73,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const sections = NAV.map((s) => ({
     ...s,
-    items: s.items.filter((i) => !i.roles || hasRole(...i.roles)).map((i) => (i.label === "CONTACTS" ? { ...i, label: plural } : i)),
+    items: s.items.filter((i) => (!i.roles || hasRole(...i.roles)) && (!i.feature || has(i.feature))).map((i) => (i.label === "CONTACTS" ? { ...i, label: plural } : i)),
   })).filter(
     (s) => s.items.length > 0,
   );
@@ -120,6 +124,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
+    <StagesProvider>
     <div className="min-h-screen lg:grid lg:grid-cols-[15rem_1fr] print:block">
       <aside className="sticky top-0 hidden h-screen flex-col border-r border-line bg-surface lg:flex print:hidden">
         <div className="flex items-center justify-between px-5 py-4">
@@ -153,5 +158,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
     </div>
+    </StagesProvider>
   );
 }

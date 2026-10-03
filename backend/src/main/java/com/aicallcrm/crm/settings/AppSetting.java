@@ -23,6 +23,10 @@ public class AppSetting {
     private String brandColor;
     private String supportPhone;
     private String contactLabel;
+    private String loginHeadline;
+    private String loginText;
+    private String industryPack;
+    private int logoVersion;
     private Long updatedBy;
     private Instant updatedAt;
 
@@ -39,6 +43,14 @@ public class AppSetting {
     public void setSupportPhone(String supportPhone) { this.supportPhone = supportPhone; }
     public String getContactLabel() { return contactLabel; }
     public void setContactLabel(String contactLabel) { this.contactLabel = contactLabel; }
+    public String getLoginHeadline() { return loginHeadline; }
+    public void setLoginHeadline(String loginHeadline) { this.loginHeadline = loginHeadline; }
+    public String getLoginText() { return loginText; }
+    public void setLoginText(String loginText) { this.loginText = loginText; }
+    public String getIndustryPack() { return industryPack; }
+    public void setIndustryPack(String industryPack) { this.industryPack = industryPack; }
+    public int getLogoVersion() { return logoVersion; }
+    public void logoChanged() { this.logoVersion++; }
     public void touched(Long userId) {
         this.updatedBy = userId;
         this.updatedAt = Instant.now();

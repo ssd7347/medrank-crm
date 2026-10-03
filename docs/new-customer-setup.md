@@ -26,12 +26,24 @@ Agree with the customer, in writing:
    - `OTP_SHOW_ON_SCREEN=false`, and connect an SMS/WhatsApp provider for login codes before going live
      (until then, anyone who knows a staff number can sign in)
    - `VOICE_HMAC_SECRET`: 32+ random characters, different for every customer
+   - `FEATURES`: the modules this customer has paid for (`ALL`, or for example `IMPORT,EXPORT` for a plan
+     without AI calls). Switched-off modules disappear from the menu and their API refuses requests, so the
+     customer cannot turn them on themselves.
 4. Set `BACKEND_URL` on the frontend to the backend's address.
 
 ## 3. Brand it (no code needed)
 
-Sign in as the admin and open **Company settings**: company name, the AI agent's name, brand colour, and what
-contacts are called (Customer, Patient, Student, Member...).
+Sign in as the admin:
+
+1. **Industry starter packs**: load the pack closest to the customer's business (clinic, loans and EMI,
+   real estate, education, insurance). It adds stages, custom fields, call scripts and knowledge-base answers,
+   and sets what contacts are called. It never deletes or overwrites anything, so it is safe to load later too.
+   Its answers arrive switched off and its scripts as drafts, because they contain [placeholders] to fill in.
+2. **Company settings**: company name, logo, the AI agent's name, brand colour, what contacts are called
+   (Customer, Patient, Student, Member...) and the login-page headline and text.
+3. **Stages**: rename, recolour and reorder the steps contacts move through, and add the customer's own.
+   The built-in ones (New, Contacted, Interested, Not interested, Do not call) are used by the AI agent and
+   cannot be deleted, only renamed.
 
 ## 4. Load their data
 

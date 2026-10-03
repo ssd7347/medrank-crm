@@ -395,7 +395,7 @@ public class VoiceCallService {
             case NOT_INTERESTED -> contactService.statusFromCall(call.getContactId(), ContactStatus.NOT_INTERESTED, why);
             case WRONG_PERSON, NO_INTERACTION, VERIFICATION_FAILED, OPTED_OUT -> {
             }
-            default -> contacts.findById(call.getContactId()).filter(c -> c.getStatus() == ContactStatus.NEW)
+            default -> contacts.findById(call.getContactId()).filter(c -> ContactStatus.NEW.equals(c.getStatus()))
                     .ifPresent(c -> contactService.statusFromCall(c.getId(), ContactStatus.CONTACTED, why));
         }
     }

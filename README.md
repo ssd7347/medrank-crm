@@ -21,8 +21,14 @@ counselling-specific module removed.
   upload and by a field condition ("Due date within the next 7 days"), calling hours in Indian time, retries,
   a "Pause all" switch, identity checks against the customer's own fields, field-level control of what the AI
   may say, call-backs for staff, transcripts, metrics and a test console.
-- **White-label settings**: company name, the AI agent's name, brand colour, and what contacts are called
-  ("Customer", "Patient", "Lead"...). The login page, menu and calls all follow them.
+- **White-label settings**: company name, logo, the AI agent's name, brand colour, login-page wording, and what
+  contacts are called ("Customer", "Patient", "Lead"...). The login page, menu and calls all follow them.
+- **Customisable stages**: each customer names, colours and orders the steps contacts move through.
+- **Industry starter packs** (clinic, loans and EMI, real estate, education, insurance): stages, fields, call
+  scripts and answers for that kind of business in one click. They live in `backend/src/main/resources/packs`,
+  so a new industry is a new JSON file.
+- **Feature switches** (`FEATURES`): sell plans with or without AI calls, imports, exports and follow-ups from
+  the same code.
 - **Sign-in**: one admin; staff (managers and agents) are created by the admin; mobile number + one-time code;
   signed out after 3 minutes without activity.
 
