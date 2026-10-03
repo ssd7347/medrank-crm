@@ -160,7 +160,12 @@ export type ImportResult = {
   skipped: number;
   problems: string[];
   newFields: string[];
+  /** Set when the AI agent was asked to call everyone in the file. */
+  calls: CallsStarted | null;
 };
+
+/** callingNow: can be called at once; waiting: later (e.g. outside calling hours); notAllowed: never (no consent...). */
+export type CallsStarted = { campaignId: number | null; campaignName: string | null; people: number; callingNow: number; waiting: number; notAllowed: number };
 
 export type ImportBatch = { id: number; fileName: string; totalRows: number; created: number; updated: number; skipped: number; createdAt: string };
 

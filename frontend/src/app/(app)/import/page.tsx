@@ -9,6 +9,7 @@ import { MANAGER_ROLES, useAuth } from "@/lib/auth";
 import { useBranding } from "@/lib/branding";
 import { formatDateTime, label } from "@/lib/format";
 import type { FieldDef, ImportBatch, ImportPreview, ImportResult, UserRef } from "@/lib/types";
+import type { VoiceScript } from "@/lib/types-voice";
 import { useApi } from "@/lib/use-api";
 
 const STANDARD: { value: string; label: string }[] = [
@@ -41,12 +42,20 @@ export default function ImportPage() {
   const [consent, setConsent] = useState(false);
   const [recording, setRecording] = useState(false);
   const [evidence, setEvidence] = useState("");
+  const [callNow, setCallNow] = useState(true);
+  const [callScript, setCallScript] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fields = useApi<FieldDef[]>("/api/fields");
   const staff = useApi<UserRef[]>("/api/users/assignable");
   const history = useApi<ImportBatch[]>(hasRole(...MANAGER_ROLES) ? "/api/contacts/imports" : null);
+  // Starting AI calls is the admin's decision, and only with a script the admin has approved.
+  const canCall = hasRole("SUPER_ADMIN") && has("AI_CALLS");
+  const scripts = useApi<VoiceScript[]>(canCall ? "/api/voice/scripts" : null);
+  const approvedScripts = [...new Set((scripts.data ?? []).filter((s) => s.kind === "OUTBOUND" && s.approved).map((s) => s.name))];
+  const script = callScript || approvedScripts[0] || "";
+  const willCall = canCall && callNow && script !== "";
 
   if (!hasRole(...MANAGER_ROLES)) return <Alert>Only an admin or a manager can import.</Alert>;
 
@@ -94,6 +103,7 @@ export default function ImportPage() {
         aiCallConsent: consent,
         recordingConsent: consent && recording,
         consentEvidence: consent ? evidence : null,
+        callScriptName: willCall ? script : null,
       };
       form.append("options", new Blob([JSON.stringify(options)], { type: "application/json" }));
       setResult(await api<ImportResult>("/api/contacts/import", { form }));
@@ -124,6 +134,7 @@ export default function ImportPage() {
             <Count label="Updated" value={result.updated} />
             <Count label="Skipped" value={result.skipped} tone={result.skipped ? "amber" : undefined} />
           </div>
+          {result.calls && <CallsSummary calls={result.calls} />}
           {result.newFields.length > 0 && (
             <p className="mt-4 text-sm">
               New fields created: {result.newFields.join(", ")}.{" "}
@@ -234,6 +245,40 @@ export default function ImportPage() {
                 {!consent && <p className="mt-1 pl-6 text-xs text-ink-faint">Without consent the AI agent will not call them. You can record consent later, person by person.</p>}
               </div>
               )}
+              {canCall && (
+                <div className="rounded-lg border border-line p-3">
+                  {scripts.loading && !scripts.data ? (
+                    <Loading />
+                  ) : approvedScripts.length === 0 ? (
+                    <p className="text-sm text-ink-soft">
+                      To have the AI agent call everyone in this file straight after the import,{" "}
+                      <Link href="/voice/scripts" className="text-brand-700 hover:underline">
+                        approve a call script
+                      </Link>{" "}
+                      first.
+                    </p>
+                  ) : (
+                    <>
+                      <Checkbox label="Call everyone in this file with the AI agent as soon as the import finishes" checked={callNow} onChange={(e) => setCallNow(e.target.checked)} />
+                      {callNow && (
+                        <div className="mt-3 space-y-3 pl-6">
+                          <Field label="Call script" hint="What the AI agent calls them about.">
+                            {(id) => <Select id={id} value={script} options={approvedScripts} onChange={(e) => setCallScript(e.target.value)} />}
+                          </Field>
+                          <p className="text-xs text-ink-faint">
+                            Calls run as a campaign you can pause at any time. They are made only within calling hours, never to anyone marked &ldquo;Do not call&rdquo;, and only to people who agreed to AI calls.
+                          </p>
+                          {!consent && (
+                            <Alert tone="amber">
+                              Only people who agreed to AI calls earlier will be called. If everyone in this file agreed, tick the consent box above.
+                            </Alert>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </Card>
 
@@ -242,7 +287,7 @@ export default function ImportPage() {
               Choose a different file
             </Button>
             <Button loading={busy} disabled={!hasName || !hasPhone || duplicates.length > 0 || (consent && !evidence.trim())} onClick={runImport}>
-              Import {preview.totalRows} rows
+              Import {preview.totalRows} {preview.totalRows === 1 ? "row" : "rows"}{willCall ? " and start calling" : ""}
             </Button>
           </div>
         </div>
@@ -279,6 +324,36 @@ function Count({ label: text, value, tone }: { label: string; value: number; ton
     <div className="rounded-xl border border-line p-3">
       <p className="text-xs text-ink-faint">{text}</p>
       <p className={`mt-0.5 text-xl font-semibold tabular-nums ${tone === "green" ? "text-emerald-700" : tone === "amber" ? "text-amber-700" : ""}`}>{value}</p>
+    </div>
+  );
+}
+
+function CallsSummary({ calls }: { calls: NonNullable<ImportResult["calls"]> }) {
+  if (!calls.campaignId || calls.people === 0) {
+    return (
+      <div className="mt-4">
+        <Alert tone="amber">Nobody in this file can be called (no one was added or updated, or everyone is marked &ldquo;Do not call&rdquo;).</Alert>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-4 rounded-lg border border-line p-3">
+      <p className="text-sm font-medium">The AI agent is calling them</p>
+      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Count label="In the campaign" value={calls.people} />
+        <Count label="Being called now" value={calls.callingNow} tone="green" />
+        <Count label="Called later" value={calls.waiting} />
+        <Count label="Will not be called" value={calls.notAllowed} tone={calls.notAllowed ? "amber" : undefined} />
+      </div>
+      <p className="mt-2 text-xs text-ink-faint">
+        &ldquo;Called later&rdquo; is usually outside calling hours. &ldquo;Will not be called&rdquo; is usually no consent to AI calls; record it on each
+        person&rsquo;s page if they agreed. Calls start within a minute.
+      </p>
+      <div className="mt-3">
+        <ButtonLink href={`/voice/campaigns/${calls.campaignId}`} variant="secondary">
+          Follow the calls
+        </ButtonLink>
+      </div>
     </div>
   );
 }

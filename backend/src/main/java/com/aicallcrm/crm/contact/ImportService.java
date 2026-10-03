@@ -61,13 +61,27 @@ public class ImportService {
                           Map<String, String> suggested) {
     }
 
-    /** {@code mapping}: heading -> target. {@code consent}: these people agreed to AI calls (with proof). */
+    /**
+     * {@code mapping}: heading -> target. {@code consent}: these people agreed to AI calls (with proof).
+     * {@code callScriptName}: when set, the AI agent starts calling everyone in this upload with that script.
+     */
     public record Options(Map<String, String> mapping, boolean updateExisting, Long assignToId,
-                          boolean aiCallConsent, boolean recordingConsent, String consentEvidence) {
+                          boolean aiCallConsent, boolean recordingConsent, String consentEvidence,
+                          String callScriptName) {
     }
 
+    /** {@code calls} is null unless AI calls were asked for. */
     public record Result(Long batchId, int totalRows, int created, int updated, int skipped, List<String> problems,
-                         List<String> newFields) {
+                         List<String> newFields, CallsStarted calls) {
+    }
+
+    /**
+     * The calling campaign started for an upload. {@code callingNow}: can be called straight away;
+     * {@code waiting}: will be called later (outside calling hours, say); {@code notAllowed}: will not be called
+     * (no consent to AI calls, do-not-disturb...).
+     */
+    public record CallsStarted(Long campaignId, String campaignName, int people, int callingNow, int waiting,
+                               int notAllowed) {
     }
 
     public record BatchView(Long id, String fileName, int totalRows, int created, int updated, int skipped,
@@ -83,6 +97,14 @@ public class ImportService {
         void recordFromImport(Contact contact, boolean recording, String evidence, Long userId);
     }
 
+    /** Lets the voice module start AI calls to an upload without this module depending on it. */
+    public interface CallStarter {
+        /** Refuses (400/403) when calls cannot be made with this script, before anything is imported. */
+        void check(String scriptName);
+
+        CallsStarted start(Long batchId, String fileName, String scriptName);
+    }
+
     private record Sheetful(List<String> headers, List<List<String>> rows) {
     }
 
@@ -94,10 +116,13 @@ public class ImportService {
     private final AuditService audit;
     private final ObjectMapper mapper;
     private final List<ConsentRecorder> consentRecorders;
+    private final List<CallStarter> callStarters;
 
     public ImportService(ContactRepository contacts, ContactActivityRepository activities,
                          ImportBatchRepository batches, FieldService fields, AppUserRepository users,
-                         AuditService audit, ObjectMapper mapper, List<ConsentRecorder> consentRecorders) {
+                         AuditService audit, ObjectMapper mapper, List<ConsentRecorder> consentRecorders,
+                         List<CallStarter> callStarters) {
+        this.callStarters = callStarters;
         this.contacts = contacts;
         this.activities = activities;
         this.batches = batches;
@@ -206,6 +231,18 @@ public class ImportService {
                 .filter(AppUser::isActive).orElseThrow(() -> ApiException.badRequest("Staff member not found"));
         if (opts.aiCallConsent() && (opts.consentEvidence() == null || opts.consentEvidence().isBlank())) {
             throw ApiException.badRequest("Say how these people agreed to AI calls (for example the form they signed)");
+        }
+        String callScript = opts.callScriptName() == null || opts.callScriptName().isBlank() ? null
+                : opts.callScriptName().trim();
+        if (callScript != null) {
+            // Calling campaigns are the admin's decision; check everything before a single row is imported.
+            if (!me.isAdmin()) {
+                throw ApiException.forbidden("Only the admin can start AI calls");
+            }
+            if (callStarters.isEmpty()) {
+                throw ApiException.badRequest("AI calls are not available");
+            }
+            callStarters.get(0).check(callScript);
         }
 
         // Work out, once, what each column becomes. New fields are created now.
@@ -352,7 +389,10 @@ public class ImportService {
                 cut(mapper.writeValueAsString(mapping), 4000));
         audit.record(me.id(), "CONTACTS_IMPORTED", "IMPORT_BATCH", batch.getId(),
                 "created=" + created + " updated=" + updated + " skipped=" + skipped);
-        return new Result(batch.getId(), s.rows().size(), created, updated, skipped, problems, newFields);
+        CallsStarted calls = callScript == null ? null
+                : created + updated == 0 ? new CallsStarted(null, null, 0, 0, 0, 0)
+                : callStarters.get(0).start(batch.getId(), nz(file.getOriginalFilename()), callScript);
+        return new Result(batch.getId(), s.rows().size(), created, updated, skipped, problems, newFields, calls);
     }
 
     @Transactional(readOnly = true)

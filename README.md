@@ -16,7 +16,9 @@ counselling-specific module removed.
 - **Import from Excel** (.xlsx, .xls) or CSV: the CRM reads the headings, guesses what each column is, the person
   confirms, and new columns become custom fields automatically. A phone number already in the CRM updates that
   contact instead of duplicating it; bad rows are reported by row number. Consent to AI calls can be recorded for
-  a whole list that agreed to it.
+  a whole list that agreed to it, and the admin can tick **"Call everyone in this file"** so the AI agent starts
+  calling the upload as soon as it is imported (as a normal campaign: consent, calling hours, do-not-call and
+  retries all still apply, and it can be paused).
 - **AI voice agent**: versioned call scripts that the admin approves, campaigns that pick contacts by status, by
   upload and by a field condition ("Due date within the next 7 days"), calling hours in Indian time, retries,
   a "Pause all" switch, identity checks against the customer's own fields, field-level control of what the AI
