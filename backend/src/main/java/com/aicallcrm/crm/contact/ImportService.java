@@ -55,7 +55,7 @@ public class ImportService {
     static final int MAX_PROBLEMS = 300;
 
     /** Standard columns a heading can be mapped to; anything else is "field:key", "new:TYPE" or "ignore". */
-    public static final List<String> STANDARD = List.of("name", "phone", "alt_phone", "email", "notes", "source");
+    public static final List<String> STANDARD = List.of("name", "phone", "alt_phone", "email", "notes", "source", "tags");
 
     public record Preview(String fileName, List<String> headers, List<List<String>> sample, int totalRows,
                           Map<String, String> suggested) {
@@ -117,11 +117,13 @@ public class ImportService {
     private final ObjectMapper mapper;
     private final List<ConsentRecorder> consentRecorders;
     private final List<CallStarter> callStarters;
+    private final TagService tags;
 
     public ImportService(ContactRepository contacts, ContactActivityRepository activities,
                          ImportBatchRepository batches, FieldService fields, AppUserRepository users,
                          AuditService audit, ObjectMapper mapper, List<ConsentRecorder> consentRecorders,
-                         List<CallStarter> callStarters) {
+                         List<CallStarter> callStarters, TagService tags) {
+        this.tags = tags;
         this.callStarters = callStarters;
         this.contacts = contacts;
         this.activities = activities;
@@ -179,6 +181,9 @@ public class ImportService {
         }
         if (h.matches("source|lead source|channel")) {
             return "source";
+        }
+        if (h.matches("tags?|labels?|segments?|groups?")) {
+            return "tags";
         }
         return "new:" + guessType(header, values);
     }
@@ -283,6 +288,7 @@ public class ImportService {
             }
         }
 
+        Map<String, String> tagSpellings = tags.spellings();
         ImportBatch batch = batches.save(new ImportBatch(cut(file.getOriginalFilename(), 200), me.id()));
         List<String> problems = new ArrayList<>();
         int created = 0, updated = 0, skipped = 0;
@@ -360,6 +366,13 @@ public class ImportService {
                     : c.getSource() != null ? c.getSource() : cut("Import: " + nz(file.getOriginalFilename()), 60));
             if (assignee != null) {
                 c.setAssignedTo(assignee);
+            }
+            if (std.get("tags") != null && !std.get("tags").isBlank()) {
+                try {
+                    TagService.add(c, TagService.split(std.get("tags")), tagSpellings);
+                } catch (ApiException e) {
+                    rowProblems.add(e.getMessage() + " (some tags left out)");
+                }
             }
             Map<String, String> merged = existing == null ? new LinkedHashMap<>() : fields.read(c);
             merged.putAll(values);

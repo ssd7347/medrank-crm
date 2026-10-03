@@ -17,7 +17,7 @@ export type StarterPack = { id: string; name: string; description: string; conta
 export type PackApplied = { id: string; stagesAdded: number; fieldsAdded: number; scriptsAdded: number; faqsAdded: number };
 
 export const MANUAL_ACTIVITY_TYPES = ["NOTE", "CALL", "WHATSAPP", "EMAIL", "MEETING"] as const;
-export type ActivityType = (typeof MANUAL_ACTIVITY_TYPES)[number] | "STATUS_CHANGE" | "ASSIGNMENT" | "IMPORT";
+export type ActivityType = (typeof MANUAL_ACTIVITY_TYPES)[number] | "STATUS_CHANGE" | "ASSIGNMENT" | "IMPORT" | "MERGE";
 
 export type Page<T> = { items: T[]; page: number; size: number; totalItems: number; totalPages: number };
 
@@ -72,6 +72,7 @@ export type ContactListItem = {
   assignedTo: UserRef | null;
   branch: BranchRef | null;
   fields: Record<string, string>;
+  tags: string[];
   createdAt: string;
 };
 
@@ -88,9 +89,18 @@ export type Contact = {
   branch: BranchRef | null;
   importBatchId: number | null;
   fields: Record<string, string>;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
 };
+
+export type TagCount = { tag: string; contacts: number };
+
+export type BulkAction = "ASSIGN" | "STAGE" | "ADD_TAG" | "REMOVE_TAG";
+export type BulkResult = { matched: number; changed: number };
+
+export type DuplicateContact = { id: number; fullName: string; phone: string; altPhone: string | null; email: string | null; status: string; tags: string[]; createdAt: string };
+export type DuplicateGroup = { reasons: string[]; contacts: DuplicateContact[] };
 
 export type ContactRequest = {
   fullName: string;

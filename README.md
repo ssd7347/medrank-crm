@@ -12,7 +12,12 @@ counselling-specific module removed.
 
 - **Contacts** with the standard details (name, phone, alternate phone, email, status, source, owner, branch, notes)
   plus **custom fields** for everything else a customer keeps (amount due, due date, customer ID, plan...).
-  Timeline, follow-ups, staff call logging, CSV export.
+  Timeline, follow-ups (with a reminder in the bell when one falls due), staff call logging, CSV export.
+- **Tags** ("Hot lead", "VIP"...) on contacts, from a spreadsheet column too; filter the list and campaigns by tag.
+- **Bulk actions**: tick contacts (or "everyone matching the filter") and assign them, move them to a stage, or
+  add / remove a tag in one go.
+- **Duplicates**: finds people who are in twice (same email, one's number is the other's alternate, or the same
+  full name) and merges them, moving their history, calls and consent; "Do not call" always wins.
 - **Import from Excel** (.xlsx, .xls) or CSV: the CRM reads the headings, guesses what each column is, the person
   confirms, and new columns become custom fields automatically. A phone number already in the CRM updates that
   contact instead of duplicating it; bad rows are reported by row number. Consent to AI calls can be recorded for

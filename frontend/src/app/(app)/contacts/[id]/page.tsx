@@ -7,6 +7,7 @@ import { useState } from "react";
 import { ContactStatusBadge } from "@/components/badges";
 import { CallButton, CallHistory } from "@/components/call-button";
 import { ContactForm } from "@/components/contact-form";
+import { TagEditor } from "@/components/tags";
 import { Alert, Badge, Button, Card, DescList, EmptyState, Input, Loading, PageHeader, Select, Textarea, cx } from "@/components/ui";
 import { ConsentCard, VoiceCallList } from "@/components/voice";
 import { api, errorMessage } from "@/lib/api";
@@ -166,6 +167,9 @@ export default function ContactPage() {
                 )}
               </div>
             </Card>
+            <Card title="Tags">
+              <TagEditor contact={c} onChanged={(saved) => (setData(saved), activities.reload())} />
+            </Card>
             {has("FOLLOW_UPS") && <FollowUpCard contactId={c.id} followUps={followUps.data} loading={followUps.loading} onChanged={followUps.reload} />}
             {has("AI_CALLS") && (
               <>
@@ -227,7 +231,7 @@ function ActivityCard({ contactId, activities, loading, onAdded }: { contactId: 
             <li key={a.id} className="relative">
               <span className="absolute top-1.5 -left-[21px] h-2.5 w-2.5 rounded-full border-2 border-surface bg-brand-500" />
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <Badge tone={a.type === "STATUS_CHANGE" || a.type === "ASSIGNMENT" || a.type === "IMPORT" ? "gray" : "teal"}>{label(a.type)}</Badge>
+                <Badge tone={a.type === "STATUS_CHANGE" || a.type === "ASSIGNMENT" || a.type === "IMPORT" || a.type === "MERGE" ? "gray" : "teal"}>{label(a.type)}</Badge>
                 {a.outcome && <span className="font-medium">{a.outcome}</span>}
               </div>
               {a.notes && <p className="mt-1 text-sm whitespace-pre-wrap text-ink-soft">{a.notes}</p>}

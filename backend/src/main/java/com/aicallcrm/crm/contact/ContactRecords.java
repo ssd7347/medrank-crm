@@ -82,6 +82,7 @@ class FollowUp {
     private Long completedBy;
     private Long createdBy;
     private Instant createdAt;
+    private Instant remindedAt;
 
     protected FollowUp() {
     }
@@ -98,6 +99,10 @@ class FollowUp {
     void complete(Long userId) {
         completedAt = Instant.now();
         completedBy = userId;
+    }
+
+    void reminded() {
+        remindedAt = Instant.now();
     }
 
     Long getId() { return id; }

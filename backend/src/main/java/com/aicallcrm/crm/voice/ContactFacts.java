@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.aicallcrm.crm.contact.Contact;
 import com.aicallcrm.crm.contact.ContactStatus;
+import com.aicallcrm.crm.contact.TagService;
 import com.aicallcrm.crm.contact.FieldDefinition;
 import com.aicallcrm.crm.contact.FieldDefinition.AgentAccess;
 import com.aicallcrm.crm.contact.FieldService;
@@ -93,6 +94,9 @@ public class ContactFacts {
         }
         Set<String> statuses = statuses(campaign.getFilterStatuses());
         if (!statuses.isEmpty() && !statuses.contains(c.getStatus())) {
+            return false;
+        }
+        if (campaign.getFilterTag() != null && !TagService.has(c, campaign.getFilterTag())) {
             return false;
         }
         if (campaign.getFilterImportId() != null && !campaign.getFilterImportId().equals(c.getImportBatchId())) {

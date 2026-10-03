@@ -1,13 +1,18 @@
 package com.aicallcrm.crm.contact;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.hibernate.annotations.BatchSize;
 
 import com.aicallcrm.crm.branch.Branch;
 import com.aicallcrm.crm.user.AppUser;
 
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -47,6 +52,13 @@ public class Contact {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id")
     private Branch branch;
+
+    /** Free-form labels. Always change them through {@link Tags} so case and spacing stay consistent. */
+    @ElementCollection
+    @CollectionTable(name = "contact_tag", joinColumns = @JoinColumn(name = "contact_id"))
+    @Column(name = "tag")
+    @BatchSize(size = 100)
+    private Set<String> tags = new HashSet<>();
 
     private Long importBatchId;
     private Long createdBy;
@@ -89,6 +101,7 @@ public class Contact {
     public void setAssignedTo(AppUser assignedTo) { this.assignedTo = assignedTo; }
     public Branch getBranch() { return branch; }
     public void setBranch(Branch branch) { this.branch = branch; }
+    public Set<String> getTags() { return tags; }
     public Long getImportBatchId() { return importBatchId; }
     public void setImportBatchId(Long importBatchId) { this.importBatchId = importBatchId; }
     public Long getCreatedBy() { return createdBy; }

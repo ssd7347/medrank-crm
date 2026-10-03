@@ -19,6 +19,7 @@ const STANDARD: { value: string; label: string }[] = [
   { value: "email", label: "Email" },
   { value: "notes", label: "Notes" },
   { value: "source", label: "Source" },
+  { value: "tags", label: "Tags (comma-separated)" },
 ];
 const NEW_FIELD: { value: string; label: string }[] = [
   { value: "new:TEXT", label: "New field: text" },

@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -73,34 +74,38 @@ public class ContactController {
                                                 @RequestParam(defaultValue = "false") boolean unassignedOnly,
                                                 @RequestParam(required = false) Long importBatchId,
                                                 @RequestParam(required = false) Long branchId,
+                                                @RequestParam(required = false) String tag,
                                                 @RequestParam(defaultValue = "0") int page,
                                                 @RequestParam(defaultValue = "25") int size) {
-        return contacts.search(new Filter(q, status, assignedToId, unassignedOnly, importBatchId, branchId), page, size);
+        return contacts.search(new Filter(q, status, assignedToId, unassignedOnly, importBatchId, branchId, tag), page, size);
     }
 
     /** Download what is on screen as a spreadsheet (CSV opens in Excel), custom fields included. */
     @GetMapping("/contacts/export")
+    @Transactional(readOnly = true)
     public ResponseEntity<byte[]> export(@RequestParam(required = false) String q,
                                          @RequestParam(required = false) String status,
                                          @RequestParam(required = false) Long assignedToId,
                                          @RequestParam(defaultValue = "false") boolean unassignedOnly,
                                          @RequestParam(required = false) Long importBatchId,
-                                         @RequestParam(required = false) Long branchId) throws Exception {
+                                         @RequestParam(required = false) Long branchId,
+                                         @RequestParam(required = false) String tag) throws Exception {
         if (!CurrentUser.get().seesAllContacts()) {
             throw ApiException.forbidden("Only an admin or a manager can export contacts");
         }
         List<FieldDefinition> defs = fields.definitions();
         List<String> head = new ArrayList<>(List.of("Name", "Phone", "Alternate phone", "Email", "Status", "Source",
-                "Assigned to", "Notes"));
+                "Assigned to", "Notes", "Tags"));
         defs.forEach(d -> head.add(d.getLabel()));
         Map<String, String> stageNames = stages.labels();
         StringWriter out = new StringWriter();
         try (CSVPrinter csv = new CSVPrinter(out, CSVFormat.DEFAULT.builder().setHeader(head.toArray(String[]::new)).get())) {
-            for (Contact c : contacts.all(new Filter(q, status, assignedToId, unassignedOnly, importBatchId, branchId))) {
+            for (Contact c : contacts.all(new Filter(q, status, assignedToId, unassignedOnly, importBatchId, branchId, tag))) {
                 Map<String, String> values = fields.read(c);
                 List<String> row = new ArrayList<>(List.of(c.getFullName(), c.getPhone(), nz(c.getAltPhone()),
                         nz(c.getEmail()), stageNames.getOrDefault(c.getStatus(), c.getStatus()), nz(c.getSource()),
-                        c.getAssignedTo() == null ? "" : c.getAssignedTo().getFullName(), nz(c.getNotes())));
+                        c.getAssignedTo() == null ? "" : c.getAssignedTo().getFullName(), nz(c.getNotes()),
+                        String.join(", ", TagService.sorted(c.getTags()))));
                 defs.forEach(d -> row.add(values.getOrDefault(d.getFieldKey(), "")));
                 csv.printRecord(row);
             }
@@ -110,6 +115,16 @@ public class ContactController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"contacts-" + LocalDate.now() + ".csv\"")
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8)).body(body);
+    }
+
+    @PutMapping("/contacts/{id}/tags")
+    public ContactView setTags(@PathVariable Long id, @Valid @RequestBody ContactService.TagsRequest req) {
+        return contacts.setTags(id, req);
+    }
+
+    @PostMapping("/contacts/bulk")
+    public ContactService.BulkResult bulk(@Valid @RequestBody ContactService.BulkRequest req) {
+        return contacts.bulk(req);
     }
 
     @GetMapping("/contacts/{id}")

@@ -34,6 +34,7 @@ public class VoiceCampaign {
     /** Comma-separated contact statuses; empty means any status except do-not-call. */
     private String filterStatuses;
     private Long filterImportId;
+    private String filterTag;
     private String filterFieldKey;
     @Enumerated(EnumType.STRING)
     private FieldOp filterFieldOp;
@@ -66,6 +67,8 @@ public class VoiceCampaign {
     public void setStatus(CampaignStatus status) { this.status = status; }
     public String getFilterStatuses() { return filterStatuses; }
     public void setFilterStatuses(String filterStatuses) { this.filterStatuses = filterStatuses; }
+    public String getFilterTag() { return filterTag; }
+    public void setFilterTag(String filterTag) { this.filterTag = filterTag; }
     public Long getFilterImportId() { return filterImportId; }
     public void setFilterImportId(Long filterImportId) { this.filterImportId = filterImportId; }
     public String getFilterFieldKey() { return filterFieldKey; }

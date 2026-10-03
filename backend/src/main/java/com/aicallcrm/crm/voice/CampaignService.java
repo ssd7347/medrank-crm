@@ -21,6 +21,7 @@ import com.aicallcrm.crm.contact.ContactRepository;
 import com.aicallcrm.crm.contact.ContactStatus;
 import com.aicallcrm.crm.contact.FieldService;
 import com.aicallcrm.crm.contact.StageService;
+import com.aicallcrm.crm.contact.TagService;
 import com.aicallcrm.crm.security.CurrentUser;
 import com.aicallcrm.crm.voice.CallEligibility.Verdict;
 import com.aicallcrm.crm.voice.Voice.CampaignStatus;
@@ -48,14 +49,15 @@ public class CampaignService {
                                   @Size(max = 40) String fieldKey, FieldOp fieldOp, @Size(max = 200) String fieldValue,
                                   LocalTime windowStart, LocalTime windowEnd,
                                   @Min(1) @Max(20) Integer maxConcurrent, @Min(1) @Max(5) Integer maxAttempts,
-                                  @Min(30) @Max(1440) Integer retryGapMin, Long branchId) {
+                                  @Min(30) @Max(1440) Integer retryGapMin, Long branchId,
+                                  @Size(max = 40) String tag) {
     }
 
     public record Counts(int total, int pending, int done, int simulated, int skipped, int failed) {
     }
 
     public record CampaignView(Long id, String name, String scriptName, CampaignStatus status, List<String> statuses,
-                               Long importBatchId, String fieldKey, FieldOp fieldOp, String fieldValue,
+                               String tag, Long importBatchId, String fieldKey, FieldOp fieldOp, String fieldValue,
                                LocalTime windowStart, LocalTime windowEnd, int maxConcurrent, int maxAttempts,
                                int retryGapMin, Long branchId, Instant createdAt, Instant startedAt,
                                Instant finishedAt, Counts counts, boolean scriptApproved) {
@@ -219,6 +221,7 @@ public class CampaignService {
                 : req.statuses().stream().map(stages::require).filter(s -> !s.equals(ContactStatus.DO_NOT_CALL)).distinct()
                         .collect(Collectors.joining(",")));
         c.setFilterImportId(req.importBatchId());
+        c.setFilterTag(TagService.clean(req.tag()));
         boolean hasField = req.fieldKey() != null && !req.fieldKey().isBlank();
         if (hasField) {
             if (req.fieldOp() == null) {
@@ -293,7 +296,7 @@ public class CampaignService {
             }
         }
         return new CampaignView(c.getId(), c.getName(), c.getScriptName(), c.getStatus(),
-                List.copyOf(ContactFacts.statuses(c.getFilterStatuses())), c.getFilterImportId(), c.getFilterFieldKey(),
+                List.copyOf(ContactFacts.statuses(c.getFilterStatuses())), c.getFilterTag(), c.getFilterImportId(), c.getFilterFieldKey(),
                 c.getFilterFieldOp(), c.getFilterFieldValue(), c.getWindowStart(), c.getWindowEnd(),
                 c.getMaxConcurrent(), c.getMaxAttempts(), c.getRetryGapMin(), c.getBranchId(), c.getCreatedAt(),
                 c.getStartedAt(), c.getFinishedAt(), new Counts(list.size(), pending, done, simulated, skipped, failed),

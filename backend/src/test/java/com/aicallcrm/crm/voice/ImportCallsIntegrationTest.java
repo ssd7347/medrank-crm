@@ -30,7 +30,7 @@ import com.jayway.jsonpath.JsonPath;
 @ActiveProfiles("test")
 class ImportCallsIntegrationTest {
 
-    private static final AtomicInteger SEQ = new AtomicInteger(71000);
+    private static final AtomicInteger SEQ = new AtomicInteger(41000);
     private static final String MAPPING = "{\"Name\":\"name\",\"Mobile\":\"phone\",\"Amount due\":\"new:AMOUNT\"}";
 
     @Autowired

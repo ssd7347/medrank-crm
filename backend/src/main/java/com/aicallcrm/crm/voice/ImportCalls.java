@@ -48,7 +48,7 @@ class ImportCalls implements ImportService.CallStarter {
     public CallsStarted start(Long batchId, String fileName, String scriptName) {
         String name = cut(fileName.isBlank() ? "Upload " + batchId : fileName, 90) + " (" + LocalDate.now(ContactFacts.IST) + ")";
         CampaignDetail d = campaigns.create(new CampaignRequest(name, scriptName, null, batchId, null, null, null,
-                null, null, null, null, null, null));
+                null, null, null, null, null, null, null));
         Long id = d.campaign().id();
         if (d.campaign().counts().pending() == 0) {
             // Everyone in the file is marked "Do not call": nothing to start.

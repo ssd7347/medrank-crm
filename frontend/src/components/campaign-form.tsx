@@ -6,7 +6,7 @@ import { api, errorMessage } from "@/lib/api";
 import { useBranding } from "@/lib/branding";
 import { label } from "@/lib/format";
 import { useStages } from "@/lib/stages";
-import { type ContactStatus, type FieldDef, type ImportBatch } from "@/lib/types";
+import { type ContactStatus, type FieldDef, type ImportBatch, type TagCount } from "@/lib/types";
 import { FIELD_OPS, FIELD_OP_LABEL, type Campaign, type CampaignDetail, type CampaignStatus, type FieldOp } from "@/lib/types-voice";
 import { useApi } from "@/lib/use-api";
 
@@ -18,6 +18,7 @@ export const CAMPAIGN_TONE: Record<CampaignStatus, Tone> = { DRAFT: "gray", RUNN
 export function describeFilter(c: Campaign, fields: FieldDef[], uploads?: ImportBatch[]) {
   const parts: string[] = [];
   parts.push(c.statuses.length ? `Status ${c.statuses.map(label).join(" or ")}` : "Any status except Do not call");
+  if (c.tag) parts.push(`tagged "${c.tag}"`);
   if (c.importBatchId) parts.push(`from ${uploads?.find((u) => u.id === c.importBatchId)?.fileName ?? "one upload"}`);
   if (c.fieldKey && c.fieldOp) {
     const f = fields.find((x) => x.key === c.fieldKey)?.label ?? c.fieldKey;
@@ -36,6 +37,8 @@ export function CampaignForm({ existing, onSaved, onCancel }: { existing?: Campa
   const scripts = useApi<string[]>("/api/voice/script-names");
   const fields = useApi<FieldDef[]>("/api/fields");
   const uploads = useApi<ImportBatch[]>("/api/contacts/imports");
+  const tags = useApi<TagCount[]>("/api/tags");
+  const [tag, setTag] = useState(existing?.tag ?? "");
   const [name, setName] = useState(existing?.name ?? "");
   const [scriptName, setScriptName] = useState(existing?.scriptName ?? "");
   const [statuses, setStatuses] = useState<ContactStatus[]>(existing?.statuses ?? []);
@@ -63,6 +66,7 @@ export function CampaignForm({ existing, onSaved, onCancel }: { existing?: Campa
       scriptName: scriptName || scripts.data?.[0],
       statuses,
       importBatchId: importBatchId ? Number(importBatchId) : null,
+      tag: tag || null,
       fieldKey: fieldKey || null,
       fieldOp: fieldKey ? fieldOp : null,
       fieldValue: fieldKey && needsValue ? fieldValue : null,
@@ -109,6 +113,17 @@ export function CampaignForm({ existing, onSaved, onCancel }: { existing?: Campa
             ))}
           </div>
         </div>
+        <Field label="Only people with this tag">
+          {(id) => (
+            <Select
+              id={id}
+              value={tag}
+              placeholder="(any tag)"
+              options={(tags.data ?? []).map((t) => ({ value: t.tag, label: `${t.tag} (${t.contacts})` }))}
+              onChange={(e) => setTag(e.target.value)}
+            />
+          )}
+        </Field>
         <Field label="Only from this upload">
           {(id) => (
             <Select

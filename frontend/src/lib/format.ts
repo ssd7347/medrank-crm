@@ -18,6 +18,7 @@ const LABELS: Record<string, string> = {
   STATUS_CHANGE: "Status change",
   ASSIGNMENT: "Assignment",
   IMPORT: "Import",
+  MERGE: "Merged",
   TEXT: "Text",
   NUMBER: "Number",
   AMOUNT: "Amount (₹)",

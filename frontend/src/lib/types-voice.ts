@@ -162,6 +162,7 @@ export type Campaign = {
   scriptName: string;
   status: CampaignStatus;
   statuses: ContactStatus[];
+  tag: string | null;
   importBatchId: number | null;
   fieldKey: string | null;
   fieldOp: FieldOp | null;

@@ -28,6 +28,15 @@ interface FollowUpRepository extends JpaRepository<FollowUp, Long> {
             order by f.dueAt
             """)
     List<FollowUp> findOpenForUserDueBefore(Long userId, Instant before);
+
+    /** Open follow-ups due by {@code before} whose assignee has not been reminded yet. */
+    @EntityGraph(attributePaths = {"contact", "assignedTo"})
+    @Query("""
+            select f from FollowUp f
+            where f.completedAt is null and f.remindedAt is null and f.dueAt <= :before
+            order by f.dueAt
+            """)
+    List<FollowUp> findDueForReminder(Instant before);
 }
 
 interface ImportBatchRepository extends JpaRepository<ImportBatch, Long> {

@@ -33,6 +33,9 @@ public interface ContactRepository extends JpaRepository<Contact, Long>, JpaSpec
 
     long countByCreatedAtGreaterThanEqual(Instant since);
 
+    @Query("select t, count(c) from Contact c join c.tags t group by t order by lower(t)")
+    List<Object[]> tagCounts();
+
     @Query("select count(c) from Contact c where c.status = :stageKey")
     long countInStage(String stageKey);
 

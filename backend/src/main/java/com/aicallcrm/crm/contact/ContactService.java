@@ -28,6 +28,8 @@ import com.aicallcrm.crm.user.UserDtos.UserRef;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
@@ -59,12 +61,13 @@ public class ContactService {
 
     public record ContactListItem(Long id, String fullName, String phone, String email, String status,
                                   String source, UserRef assignedTo, BranchRef branch, Map<String, String> fields,
-                                  Instant createdAt) {
+                                  List<String> tags, Instant createdAt) {
     }
 
     public record ContactView(Long id, String fullName, String phone, String altPhone, String email,
                               String status, String source, String notes, UserRef assignedTo, BranchRef branch,
-                              Long importBatchId, Map<String, String> fields, Instant createdAt, Instant updatedAt) {
+                              Long importBatchId, Map<String, String> fields, List<String> tags, Instant createdAt,
+                              Instant updatedAt) {
     }
 
     public record StatusRequest(@NotBlank @Size(max = 20) String status, @Size(max = 1000) String note) {
@@ -99,8 +102,31 @@ public class ContactService {
 
     /** Filters for the list, the CSV export and campaign audiences. All optional. */
     public record Filter(String q, String status, Long assignedToId, boolean unassignedOnly, Long importBatchId,
-                         Long branchId) {
+                         Long branchId, String tag) {
+        public Filter(String q, String status, Long assignedToId, boolean unassignedOnly, Long importBatchId,
+                      Long branchId) {
+            this(q, status, assignedToId, unassignedOnly, importBatchId, branchId, null);
+        }
     }
+
+    public record TagsRequest(@NotNull @Size(max = TagService.MAX_PER_CONTACT) List<String> tags) {
+    }
+
+    public enum BulkAction { ASSIGN, STAGE, ADD_TAG, REMOVE_TAG }
+
+    /**
+     * One change to many contacts: either the ones ticked ({@code ids}) or everyone matching {@code filter}
+     * (the list as filtered on screen). {@code userId} for ASSIGN (null = unassign), {@code stage} for STAGE,
+     * {@code tag} for the tag actions.
+     */
+    public record BulkRequest(@Size(max = MAX_BULK) List<Long> ids, Filter filter, @NotNull BulkAction action,
+                              Long userId, @Size(max = 20) String stage, @Size(max = 60) String tag) {
+    }
+
+    public record BulkResult(int matched, int changed) {
+    }
+
+    public static final int MAX_BULK = 20_000;
 
     private final ContactRepository contacts;
     private final ContactActivityRepository activities;
@@ -109,11 +135,13 @@ public class ContactService {
     private final AppUserRepository users;
     private final BranchRepository branches;
     private final StageService stages;
+    private final TagService tags;
     private final AuditService audit;
 
     public ContactService(ContactRepository contacts, ContactActivityRepository activities,
                           FollowUpRepository followUps, FieldService fields, AppUserRepository users,
-                          BranchRepository branches, StageService stages, AuditService audit) {
+                          BranchRepository branches, StageService stages, TagService tags, AuditService audit) {
+        this.tags = tags;
         this.contacts = contacts;
         this.activities = activities;
         this.followUps = followUps;
@@ -155,11 +183,20 @@ public class ContactService {
             } else if (f.assignedToId() != null) {
                 p.add(cb.equal(owner.get("id"), f.assignedToId()));
             }
-            if (f.status() != null) {
+            if (f.status() != null && !f.status().isBlank()) {
                 p.add(cb.equal(root.get("status"), f.status()));
             }
             if (f.importBatchId() != null) {
                 p.add(cb.equal(root.get("importBatchId"), f.importBatchId()));
+            }
+            if (f.tag() != null && !f.tag().isBlank()) {
+                // Tags match whatever their case, so "vip" finds "VIP".
+                Subquery<Long> tagged = query.subquery(Long.class);
+                Root<Contact> other = tagged.from(Contact.class);
+                Join<Contact, String> tag = other.join("tags");
+                tagged.select(other.get("id")).where(cb.equal(other.get("id"), root.get("id")),
+                        cb.equal(cb.lower(tag), f.tag().trim().toLowerCase(Locale.ROOT)));
+                p.add(cb.exists(tagged));
             }
             if (f.q() != null && !f.q().isBlank()) {
                 String like = "%" + f.q().trim().toLowerCase(Locale.ROOT) + "%";
@@ -313,6 +350,85 @@ public class ContactService {
         return view(c);
     }
 
+    @Transactional
+    public ContactView setTags(Long id, TagsRequest req) {
+        CurrentUser me = CurrentUser.get();
+        Contact c = requireVisible(id);
+        TagService.set(c, req.tags(), tags.spellings());
+        audit.record(me.id(), "CONTACT_TAGGED", "CONTACT", c.getId(), null);
+        return view(c);
+    }
+
+    /** Assign, move to a stage, or tag many contacts at once. Admins and managers only. */
+    @Transactional
+    public BulkResult bulk(BulkRequest req) {
+        CurrentUser me = CurrentUser.get();
+        if (!me.seesAllContacts()) {
+            throw ApiException.forbidden("Only an admin or a manager can change many contacts at once");
+        }
+        boolean byIds = req.ids() != null && !req.ids().isEmpty();
+        if (!byIds && req.filter() == null) {
+            throw ApiException.badRequest("Choose the contacts to change");
+        }
+        Specification<Contact> which = spec(me, byIds ? new Filter(null, null, null, false, null, null) : req.filter());
+        if (byIds) {
+            which = which.and((root, query, cb) -> root.get("id").in(req.ids()));
+        }
+        List<Contact> list = contacts.findAll(which);
+        if (list.size() > MAX_BULK) {
+            throw ApiException.badRequest("That is " + list.size() + " contacts; narrow the list to " + MAX_BULK
+                    + " or fewer");
+        }
+        AppUser by = users.getReferenceById(me.id());
+        int changed = 0;
+        switch (req.action()) {
+            case ASSIGN -> {
+                AppUser to = req.userId() == null ? null : activeUser(req.userId());
+                for (Contact c : list) {
+                    Long current = c.getAssignedTo() == null ? null : c.getAssignedTo().getId();
+                    if (!java.util.Objects.equals(current, req.userId())) {
+                        c.setAssignedTo(to);
+                        activities.save(new ContactActivity(c.getId(), ActivityType.ASSIGNMENT,
+                                to == null ? "Unassigned" : "Assigned to " + to.getFullName(), null, by));
+                        changed++;
+                    }
+                }
+            }
+            case STAGE -> {
+                String stage = stages.require(req.stage());
+                String toLabel = stages.label(stage);
+                for (Contact c : list) {
+                    if (!c.getStatus().equals(stage)) {
+                        activities.save(new ContactActivity(c.getId(), ActivityType.STATUS_CHANGE,
+                                label(c.getStatus()) + " → " + toLabel, null, by));
+                        c.setStatus(stage);
+                        changed++;
+                    }
+                }
+            }
+            case ADD_TAG, REMOVE_TAG -> {
+                String tag = TagService.clean(req.tag());
+                if (tag == null) {
+                    throw ApiException.badRequest("Type the tag");
+                }
+                Map<String, String> spellings = tags.spellings();
+                for (Contact c : list) {
+                    boolean had = TagService.has(c, tag);
+                    if (req.action() == BulkAction.ADD_TAG && !had) {
+                        TagService.add(c, List.of(tag), spellings);
+                        changed++;
+                    } else if (req.action() == BulkAction.REMOVE_TAG && had) {
+                        TagService.remove(c, List.of(tag));
+                        changed++;
+                    }
+                }
+            }
+        }
+        audit.record(me.id(), "CONTACTS_BULK_" + req.action().name(), "CONTACT", null,
+                "matched=" + list.size() + " changed=" + changed);
+        return new BulkResult(list.size(), changed);
+    }
+
     // ------------------------------------------------------------------ timeline and follow-ups
 
     @Transactional(readOnly = true)
@@ -326,7 +442,7 @@ public class ContactService {
         CurrentUser me = CurrentUser.get();
         requireVisible(id);
         if (req.type() == ActivityType.STATUS_CHANGE || req.type() == ActivityType.ASSIGNMENT
-                || req.type() == ActivityType.IMPORT) {
+                || req.type() == ActivityType.IMPORT || req.type() == ActivityType.MERGE) {
             throw ApiException.badRequest("That kind of entry is recorded automatically");
         }
         return ActivityView.of(activities.save(new ContactActivity(id, req.type(), blankToNull(req.outcome()),
@@ -375,13 +491,14 @@ public class ContactService {
 
     ContactListItem listItem(Contact c) {
         return new ContactListItem(c.getId(), c.getFullName(), c.getPhone(), c.getEmail(), c.getStatus(), c.getSource(),
-                UserRef.of(c.getAssignedTo()), BranchRef.of(c.getBranch()), fields.read(c), c.getCreatedAt());
+                UserRef.of(c.getAssignedTo()), BranchRef.of(c.getBranch()), fields.read(c),
+                TagService.sorted(c.getTags()), c.getCreatedAt());
     }
 
     ContactView view(Contact c) {
         return new ContactView(c.getId(), c.getFullName(), c.getPhone(), c.getAltPhone(), c.getEmail(), c.getStatus(),
                 c.getSource(), c.getNotes(), UserRef.of(c.getAssignedTo()), BranchRef.of(c.getBranch()),
-                c.getImportBatchId(), fields.read(c), c.getCreatedAt(), c.getUpdatedAt());
+                c.getImportBatchId(), fields.read(c), TagService.sorted(c.getTags()), c.getCreatedAt(), c.getUpdatedAt());
     }
 
     private AppUser activeUser(Long id) {
