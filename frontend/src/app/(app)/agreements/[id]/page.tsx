@@ -26,7 +26,7 @@ export default function AgreementPage() {
           Print
         </Button>
       </div>
-      <article className="rounded-xl border border-line bg-surface p-6 shadow-sm sm:p-10 print:border-0 print:p-0 print:shadow-none">
+      <article className="rounded-lg border border-line bg-surface p-6 shadow-card sm:p-10 print:border-0 print:p-0 print:shadow-none">
         <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">{a.orgName}</p>
         <h1 className="mt-1 text-xl font-semibold tracking-tight">{a.title}</h1>
         <p className="mt-1 text-sm text-ink-soft">For {a.studentName}</p>

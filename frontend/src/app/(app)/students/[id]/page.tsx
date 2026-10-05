@@ -265,8 +265,8 @@ function StudentView() {
 function Big({ label: l, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-muted p-3">
-      <p className="text-xs text-ink-faint">{l}</p>
-      <p className="mt-0.5 text-lg font-semibold tabular-nums">{value}</p>
+      <p className="eyebrow text-ink-faint">{l}</p>
+      <p className="mt-2 font-display text-[1.75rem] leading-none font-semibold">{value}</p>
     </div>
   );
 }

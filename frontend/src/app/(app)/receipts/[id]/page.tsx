@@ -20,7 +20,7 @@ export default function ReceiptPage() {
       <div className="mb-4 flex justify-end gap-2 print:hidden">
         <Button onClick={() => window.print()}>Print / save as PDF</Button>
       </div>
-      <article className="relative rounded-xl border border-line bg-surface p-6 shadow-sm print:border-0 print:shadow-none">
+      <article className="relative rounded-lg border border-line bg-surface p-6 shadow-card print:border-0 print:shadow-none">
         {r.voided && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
             <span className="-rotate-12 rounded-lg border-4 border-red-600 px-6 py-2 text-4xl font-bold text-red-600 opacity-70">VOID</span>

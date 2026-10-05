@@ -127,7 +127,7 @@ export function StudentTickets({ studentId }: { studentId: number }) {
         <Button onClick={() => setAdding((a) => !a)}>{adding ? "Cancel" : "New ticket"}</Button>
       </div>
       {adding && (
-        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+        <div className="group relative overflow-hidden rounded-lg border border-line bg-surface p-5 shadow-card transition duration-300 hover:border-brand-300 hover:shadow-lift">
           <TicketForm
             studentId={studentId}
             onDone={() => {
@@ -137,7 +137,7 @@ export function StudentTickets({ studentId }: { studentId: number }) {
           />
         </div>
       )}
-      <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+      <div className="overflow-hidden rounded-lg border border-line bg-surface shadow-card">
         <TicketTable tickets={data ?? []} showStudent={false} />
       </div>
       <p className="text-xs text-ink-faint">Updated {formatDateTime(new Date().toISOString())}</p>

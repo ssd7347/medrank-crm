@@ -111,8 +111,8 @@ export default function PortalHome() {
                 aria-selected={s.id === studentId}
                 onClick={() => setStudentId(s.id)}
                 className={cx(
-                  "shrink-0 rounded-full border px-3 py-1.5 text-sm",
-                  s.id === studentId ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface",
+                  "shrink-0 rounded-md border px-3 py-1.5 font-medium transition-colors.5 text-sm",
+                  s.id === studentId ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line bg-surface",
                 )}
               >
                 {s.fullName}
@@ -157,7 +157,7 @@ function Overview({ data, onChanged, setData }: { data: PortalOverview; onChange
       <section
         aria-label="Next deadline"
         className={cx(
-          "rounded-2xl border p-5 shadow-sm",
+          "rounded-lg border p-5 shadow-card",
           !next ? "border-line bg-surface" : hoursLeft! <= 48 ? "border-red-300 bg-red-50" : "border-brand-200 bg-brand-50",
         )}
       >
@@ -179,13 +179,13 @@ function Overview({ data, onChanged, setData }: { data: PortalOverview; onChange
       </section>
 
       {s.counsellorName && (
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm">
+        <section className="flex flex-wrap items-center justify-between gap-3 group relative overflow-hidden rounded-lg border border-line bg-surface p-5 shadow-card transition duration-300 hover:border-brand-300 hover:shadow-lift">
           <div>
             <p className="text-xs text-ink-faint">Your counsellor</p>
             <p className="text-sm font-medium">{s.counsellorName}</p>
           </div>
           {s.counsellorPhone && (
-            <a href={`tel:${s.counsellorPhone}`} className="rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-700">
+            <a href={`tel:${s.counsellorPhone}`} className="rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-on-brand hover:bg-brand-500">
               Call {s.counsellorPhone}
             </a>
           )}
@@ -207,7 +207,7 @@ function Overview({ data, onChanged, setData }: { data: PortalOverview; onChange
                   </span>
                 </span>
                 {x.meetingUrl && (
-                  <a href={x.meetingUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
+                  <a href={x.meetingUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-on-brand hover:bg-brand-500">
                     Join
                   </a>
                 )}
@@ -400,7 +400,7 @@ function Overview({ data, onChanged, setData }: { data: PortalOverview; onChange
 function Figure({ label: l, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="rounded-lg bg-muted p-2.5">
-      <p className="text-xs text-ink-faint">{l}</p>
+      <p className="eyebrow text-ink-faint">{l}</p>
       <p className={cx("mt-0.5 text-sm font-semibold tabular-nums sm:text-base", strong && "text-red-700")}>{value}</p>
     </div>
   );
@@ -530,7 +530,7 @@ function Agreements({ studentId, agreements, onChanged }: { studentId: number; a
   if (!agreements.length) return null;
   const pending = agreements.filter((a) => a.status === "PENDING");
   return (
-    <section className={cx("rounded-xl border bg-surface p-4 shadow-sm", pending.length ? "border-amber-300" : "border-line")}>
+    <section className={cx("rounded-lg border bg-surface p-5 shadow-card", pending.length ? "border-amber-300" : "border-line")}>
       <h2 className="text-sm font-semibold">{pending.length ? "Please read and accept" : "Your agreements"}</h2>
       <ul className="mt-2 divide-y divide-line">
         {agreements.map((a) => (

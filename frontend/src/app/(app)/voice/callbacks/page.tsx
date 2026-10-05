@@ -46,7 +46,7 @@ export default function CallbacksPage() {
   };
 
   const chip = (active: boolean, text: string, onClick: () => void) => (
-    <button onClick={onClick} className={cx("shrink-0 rounded-full border px-3 py-1 text-xs", active ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface hover:bg-muted")}>
+    <button onClick={onClick} className={cx("shrink-0 rounded-md border px-3 py-1.5 font-medium transition-colors text-xs", active ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line bg-surface hover:bg-muted")}>
       {text}
     </button>
   );
@@ -69,7 +69,7 @@ export default function CallbacksPage() {
       ) : (
         <ul className="space-y-3">
           {data.map((c) => (
-            <li key={c.id} className={cx("rounded-xl border bg-surface p-4 shadow-sm", c.overdue ? "border-red-300" : "border-line")}>
+            <li key={c.id} className={cx("rounded-lg border bg-surface p-5 shadow-card", c.overdue ? "border-red-300" : "border-line")}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

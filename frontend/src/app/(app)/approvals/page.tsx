@@ -53,7 +53,7 @@ export default function ApprovalsPage() {
               setStatus(f.value);
               setPage(0);
             }}
-            className={cx("rounded-full border px-3 py-1 text-xs", status === f.value ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface hover:bg-muted")}
+            className={cx("rounded-md border px-3 py-1.5 font-medium transition-colors text-xs", status === f.value ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line bg-surface hover:bg-muted")}
           >
             {f.label}
           </button>

@@ -252,7 +252,7 @@ function Money({ k, v, sub, strong }: { k: string; v: number; sub?: string; stro
   return (
     <div className="rounded-lg bg-muted p-3">
       <dt className="text-xs text-ink-faint">{k}</dt>
-      <dd className={cx("mt-0.5 text-lg font-semibold tabular-nums", strong && "text-red-700")}>{formatRupees(v)}</dd>
+      <dd className={cx("mt-2 font-display text-[1.75rem] leading-none font-semibold", strong && "text-red-700")}>{formatRupees(v)}</dd>
       {sub && <dd className="text-xs text-ink-soft">{sub}</dd>}
     </div>
   );
@@ -353,7 +353,7 @@ function PaymentForm({ plan, onDone }: { plan: PlanView; onDone: () => void }) {
           Payment recorded. Receipt <b className="font-mono">{done.receiptNo}</b>.
         </Alert>
         <div className="flex gap-2">
-          <Link href={`/receipts/${done.id}`} className="inline-flex items-center rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-700">
+          <Link href={`/receipts/${done.id}`} className="inline-flex items-center rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-on-brand hover:bg-brand-500">
             Open receipt
           </Link>
           <Button variant="secondary" onClick={onDone}>

@@ -124,9 +124,9 @@ export default function AssociatesPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-      <p className="text-xs text-ink-faint">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
+    <div className="group relative overflow-hidden rounded-lg border border-line bg-surface p-5 shadow-card transition duration-300 hover:border-brand-300 hover:shadow-lift">
+      <p className="eyebrow text-ink-faint">{label}</p>
+      <p className="mt-2.5 font-display text-3xl leading-none font-semibold">{value}</p>
     </div>
   );
 }

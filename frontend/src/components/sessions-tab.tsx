@@ -44,7 +44,7 @@ export function SessionsTab({ studentId, callsVersion }: { studentId: number; ca
                 {s.notes && <p className="mt-1.5 rounded-lg bg-muted p-2 text-sm whitespace-pre-wrap">{s.notes}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {s.meetingUrl && s.status === "SCHEDULED" && (
-                    <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-brand-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-brand-700">
+                    <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-brand-600 px-2.5 py-1.5 text-xs font-medium text-on-brand hover:bg-brand-500">
                       Join video call
                     </a>
                   )}

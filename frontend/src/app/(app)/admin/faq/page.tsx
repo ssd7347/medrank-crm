@@ -36,7 +36,7 @@ export default function FaqPage() {
             key={l}
             onClick={() => setLanguage(l)}
             aria-pressed={language === l}
-            className={cx("rounded-full border px-3 py-1 text-sm", language === l ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface hover:bg-muted")}
+            className={cx("rounded-md border px-3 py-1.5 font-medium transition-colors text-sm", language === l ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line bg-surface hover:bg-muted")}
           >
             {label(l)} ({(data ?? []).filter((f) => f.language === l).length})
           </button>

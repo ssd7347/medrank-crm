@@ -115,7 +115,7 @@ function MetricsCard() {
             <button
               key={d}
               onClick={() => setDays(d)}
-              className={cx("rounded-full border px-2.5 py-0.5 text-xs", d === days ? "border-brand-600 bg-brand-600 text-white" : "border-line hover:bg-muted")}
+              className={cx("rounded-md border px-2.5 py-1.5 font-medium transition-colors text-xs", d === days ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line hover:bg-muted")}
             >
               {d} days
             </button>
@@ -183,9 +183,9 @@ function Breakdown({ title, rows, purpose }: { title: string; rows: Record<strin
 
 function Stat({ label: text, value, sub, tone, href }: { label: string; value: string; sub?: string; tone?: "red" | "green" | "amber"; href?: string }) {
   const body = (
-    <div className="h-full rounded-xl border border-line bg-surface p-3 shadow-sm">
-      <p className="text-xs text-ink-faint">{text}</p>
-      <p className={cx("mt-0.5 text-lg font-semibold tabular-nums", tone === "red" && "text-red-700", tone === "green" && "text-emerald-700", tone === "amber" && "text-amber-700")}>{value}</p>
+    <div className="h-full rounded-lg border border-line bg-surface p-4 shadow-card transition duration-300 hover:border-brand-300">
+      <p className="eyebrow text-ink-faint">{text}</p>
+      <p className={cx("mt-2 font-display text-[1.75rem] leading-none font-semibold", tone === "red" && "text-red-700", tone === "green" && "text-emerald-700", tone === "amber" && "text-amber-700")}>{value}</p>
       {sub && <p className="text-xs text-ink-faint">{sub}</p>}
     </div>
   );

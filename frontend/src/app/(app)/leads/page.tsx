@@ -81,7 +81,7 @@ function LeadsView() {
       <div className="-mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
         <button
           onClick={() => setParam("status", "")}
-          className={cx("shrink-0 rounded-full border px-3 py-1 text-xs", !status ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface hover:bg-muted")}
+          className={cx("shrink-0 rounded-md border px-3 py-1.5 font-medium transition-colors text-xs", !status ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line bg-surface hover:bg-muted")}
         >
           All stages
         </button>
@@ -89,7 +89,7 @@ function LeadsView() {
           <button
             key={s}
             onClick={() => setParam("status", s)}
-            className={cx("shrink-0 rounded-full border px-3 py-1 text-xs whitespace-nowrap", status === s ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface hover:bg-muted")}
+            className={cx("shrink-0 rounded-md border px-3 py-1.5 font-medium transition-colors text-xs whitespace-nowrap", status === s ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line bg-surface hover:bg-muted")}
           >
             {label(s)}
           </button>

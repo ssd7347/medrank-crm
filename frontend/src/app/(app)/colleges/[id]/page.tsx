@@ -122,7 +122,7 @@ export default function CollegeDetailPage() {
               role="tab"
               aria-selected={tab === t.key}
               onClick={() => setTab(t.key)}
-              className={cx("rounded-md px-3 py-1.5 text-sm", tab === t.key ? "bg-brand-600 text-white" : "text-ink-soft hover:text-ink")}
+              className={cx("rounded-md px-3 py-1.5 text-sm", tab === t.key ? "bg-brand-600 text-on-brand" : "text-ink-soft hover:text-ink")}
             >
               {t.label}
             </button>

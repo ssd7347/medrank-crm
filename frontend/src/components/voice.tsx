@@ -141,11 +141,11 @@ export function Transcript({ lines, empty }: { lines: TranscriptLine[]; empty?: 
           <li key={i} className={cx("flex", l.role === "caller" ? "justify-end" : "justify-start")}>
             <div
               className={cx(
-                "max-w-[85%] rounded-xl px-3 py-2 text-sm break-words whitespace-pre-wrap sm:max-w-[75%]",
-                l.role === "caller" ? "bg-brand-600 text-white" : "bg-muted text-ink",
+                "max-w-[85%] rounded-lg px-3 py-2 text-sm break-words whitespace-pre-wrap sm:max-w-[75%]",
+                l.role === "caller" ? "bg-brand-600 text-on-brand" : "bg-muted text-ink",
               )}
             >
-              <span className={cx("block text-[10px] font-semibold tracking-wide uppercase", l.role === "caller" ? "text-white/70" : "text-ink-faint")}>
+              <span className={cx("block text-[10px] font-semibold tracking-wide uppercase", l.role === "caller" ? "text-on-brand/70" : "text-ink-faint")}>
                 {l.role === "caller" ? "Caller" : "AI agent"}
               </span>
               {l.text}

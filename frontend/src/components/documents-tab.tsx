@@ -116,7 +116,7 @@ function DocumentCard({ item, studentId, onChanged }: { item: ChecklistItem; stu
   }
 
   return (
-    <article className={cx("rounded-xl border bg-surface p-4 shadow-sm", item.expired ? "border-red-300" : "border-line")}>
+    <article className={cx("rounded-lg border bg-surface p-5 shadow-card", item.expired ? "border-red-300" : "border-line")}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-medium">{item.name}</h3>

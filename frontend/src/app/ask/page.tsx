@@ -148,7 +148,7 @@ export default function AssistantPage() {
                 key={l}
                 onClick={() => setLanguage(l)}
                 aria-pressed={language === l}
-                className={cx("rounded-full border px-2.5 py-1 text-xs", language === l ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface")}
+                className={cx("rounded-md border px-2.5 py-1.5 font-medium transition-colors text-xs", language === l ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line bg-surface")}
               >
                 {T[l].name}
               </button>
@@ -165,7 +165,7 @@ export default function AssistantPage() {
           <Bubble key={i} from={m.from}>
             {m.text}
             {m.offerCallback && i === messages.length - 1 && !done && !formOpen && (
-              <button onClick={() => setFormOpen(true)} className="mt-2 block rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">
+              <button onClick={() => setFormOpen(true)} className="mt-2 block rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-on-brand hover:bg-brand-500">
                 {t.callback}
               </button>
             )}
@@ -231,7 +231,7 @@ export default function AssistantPage() {
 
 function Bubble({ from, children }: { from: "bot" | "user"; children: React.ReactNode }) {
   return (
-    <div className={cx("max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap", from === "bot" ? "self-start border border-line bg-surface" : "self-end bg-brand-600 text-white")}>
+    <div className={cx("max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap", from === "bot" ? "self-start border border-line bg-surface" : "self-end bg-brand-600 text-on-brand")}>
       {children}
     </div>
   );

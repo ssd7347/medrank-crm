@@ -133,7 +133,7 @@ function PredictorView() {
                         key={q}
                         onClick={() => toggleQuota(q)}
                         aria-pressed={f.quotas.includes(q)}
-                        className={cx("rounded-full border px-3 py-1 text-xs", f.quotas.includes(q) ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface")}
+                        className={cx("rounded-md border px-3 py-1.5 font-medium transition-colors text-xs", f.quotas.includes(q) ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line bg-surface")}
                       >
                         {q}
                       </button>
@@ -192,7 +192,7 @@ function PredictorView() {
                         {rows.map((p) => {
                           const key = `${p.collegeId}|${p.quota}`;
                           return (
-                            <article key={key} className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+                            <article key={key} className="group relative overflow-hidden rounded-lg border border-line bg-surface p-5 shadow-card transition duration-300 hover:border-brand-300 hover:shadow-lift">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <Link href={`/colleges/${p.collegeId}`} className="font-medium text-brand-800 hover:underline">

@@ -99,10 +99,10 @@ function LoginForm({ startPhone }: { startPhone: string }) {
       {sent && (
         <>
           {sent.codeOnScreen ? (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900" role="status">
-              <p>Your one-time code is</p>
-              <p className="my-1 font-mono text-2xl font-semibold tracking-[0.3em]">{sent.codeOnScreen}</p>
-              <p className="text-xs">Shown here only until WhatsApp delivery is connected. It works once, for {Math.round(sent.validForSeconds / 60)} minutes.</p>
+            <div className="rounded-md border border-brand-300 bg-brand-50 px-4 py-3.5 text-sm text-ink-soft" role="status">
+              <p className="eyebrow text-brand-700">Your one-time code</p>
+              <p className="my-2 font-mono text-3xl font-semibold tracking-[0.35em] text-brand-900">{sent.codeOnScreen}</p>
+              <p className="text-xs leading-relaxed text-ink-faint">Shown here only until WhatsApp delivery is connected. It works once, for {Math.round(sent.validForSeconds / 60)} minutes.</p>
             </div>
           ) : sent.shownOnScreen ? (
             <Alert tone="amber">This number has no ID yet. Students can create one with Register; staff IDs are created by the admin.</Alert>
@@ -273,25 +273,31 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [startPhone, setStartPhone] = useState("");
   return (
-    <main className="grid min-h-screen lg:grid-cols-2">
-      <div className="hidden flex-col justify-between bg-brand-800 p-10 text-brand-50 lg:flex">
-        <Logo light />
-        <div className="max-w-md">
-          <p className="text-3xl leading-tight font-semibold tracking-tight">
+    <main className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
+      <div className="relative hidden flex-col justify-between overflow-hidden border-r border-line bg-gradient-to-br from-surface via-brand-50 to-brand-100 p-12 lg:flex">
+        {/* A soft gold glow and a fine frame: the brand's quiet signature. */}
+        <div aria-hidden className="pointer-events-none absolute -top-40 -right-40 h-[28rem] w-[28rem] rounded-full bg-brand-300/40 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute inset-6 rounded-lg border border-brand-600/30" />
+        <div className="relative">
+          <Logo light />
+        </div>
+        <div className="relative max-w-lg">
+          <div className="mb-6 h-px w-16 bg-brand-600" />
+          <p className="font-display text-[2.75rem] leading-[1.1] font-semibold tracking-wide text-navy">
             Every NEET aspirant, every round, every deadline — in one place.
           </p>
-          <p className="mt-4 text-brand-200">
+          <p className="mt-6 text-[0.95rem] leading-relaxed text-ink-soft">
             Leads, NEET profiles, college and seat-matrix data for AIQ, State, Management and NRI counselling.
           </p>
         </div>
-        <p className="text-xs text-brand-300">All actions are logged.</p>
+        <p className="eyebrow relative text-brand-800">Private and secure · Every action is logged</p>
       </div>
-      <div className="flex items-center justify-center px-4 py-12">
+      <div className="flex items-center justify-center px-5 py-12">
         <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden">
+          <div className="mb-10 lg:hidden">
             <Logo />
           </div>
-          <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-sm" role="tablist">
+          <div className="mb-8 grid grid-cols-2 gap-1 rounded-md border border-line bg-muted p-1 text-sm" role="tablist">
             {(["login", "register"] as const).map((m) => (
               <button
                 key={m}
@@ -299,7 +305,7 @@ export default function LoginPage() {
                 role="tab"
                 aria-selected={mode === m}
                 onClick={() => setMode(m)}
-                className={cx("rounded-md px-2 py-1.5", mode === m ? "bg-surface font-medium shadow-sm" : "text-ink-soft hover:text-ink")}
+                className={cx("rounded px-2 py-2 transition-colors", mode === m ? "bg-surface font-semibold text-ink shadow-card ring-1 ring-brand-300" : "text-ink-soft hover:text-ink")}
               >
                 {m === "login" ? "Login" : "Register"}
               </button>
@@ -307,16 +313,20 @@ export default function LoginPage() {
           </div>
           {mode === "login" ? (
             <>
-              <h1 className="text-xl font-semibold tracking-tight">Log in</h1>
-              <p className="mt-1 mb-6 text-sm text-ink-soft">Enter your mobile number to get a one-time code.</p>
+              <p className="eyebrow text-brand-700">Welcome back</p>
+              <h1 className="mt-2 font-display text-4xl font-semibold tracking-wide">Sign in</h1>
+              <div className="gold-rule mt-4 mb-5" />
+              <p className="mb-7 text-sm leading-relaxed text-ink-soft">Enter your mobile number to get a one-time code.</p>
               <Suspense fallback={<Loading />}>
                 <LoginForm key={startPhone} startPhone={startPhone} />
               </Suspense>
             </>
           ) : (
             <>
-              <h1 className="text-xl font-semibold tracking-tight">Student registration</h1>
-              <p className="mt-1 mb-6 text-sm text-ink-soft">
+              <p className="eyebrow text-brand-700">Students and parents</p>
+              <h1 className="mt-2 font-display text-4xl font-semibold tracking-wide">Register</h1>
+              <div className="gold-rule mt-4 mb-5" />
+              <p className="mb-7 text-sm leading-relaxed text-ink-soft">
                 For students and parents. Staff do not register here: the admin creates staff IDs.
               </p>
               <RegisterForm

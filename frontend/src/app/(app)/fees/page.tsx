@@ -65,7 +65,7 @@ export default function FeesPage() {
                     <button
                       key={f}
                       onClick={() => setFilter(f)}
-                      className={cx("rounded-full border px-2.5 py-0.5 text-xs", filter === f ? "border-brand-600 bg-brand-600 text-white" : "border-line")}
+                      className={cx("rounded-md border px-2.5 py-1.5 font-medium transition-colors text-xs", filter === f ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line")}
                     >
                       {f === "overdue" ? "Overdue" : f === "week" ? "This week" : "All"}
                     </button>
@@ -138,9 +138,9 @@ export default function FeesPage() {
 
 function Tile({ k, v, tone }: { k: string; v: number; tone?: "red" | "amber" }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+    <div className="group relative overflow-hidden rounded-lg border border-line bg-surface p-5 shadow-card transition duration-300 hover:border-brand-300 hover:shadow-lift">
       <p className="text-xs text-ink-faint">{k}</p>
-      <p className={cx("mt-1 text-xl font-semibold tabular-nums", tone === "red" && v > 0 && "text-red-700", tone === "amber" && v > 0 && "text-amber-700")}>{formatRupees(v)}</p>
+      <p className={cx("mt-2.5 font-display text-3xl leading-none font-semibold", tone === "red" && v > 0 && "text-red-700", tone === "amber" && v > 0 && "text-amber-700")}>{formatRupees(v)}</p>
     </div>
   );
 }

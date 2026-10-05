@@ -35,7 +35,7 @@ export default function CommissionsPage() {
       <PageHeader title="Referral commissions" subtitle="Created automatically when a referred lead's admission is confirmed. Amount = associate's rate × the student's consultancy fee after discount." />
       <div className="mb-3 flex gap-1.5 overflow-x-auto">
         {FILTERS.map((f) => (
-          <button key={f} onClick={() => setStatus(f)} className={cx("shrink-0 rounded-full border px-3 py-1 text-xs", status === f ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface")}>
+          <button key={f} onClick={() => setStatus(f)} className={cx("shrink-0 rounded-md border px-3 py-1.5 font-medium transition-colors text-xs", status === f ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line bg-surface")}>
             {f ? label(f) : "All"}
           </button>
         ))}

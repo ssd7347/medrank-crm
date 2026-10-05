@@ -127,9 +127,9 @@ export default function AnalyticsPage() {
 function Live({ label: l, value, hint, href, urgent }: { label: string; value: number; hint: string; href: string; urgent?: boolean }) {
   const hot = urgent && value > 0;
   return (
-    <Link href={href} className={cx("block rounded-xl border bg-surface p-4 shadow-sm hover:bg-muted", hot ? "border-red-300" : "border-line")}>
-      <p className="text-xs text-ink-faint">{l}</p>
-      <p className={cx("mt-1 text-2xl font-semibold tabular-nums", hot && "text-red-700")}>{formatNumber(value)}</p>
+    <Link href={href} className={cx("block rounded-lg border bg-surface p-5 shadow-card transition duration-300 hover:border-brand-300 hover:shadow-lift", hot ? "border-red-300" : "border-line")}>
+      <p className="eyebrow text-ink-faint">{l}</p>
+      <p className={cx("mt-2.5 font-display text-[2.4rem] leading-none font-semibold", hot && "text-red-700")}>{formatNumber(value)}</p>
       <p className="mt-0.5 text-xs text-ink-soft">{hint}</p>
     </Link>
   );
@@ -138,8 +138,8 @@ function Live({ label: l, value, hint, href, urgent }: { label: string; value: n
 function Money({ label: l, value, hint, href }: { label: string; value: number; hint?: string; href?: string }) {
   const body = (
     <>
-      <p className="text-xs text-ink-faint">{l}</p>
-      <p className="mt-0.5 text-lg font-semibold tabular-nums">{formatRupees(value)}</p>
+      <p className="eyebrow text-ink-faint">{l}</p>
+      <p className="mt-2 font-display text-[1.75rem] leading-none font-semibold">{formatRupees(value)}</p>
       {hint && <p className="text-xs text-ink-soft">{hint}</p>}
     </>
   );
@@ -194,7 +194,7 @@ function MonthlyBars({ months }: { months: { month: string; collected: number }[
             <div key={m.month} className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end" title={`${monthLongFmt.format(date)}: ${formatRupees(m.collected)}`}>
               {labelled && <span className="mb-0.5 text-[10px] whitespace-nowrap text-ink-soft tabular-nums">₹{compactFmt.format(m.collected)}</span>}
               <div
-                className="w-full max-w-7 rounded-t bg-brand-600 group-hover:bg-brand-700"
+                className="w-full max-w-7 rounded-t bg-brand-600 group-hover:bg-brand-500"
                 style={{ height: `${(100 * m.collected) / max}%`, minHeight: m.collected > 0 ? 2 : 0 }}
               />
             </div>

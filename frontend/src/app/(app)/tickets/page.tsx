@@ -17,7 +17,7 @@ export default function TicketsPage() {
   const overdue = (data ?? []).filter((t) => t.overdue).length;
 
   const chip = (active: boolean, text: string, onClick: () => void) => (
-    <button onClick={onClick} className={cx("shrink-0 rounded-full border px-3 py-1 text-xs", active ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface hover:bg-muted")}>
+    <button onClick={onClick} className={cx("shrink-0 rounded-md border px-3 py-1.5 font-medium transition-colors text-xs", active ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line bg-surface hover:bg-muted")}>
       {text}
     </button>
   );

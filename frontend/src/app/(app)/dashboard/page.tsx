@@ -15,9 +15,9 @@ import { useNow } from "@/lib/use-now";
 
 function Stat({ title, value, href, tone }: { title: string; value: number | string; href?: string; tone?: "red" | "amber" }) {
   const body = (
-    <div className="rounded-xl border border-line bg-surface p-4 shadow-sm transition-colors hover:border-brand-300">
-      <p className="text-xs font-medium text-ink-faint">{title}</p>
-      <p className={cx("mt-1 text-2xl font-semibold tabular-nums", tone === "red" ? "text-red-700" : tone === "amber" ? "text-amber-700" : "text-ink")}>
+    <div className="group relative overflow-hidden rounded-lg border border-line bg-surface p-5 shadow-card transition duration-300 hover:border-brand-300 hover:shadow-lift">
+      <p className="eyebrow text-ink-faint">{title}</p>
+      <p className={cx("mt-2.5 font-display text-[2.4rem] leading-none font-semibold", tone === "red" ? "text-red-700" : tone === "amber" ? "text-amber-700" : "text-ink")}>
         {value}
       </p>
     </div>

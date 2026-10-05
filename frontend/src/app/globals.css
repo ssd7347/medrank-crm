@@ -1,28 +1,46 @@
 @import "tailwindcss";
 
-/* Design tokens. Brand is a deep teal: calm and clinical, distinct from generic SaaS blue. */
+/*
+ * Design tokens: understated, light luxury. Warm ivory canvas, white surfaces, royal navy text and a muted
+ * champagne gold used sparingly (primary actions, active states, key figures, fine rules).
+ * Every text colour here passes WCAG AA on the surfaces it is used on.
+ *
+ * The brand-* scale is the customer's colour (Company settings) and is rebuilt at runtime by
+ * BrandingProvider; these values are the champagne-gold default: 50–300 are pale tints for backgrounds,
+ * 700–900 deep tones that are readable as text.
+ */
 @theme {
-  --color-brand-50: #effbf9;
-  --color-brand-100: #d7f4ef;
-  --color-brand-200: #b0e8df;
-  --color-brand-300: #7dd5c9;
-  --color-brand-400: #45b9ac;
-  --color-brand-500: #259d91;
-  --color-brand-600: #197e76;
-  --color-brand-700: #186560;
-  --color-brand-800: #17514e;
-  --color-brand-900: #164442;
+  --color-brand-50: color-mix(in srgb, #c9a96e 9%, white);
+  --color-brand-100: color-mix(in srgb, #c9a96e 16%, white);
+  --color-brand-200: color-mix(in srgb, #c9a96e 30%, white);
+  --color-brand-300: color-mix(in srgb, #c9a96e 50%, white);
+  --color-brand-400: color-mix(in srgb, #c9a96e 75%, white);
+  --color-brand-500: color-mix(in srgb, #c9a96e 88%, white);
+  --color-brand-600: #c9a96e;
+  --color-brand-700: color-mix(in srgb, #c9a96e 62%, black);
+  --color-brand-800: color-mix(in srgb, #c9a96e 50%, black);
+  --color-brand-900: color-mix(in srgb, #c9a96e 40%, black);
+  /* Text placed on a brand-600 background. */
+  --color-on-brand: #1b1408;
 
-  --color-canvas: #f5f7f8;
+  --color-canvas: #f7f4ee;
   --color-surface: #ffffff;
-  --color-muted: #eef2f3;
-  --color-line: #dfe5e7;
+  --color-raised: #fbf9f5;
+  --color-muted: #f1ece2;
+  --color-line: #e7e0d2;
+  --color-line-strong: #d6ccb9;
   --color-ink: #1e3a6e;
   --color-ink-soft: #3d5a8a;
-  --color-ink-faint: #5e7196;
+  --color-ink-faint: #55688c;
+  --color-navy: #13284b;
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-serif), ui-serif, Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --shadow-card: 0 1px 2px rgb(30 58 110 / 0.04), 0 10px 30px -18px rgb(30 58 110 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(30 58 110 / 0.05), 0 18px 40px -18px rgb(30 58 110 / 0.28);
+  --shadow-gold: 0 8px 20px -12px rgb(150 115 50 / 0.55);
 }
 
 :root {
@@ -30,8 +48,49 @@
 }
 
 body {
-  background: var(--color-canvas);
+  background:
+    radial-gradient(1100px 520px at 88% -14%, rgb(201 169 110 / 0.12), transparent 60%),
+    radial-gradient(900px 480px at -12% 112%, rgb(30 58 110 / 0.05), transparent 60%),
+    var(--color-canvas);
+  background-attachment: fixed;
   color: var(--color-ink);
+  letter-spacing: 0.005em;
+}
+
+::selection {
+  background: rgb(201 169 110 / 0.3);
+  color: #13284b;
+}
+
+/* Quiet scrollbars that belong to the theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d6ccb9 transparent;
+}
+
+/* Keyboard focus: a fine gold ring everywhere, never the browser's default blue. */
+:focus-visible {
+  outline: 2px solid rgb(176 141 79 / 0.9);
+  outline-offset: 2px;
+}
+
+/* The display serif's old-style figures ("o" for 0) do not suit statistics: use full-height, even-width digits. */
+.font-display {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* A hairline of gold under display headings and the like. */
+.gold-rule {
+  height: 1px;
+  background: linear-gradient(90deg, rgb(201 169 110 / 0.9), rgb(201 169 110 / 0.25) 45%, transparent);
+}
+
+/* Small-caps labels: section names, table headings, eyebrows. */
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 /* Phones: tables become stacked cards, each value labelled with its column name. */
@@ -41,7 +100,7 @@ body {
   }
   .rtable tr {
     display: block;
-    padding: 0.625rem 1rem;
+    padding: 0.75rem 1rem;
   }
   .rtable td {
     display: flex;
@@ -55,7 +114,9 @@ body {
   .rtable td::before {
     content: attr(data-label);
     flex-shrink: 0;
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: var(--color-ink-faint);
     text-align: left;
   }
@@ -76,8 +137,18 @@ body {
 
 /* Native <dialog> centring and scroll lock. */
 dialog::backdrop {
-  backdrop-filter: blur(1px);
+  background: rgb(19 40 75 / 0.35);
+  backdrop-filter: blur(3px);
 }
 html:has(dialog[open]) {
   overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

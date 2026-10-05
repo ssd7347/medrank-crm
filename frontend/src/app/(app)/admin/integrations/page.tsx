@@ -21,7 +21,7 @@ export default function IntegrationsPage() {
           </p>
           <ul className="grid gap-3 lg:grid-cols-2">
             {data.map((i) => (
-              <li key={i.key} className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+              <li key={i.key} className="group relative overflow-hidden rounded-lg border border-line bg-surface p-5 shadow-card transition duration-300 hover:border-brand-300 hover:shadow-lift">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-sm font-semibold">{i.name}</h2>
