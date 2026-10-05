@@ -164,7 +164,7 @@ export default function ImportPage() {
         </Card>
       ) : !preview ? (
         <Card title="1. Choose the file">
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line px-4 py-10 text-center hover:bg-muted">
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-line px-4 py-10 text-center hover:bg-muted">
             <span className="text-sm font-medium">{busy ? "Reading the file…" : file ? file.name : "Click to choose an Excel or CSV file"}</span>
             <span className="text-xs text-ink-faint">Up to 20,000 rows and 10 MB. Any columns: name and phone are the only ones required.</span>
             <input
@@ -322,8 +322,8 @@ export default function ImportPage() {
 
 function Count({ label: text, value, tone }: { label: string; value: number; tone?: "green" | "amber" }) {
   return (
-    <div className="rounded-xl border border-line p-3">
-      <p className="text-xs text-ink-faint">{text}</p>
+    <div className="rounded-lg border border-line p-3">
+      <p className="eyebrow text-ink-faint">{text}</p>
       <p className={`mt-0.5 text-xl font-semibold tabular-nums ${tone === "green" ? "text-emerald-700" : tone === "amber" ? "text-amber-700" : ""}`}>{value}</p>
     </div>
   );

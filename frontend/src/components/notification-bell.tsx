@@ -33,14 +33,14 @@ export function NotificationBell({ className }: { className?: string }) {
     <Link
       href="/notifications"
       aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
-      className={cx("relative inline-grid h-9 w-9 place-items-center rounded-lg border border-line bg-surface text-ink-soft hover:text-ink", className)}
+      className={cx("relative inline-grid h-9 w-9 place-items-center rounded-md border border-line-strong bg-surface text-ink-soft transition hover:border-brand-600 hover:text-brand-800", className)}
     >
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
         <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" strokeLinecap="round" />
       </svg>
       {unread > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] leading-5 font-semibold text-white">
+        <span className="absolute -top-1.5 -right-1.5 min-w-5 rounded-full bg-brand-600 px-1 text-center text-[10px] leading-5 font-bold text-on-brand ring-2 ring-surface">
           {unread > 99 ? "99+" : unread}
         </span>
       )}

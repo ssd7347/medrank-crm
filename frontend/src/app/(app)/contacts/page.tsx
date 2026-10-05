@@ -111,7 +111,7 @@ function Contacts() {
   const chip = (active: boolean, text: string, onClick: () => void) => (
     <button
       onClick={onClick}
-      className={cx("shrink-0 rounded-full border px-3 py-1 text-xs", active ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface hover:bg-muted")}
+      className={cx("shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors", active ? "border-brand-600 bg-brand-600 text-on-brand" : "border-line bg-surface hover:bg-muted")}
     >
       {text}
     </button>
@@ -321,7 +321,7 @@ function BulkBar({
   }
 
   return (
-    <div className="sticky top-[57px] z-10 mb-3 rounded-xl border border-brand-200 bg-brand-50 p-3 lg:top-2">
+    <div className="sticky top-[57px] z-10 mb-3 rounded-lg border border-brand-200 bg-brand-50 p-3 lg:top-2">
       {message && (
         <div className="mb-2">
           <Alert tone={message.tone}>{message.text}</Alert>

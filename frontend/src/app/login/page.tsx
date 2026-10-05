@@ -97,10 +97,10 @@ function LoginForm() {
       {sent && (
         <>
           {sent.codeOnScreen ? (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900" role="status">
-              <p>Your one-time code is</p>
-              <p className="my-1 font-mono text-2xl font-semibold tracking-[0.3em]">{sent.codeOnScreen}</p>
-              <p className="text-xs">Shown here only until SMS or WhatsApp delivery is connected. It works once, for {Math.round(sent.validForSeconds / 60)} minutes.</p>
+            <div className="rounded-md border border-brand-300 bg-brand-50 px-4 py-3.5 text-sm text-ink-soft" role="status">
+              <p className="eyebrow text-brand-700">Your one-time code</p>
+              <p className="my-2 font-mono text-3xl font-semibold tracking-[0.35em] text-brand-800">{sent.codeOnScreen}</p>
+              <p className="text-xs leading-relaxed text-ink-faint">Shown here only until SMS or WhatsApp delivery is connected. It works once, for {Math.round(sent.validForSeconds / 60)} minutes.</p>
             </div>
           ) : sent.shownOnScreen ? (
             <Alert tone="amber">There is no account for this number. Ask the admin to create one for you.</Alert>
@@ -134,7 +134,7 @@ function LoginForm() {
         <div className="flex justify-between text-sm">
           <button
             type="button"
-            className="text-brand-700 hover:underline"
+            className="text-brand-700 underline-offset-4 transition hover:text-brand-800 hover:underline"
             onClick={() => {
               setSent(null);
               setCode("");
@@ -143,7 +143,7 @@ function LoginForm() {
           >
             Change number
           </button>
-          <button type="button" className="text-brand-700 hover:underline" onClick={sendCode} disabled={submitting}>
+          <button type="button" className="text-brand-700 underline-offset-4 transition hover:text-brand-800 hover:underline" onClick={sendCode} disabled={submitting}>
             Get a new code
           </button>
         </div>
@@ -155,24 +155,32 @@ function LoginForm() {
 export default function LoginPage() {
   const { companyName, agentName, loginHeadline, loginText } = useBranding();
   return (
-    <main className="grid min-h-screen lg:grid-cols-2">
-      <div className="hidden flex-col justify-between bg-brand-800 p-10 text-brand-50 lg:flex">
-        <Logo light />
-        <div className="max-w-md">
-          <p className="text-3xl leading-tight font-semibold tracking-tight">{loginHeadline || "Every customer reached, every call followed up."}</p>
-          <p className="mt-4 text-brand-200">
+    <main className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
+      <div className="relative hidden flex-col justify-between overflow-hidden border-r border-line bg-gradient-to-br from-surface via-brand-50 to-brand-100 p-12 lg:flex">
+        {/* A soft gold glow and a fine frame: the brand's quiet signature. */}
+        <div aria-hidden className="pointer-events-none absolute -top-40 -right-40 h-[28rem] w-[28rem] rounded-full bg-brand-300/40 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute inset-6 rounded-lg border border-brand-600/30" />
+        <div className="relative">
+          <Logo light />
+        </div>
+        <div className="relative max-w-lg">
+          <div className="mb-6 h-px w-16 bg-brand-600" />
+          <p className="font-display text-[2.75rem] leading-[1.1] font-semibold tracking-wide text-navy">{loginHeadline || "Every customer reached, every call followed up."}</p>
+          <p className="mt-6 text-[0.95rem] leading-relaxed text-ink-soft">
             {loginText || `${agentName}, the AI assistant of ${companyName}, makes the routine calls. Your team takes over whenever a person is needed.`}
           </p>
         </div>
-        <p className="text-xs text-brand-300">All actions are logged.</p>
+        <p className="eyebrow relative text-brand-800">Private and secure · Every action is logged</p>
       </div>
-      <div className="flex items-center justify-center px-4 py-12">
+      <div className="flex items-center justify-center px-5 py-12">
         <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden">
+          <div className="mb-10 lg:hidden">
             <Logo />
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">Log in</h1>
-          <p className="mt-1 mb-6 text-sm text-ink-soft">Enter your mobile number to get a one-time code.</p>
+          <p className="eyebrow text-brand-700">Welcome back</p>
+          <h1 className="mt-2 font-display text-4xl font-semibold tracking-wide">Sign in</h1>
+          <div className="gold-rule mt-4 mb-5" />
+          <p className="mb-7 text-sm leading-relaxed text-ink-soft">Enter your mobile number to get a one-time code.</p>
           <Suspense fallback={<Loading />}>
             <LoginForm />
           </Suspense>

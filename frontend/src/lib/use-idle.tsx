@@ -94,7 +94,7 @@ export function useIdleLogout({ enabled, storageKey, keepAlive, onIdle }: { enab
 export function IdleWarning({ secondsLeft }: { secondsLeft: number | null }) {
   if (secondsLeft === null) return null;
   return (
-    <div role="alert" className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-sm rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-lg print:hidden">
+    <div role="alert" className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-sm rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-lg print:hidden">
       <p className="font-medium">Still there?</p>
       <p>
         You will be signed out in <span className="tabular-nums">{secondsLeft}</span> seconds. Move the mouse or press a key to stay signed in.
