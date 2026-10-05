@@ -17,9 +17,9 @@
   --color-surface: #ffffff;
   --color-muted: #eef2f3;
   --color-line: #dfe5e7;
-  --color-ink: #0b1d3a;
-  --color-ink-soft: #34486b;
-  --color-ink-faint: #5f6f8c;
+  --color-ink: #1e3a6e;
+  --color-ink-soft: #3d5a8a;
+  --color-ink-faint: #5e7196;
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
