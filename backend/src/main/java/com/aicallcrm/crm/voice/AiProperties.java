@@ -14,7 +14,7 @@ public record AiProperties(
         @DefaultValue("SIMULATED") String brain,
         /** Anthropic API key. Blank: the Claude brain is unavailable. */
         @DefaultValue("") String anthropicApiKey,
-        @DefaultValue("claude-haiku-4-5-20251001") String anthropicModel,
+        @DefaultValue("claude-haiku-4-5") String anthropicModel,
         @DefaultValue("https://api.anthropic.com") String anthropicUrl,
         /** Base URL of an OpenAI-compatible server with an open model (Ollama by default). */
         @DefaultValue("http://localhost:11434") String localUrl,

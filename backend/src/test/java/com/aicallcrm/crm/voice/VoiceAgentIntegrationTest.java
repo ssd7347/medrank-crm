@@ -275,7 +275,7 @@ class VoiceAgentIntegrationTest {
     @Test
     void scriptsAreVersionedAndOnlyOneInboundScriptIsInUse() throws Exception {
         String agent = login(user("AGENT"), "StaffPass123!");
-        String body = "{\"name\":\"Renewal call\",\"kind\":\"OUTBOUND\",\"model\":\"claude-haiku-4-5-20251001\","
+        String body = "{\"name\":\"Renewal call\",\"kind\":\"OUTBOUND\",\"model\":\"claude-haiku-4-5\","
                 + "\"systemPrompt\":\"Rules...\",\"openingLine\":\"Hello {{first_name}}\"}";
         mvc.perform(auth(post("/api/voice/scripts"), agent).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isForbidden());

@@ -13,7 +13,7 @@ import java.util.UUID;
 
 import tools.jackson.databind.ObjectMapper;
 
-/** The two ways of talking to a language model: Anthropic's API, and the OpenAI-compatible API of open models. */
+/** Talking to open models over the OpenAI-compatible API (Ollama, vLLM, llama.cpp). Claude: see {@link ClaudeLlm}. */
 final class LlmClients {
 
     private LlmClients() {
@@ -44,85 +44,6 @@ final class LlmClients {
                     + (err.length() > 300 ? err.substring(0, 300) : err));
         }
         return mapper.readValue(res.body(), Map.class);
-    }
-
-    // ------------------------------------------------------------------ Anthropic
-
-    static final class Anthropic implements LlmClient {
-
-        private final AiProperties props;
-        private final ObjectMapper mapper;
-
-        Anthropic(AiProperties props, ObjectMapper mapper) {
-            this.props = props;
-            this.mapper = mapper;
-        }
-
-        @Override
-        public String describe() {
-            return "Claude (" + props.anthropicModel() + ")";
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public Reply chat(String system, List<Message> messages, List<ToolSpec> tools) {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("model", props.anthropicModel());
-            body.put("max_tokens", props.maxReplyTokens());
-            body.put("system", system);
-            body.put("tools", tools.stream().map(t -> Map.of("name", t.name(), "description", t.description(),
-                    "input_schema", t.inputSchema())).toList());
-            body.put("messages", toAnthropic(messages));
-            Map<String, Object> res = post(mapper, props.anthropicUrl() + "/v1/messages",
-                    Map.of("x-api-key", props.anthropicApiKey(), "anthropic-version", "2023-06-01"), body,
-                    props.timeoutSeconds());
-            StringBuilder text = new StringBuilder();
-            List<ToolCall> calls = new ArrayList<>();
-            if (res.get("content") instanceof List<?> blocks) {
-                for (Object o : blocks) {
-                    Map<String, Object> block = (Map<String, Object>) o;
-                    if ("text".equals(block.get("type"))) {
-                        text.append(block.get("text"));
-                    } else if ("tool_use".equals(block.get("type"))) {
-                        calls.add(new ToolCall(String.valueOf(block.get("id")), String.valueOf(block.get("name")),
-                                block.get("input") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of()));
-                    }
-                }
-            }
-            return new Reply(text.toString().trim(), calls);
-        }
-
-        /** Anthropic wants tool results inside a user message, all results of one turn together. */
-        private static List<Map<String, Object>> toAnthropic(List<Message> messages) {
-            List<Map<String, Object>> out = new ArrayList<>();
-            List<Map<String, Object>> pendingResults = new ArrayList<>();
-            for (Message m : messages) {
-                if ("tool".equals(m.role())) {
-                    pendingResults.add(Map.of("type", "tool_result", "tool_use_id", m.toolCallId(), "content", m.text()));
-                    continue;
-                }
-                if (!pendingResults.isEmpty()) {
-                    out.add(Map.of("role", "user", "content", List.copyOf(pendingResults)));
-                    pendingResults.clear();
-                }
-                if ("assistant".equals(m.role())) {
-                    List<Map<String, Object>> content = new ArrayList<>();
-                    if (m.text() != null && !m.text().isBlank()) {
-                        content.add(Map.of("type", "text", "text", m.text()));
-                    }
-                    for (ToolCall c : m.toolCalls()) {
-                        content.add(Map.of("type", "tool_use", "id", c.id(), "name", c.name(), "input", c.arguments()));
-                    }
-                    out.add(Map.of("role", "assistant", "content", content));
-                } else {
-                    out.add(Map.of("role", "user", "content", m.text()));
-                }
-            }
-            if (!pendingResults.isEmpty()) {
-                out.add(Map.of("role", "user", "content", List.copyOf(pendingResults)));
-            }
-            return out;
-        }
     }
 
     // ------------------------------------------------------------------ OpenAI-compatible (Ollama, vLLM...)

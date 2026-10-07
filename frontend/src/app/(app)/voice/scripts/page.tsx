@@ -38,7 +38,7 @@ export default function ScriptsPage() {
           What the AI says and must never say, for each kind of call. Changing a script makes a new version; only a version you approve is used on real
           calls. The starter scripts are drafts: read and adjust them for this company before approving. Exactly one incoming-call script can be in use.
         </p>
-        <Button onClick={() => setDraft({ name: "", kind: "OUTBOUND", model: "claude-haiku-4-5-20251001" })}>New script</Button>
+        <Button onClick={() => setDraft({ name: "", kind: "OUTBOUND", model: "claude-haiku-4-5" })}>New script</Button>
       </div>
       {(error || actionError) && <Alert>{error ?? actionError}</Alert>}
       {names.map((name) => {

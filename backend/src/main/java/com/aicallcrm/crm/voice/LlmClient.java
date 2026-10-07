@@ -12,27 +12,38 @@ public interface LlmClient {
     record ToolCall(String id, String name, Map<String, Object> arguments) {
     }
 
-    /** {@code role}: user, assistant or tool. Assistant messages may carry tool calls; tool messages answer one. */
-    record Message(String role, String text, List<ToolCall> toolCalls, String toolCallId) {
+    /**
+     * {@code role}: user, assistant or tool. Assistant messages may carry tool calls; tool messages answer one.
+     * {@code raw}: the provider's own copy of an assistant reply (e.g. with thinking blocks), sent back unchanged.
+     */
+    record Message(String role, String text, List<ToolCall> toolCalls, String toolCallId, Object raw) {
 
         static Message user(String text) {
-            return new Message("user", text, List.of(), null);
+            return new Message("user", text, List.of(), null, null);
         }
 
         static Message assistant(String text, List<ToolCall> calls) {
-            return new Message("assistant", text, calls == null ? List.of() : calls, null);
+            return assistant(text, calls, null);
+        }
+
+        static Message assistant(String text, List<ToolCall> calls, Object raw) {
+            return new Message("assistant", text, calls == null ? List.of() : calls, null, raw);
         }
 
         static Message toolResult(String toolCallId, String json) {
-            return new Message("tool", json, List.of(), toolCallId);
+            return new Message("tool", json, List.of(), toolCallId, null);
         }
     }
 
     record ToolSpec(String name, String description, Map<String, Object> inputSchema) {
     }
 
-    /** {@code text} may be empty when the model only asked for tools. */
-    record Reply(String text, List<ToolCall> toolCalls) {
+    /** {@code text} may be empty when the model only asked for tools. {@code raw}: see {@link Message#raw()}. */
+    record Reply(String text, List<ToolCall> toolCalls, Object raw) {
+
+        Reply(String text, List<ToolCall> toolCalls) {
+            this(text, toolCalls, null);
+        }
     }
 
     Reply chat(String system, List<Message> messages, List<ToolSpec> tools);
@@ -44,6 +55,6 @@ public interface LlmClient {
     default void warmUp(String system, List<Message> messages, List<ToolSpec> tools) {
     }
 
-    /** For screens and logs: "Claude (claude-haiku-4-5…)" or "Local model (qwen2.5:3b)". */
+    /** For screens and logs: "Claude (claude-haiku-4-5)" or "Local model (qwen2.5:3b)". */
     String describe();
 }

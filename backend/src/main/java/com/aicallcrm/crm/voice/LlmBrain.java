@@ -114,9 +114,21 @@ public class LlmBrain {
         };
     }
 
+    /** One Claude client for the whole application: it holds a connection pool. */
+    private volatile ClaudeLlm claude;
+
     LlmClient client(ConversationBrain.Kind kind) {
         return switch (kind) {
-            case CLAUDE -> new LlmClients.Anthropic(props, mapper);
+            case CLAUDE -> {
+                if (claude == null) {
+                    synchronized (this) {
+                        if (claude == null) {
+                            claude = new ClaudeLlm(props, mapper);
+                        }
+                    }
+                }
+                yield claude;
+            }
             case LOCAL -> new LlmClients.OpenAiCompatible(props, mapper);
             case SIMULATED -> throw new IllegalArgumentException("The simulated brain is not a model");
         };
@@ -170,14 +182,14 @@ public class LlmBrain {
                         if (text.isEmpty()) {
                             text = "Sorry, could you say that again?";
                         }
-                        s.history.add(Message.assistant(text, List.of()));
+                        s.history.add(Message.assistant(text, List.of(), r.raw()));
                         out.add(Line.agent(text));
                         if (s.closing) {
                             s.over = true;
                         }
                         return out;
                     }
-                    s.history.add(Message.assistant(r.text(), r.toolCalls()));
+                    s.history.add(Message.assistant(r.text(), r.toolCalls(), r.raw()));
                     if (!spoken(r.text()).isEmpty()) {
                         out.add(Line.agent(spoken(r.text())));
                     }

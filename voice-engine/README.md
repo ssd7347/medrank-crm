@@ -41,7 +41,14 @@ Check it: <http://127.0.0.1:8090/health>. Other voices: `python download_models.
 
 ## 3. Claude as the brain (optional)
 
-Set `ANTHROPIC_API_KEY=...` in `backend/.env` and restart the backend.
+Set `ANTHROPIC_API_KEY=...` in `backend/.env` and restart the backend. The default model is `claude-haiku-4-5`
+(`ANTHROPIC_MODEL` changes it, e.g. `claude-sonnet-5-5`).
+
+The CRM uses Anthropic's official Java SDK with **prompt caching**: the tools and script, which every turn re-sends,
+are cached, and cache reads cost a tenth of normal input. Each model has a minimum size before anything is cached:
+Claude Haiku 4.5 needs 4,096 tokens, so the first turns of a short call are not cached and later ones are; Claude
+Sonnet 5.5 caches from 512 tokens, so every turn after the first is. With `logging.level.com.aicallcrm.crm.voice=DEBUG`
+the backend logs each turn's `cache_read` and `cache_write` token counts.
 
 ## How a turn works
 
