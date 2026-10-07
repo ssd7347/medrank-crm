@@ -41,8 +41,9 @@ Check it: <http://127.0.0.1:8090/health>. Other voices: `python download_models.
 
 ## 3. Claude as the brain (optional)
 
-Set `ANTHROPIC_API_KEY=...` in `backend/.env` and restart the backend. The default model is `claude-haiku-4-5`
-(`ANTHROPIC_MODEL` changes it, e.g. `claude-sonnet-5-5`).
+Set `ANTHROPIC_API_KEY=...` in `backend/.env` and restart the backend. The default model is `claude-sonnet-5-5`
+(`ANTHROPIC_MODEL=claude-haiku-4-5` for the fastest replies on the simplest calls). If Claude declines a
+conversation, Anthropic retries it on a recommended model where it can; otherwise the call goes to a person.
 
 The CRM uses Anthropic's official Java SDK with **prompt caching**: the tools and script, which every turn re-sends,
 are cached, and cache reads cost a tenth of normal input. Each model has a minimum size before anything is cached:

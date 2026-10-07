@@ -18,6 +18,7 @@ import com.anthropic.models.messages.ContentBlockParam;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.MessageParam;
 import com.anthropic.models.messages.OutputConfig;
+import com.anthropic.models.messages.StopReason;
 import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.Tool;
 import com.anthropic.models.messages.ToolResultBlockParam;
@@ -64,21 +65,33 @@ final class ClaudeLlm implements LlmClient {
     public Reply chat(String system, List<Message> messages, List<ToolSpec> tools) {
         MessageCreateParams.Builder b = MessageCreateParams.builder()
                 .model(props.anthropicModel())
-                .maxTokens(props.maxReplyTokens())
+                .maxTokens(props.claudeMaxTokens())
                 // Breakpoint 1: tools + script, identical on every turn of the call.
                 .systemOfTextBlockParams(List.of(TextBlockParam.builder().text(system)
                         .cacheControl(CacheControlEphemeral.builder().build()).build()))
                 // Breakpoint 2 (automatic): the conversation so far, which each turn only appends to.
                 .cacheControl(CacheControlEphemeral.builder().build());
         // A phone call needs quick, short answers. Claude Haiku 4.5 takes no effort setting.
-        if (!props.anthropicModel().startsWith("claude-haiku-4-5")) {
+        boolean haiku = props.anthropicModel().startsWith("claude-haiku-4-5");
+        if (!haiku) {
             b.outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.LOW).build());
+        }
+        // If Claude declines (its safety classifiers), Anthropic retries on the model it recommends for that kind of
+        // decline. Only on Anthropic's own API; declines that are not retried end in a hand-over (below).
+        if (!haiku && props.anthropicUrl().contains("api.anthropic.com")) {
+            b.putAdditionalHeader("anthropic-beta", "server-side-fallback-2026-07-01");
+            b.putAdditionalBodyProperty("fallbacks", JsonValue.from("default"));
         }
         // Same order every time, so the cached prefix stays byte-identical.
         tools.stream().sorted(java.util.Comparator.comparing(ToolSpec::name)).forEach(t -> b.addTool(tool(t)));
         addMessages(b, messages);
 
         com.anthropic.models.messages.Message res = client.messages().create(b.build());
+        if (res.stopReason().filter(StopReason.REFUSAL::equals).isPresent()) {
+            // Never read the content of a declined reply; the brain hands the call to a person instead.
+            throw new IllegalStateException("Claude declined to continue this conversation"
+                    + res.stopDetails().map(d -> " (" + d.category() + ")").orElse(""));
+        }
         Usage u = res.usage();
         log.debug("Claude usage: input={} cache_write={} cache_read={} output={}", u.inputTokens(),
                 u.cacheCreationInputTokens().orElse(0L), u.cacheReadInputTokens().orElse(0L), u.outputTokens());

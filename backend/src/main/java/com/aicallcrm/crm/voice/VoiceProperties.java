@@ -25,7 +25,7 @@ public record VoiceProperties(
         @DefaultValue("120") int minGapMinutes,
         @DefaultValue("24") int dndTtlHours,
         @DefaultValue("365") int retentionDays,
-        @DefaultValue("claude-haiku-4-5") String defaultModel,
+        @DefaultValue("claude-sonnet-5-5") String defaultModel,
         @DefaultValue("claude-sonnet-5-5") String richModel,
         /** Staff desk number for a live transfer. Blank: every handoff becomes a callback task. */
         @DefaultValue("") String deskTransferNumber,

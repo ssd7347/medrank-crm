@@ -14,6 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -59,6 +60,11 @@ class ClaudeBrainIntegrationTest {
     @Autowired
     MockMvc mvc;
 
+    @BeforeEach
+    void clear() {
+        REQUESTS.clear();
+    }
+
     @Test
     @SuppressWarnings("unchecked")
     void claudeAnswersWithCachingAndTheSdk() throws Exception {
@@ -78,13 +84,15 @@ class ClaudeBrainIntegrationTest {
 
         assertThat(REQUESTS).hasSize(2);
         for (Map<String, Object> req : REQUESTS) {
-            assertThat(req.get("model")).isEqualTo("claude-haiku-4-5");
+            assertThat(req.get("model")).isEqualTo("claude-sonnet-5-5");
+            // Room for Claude's brief thinking plus the spoken reply.
+            assertThat(((Number) req.get("max_tokens")).intValue()).isEqualTo(2048);
             // Explicit breakpoint on the script (caches tools + system) and automatic caching of the conversation.
             List<Map<String, Object>> system = (List<Map<String, Object>>) req.get("system");
             assertThat(system.get(0).get("cache_control")).isEqualTo(Map.of("type", "ephemeral"));
             assertThat(req.get("cache_control")).isEqualTo(Map.of("type", "ephemeral"));
-            // Claude Haiku 4.5 takes no effort setting.
-            assertThat(req).doesNotContainKey("output_config");
+            // A phone call wants quick answers: low effort.
+            assertThat(req.get("output_config")).isEqualTo(Map.of("effort", "low"));
             List<String> toolNames = ((List<Map<String, Object>>) req.get("tools")).stream()
                     .map(t -> String.valueOf(t.get("name"))).toList();
             assertThat(toolNames).isSorted().contains("verify_identity", "opt_out");
@@ -96,6 +104,21 @@ class ClaudeBrainIntegrationTest {
         assertThat(String.valueOf(replayed.get("content"))).contains("tool_use").contains("toolu_1");
         Map<String, Object> results = messages.get(messages.size() - 1);
         assertThat(String.valueOf(results.get("content"))).contains("tool_result").contains("toolu_1");
+    }
+
+    @Test
+    void whenClaudeDeclinesAPersonTakesOver() throws Exception {
+        String token = JsonPath.read(mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"admin@test.local\",\"password\":\"AdminPass123!\"}")).andReturn()
+                .getResponse().getContentAsString(), "$.accessToken");
+        String callId = JsonPath.read(mvc.perform(post("/api/voice/test-calls").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"scriptName\":\"Incoming calls\",\"brain\":\"CLAUDE\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        mvc.perform(post("/api/voice/test-calls/" + callId + "/say").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"please decline this\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.over").value(true))
+                .andExpect(jsonPath("$.added[*].tool").value(Matchers.hasItems("ai_model", "request_human_handoff")));
     }
 
     // ------------------------------------------------------------------ stand-in Messages API
@@ -114,11 +137,15 @@ class ClaudeBrainIntegrationTest {
     private static void messages(HttpExchange ex) throws IOException {
         Map<String, Object> body = JSON.readValue(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8), Map.class);
         REQUESTS.add(body);
-        String content = REQUESTS.size() == 1
+        String sent = String.valueOf(body.get("messages"));
+        boolean decline = sent.contains("decline this");
+        boolean toolAnswered = sent.contains("tool_result");
+        String content = decline ? "[]" : !toolAnswered
                 ? "[{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"search_faq\",\"input\":{\"query\":\"opening hours\"}}]"
                 : "[{\"type\":\"text\",\"text\":\"We are open from nine to six.\"}]";
-        String json = "{\"id\":\"msg_" + REQUESTS.size() + "\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-haiku-4-5\","
-                + "\"content\":" + content + ",\"stop_reason\":\"" + (REQUESTS.size() == 1 ? "tool_use" : "end_turn") + "\","
+        String stop = decline ? "refusal" : !toolAnswered ? "tool_use" : "end_turn";
+        String json = "{\"id\":\"msg_" + REQUESTS.size() + "\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-5-5\","
+                + "\"content\":" + content + ",\"stop_reason\":\"" + stop + "\","
                 + "\"stop_sequence\":null,\"usage\":{\"input_tokens\":20,\"output_tokens\":8,"
                 + "\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0}}";
         byte[] b = json.getBytes(StandardCharsets.UTF_8);
