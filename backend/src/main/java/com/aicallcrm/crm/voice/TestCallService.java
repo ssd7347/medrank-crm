@@ -30,7 +30,8 @@ import jakarta.validation.constraints.Size;
 @Service
 public class TestCallService {
 
-    public record StartRequest(Long contactId, @NotBlank @Size(max = 80) String scriptName) {
+    /** {@code brain}: which brain answers (null = the configured default). */
+    public record StartRequest(Long contactId, @NotBlank @Size(max = 80) String scriptName, ConversationBrain.Kind brain) {
     }
 
     public record SayRequest(@NotBlank @Size(max = 500) String text) {
@@ -38,25 +39,26 @@ public class TestCallService {
 
     /** {@code added} are the lines produced by this step; {@code over} once the agent has said goodbye. */
     public record TestCall(UUID callId, String scriptName, String contactName, boolean verified, Outcome outcome,
-                           boolean over, List<Line> transcript, List<Line> added) {
+                           boolean over, List<Line> transcript, List<Line> added, String brain) {
     }
 
     private final VoiceCallRepository calls;
     private final VoiceScriptRepository scriptRepo;
     private final VoiceCallService callService;
     private final VoiceScriptService scripts;
-    private final SimulatedBrain brain;
+    private final Brains brains;
+    private final Map<UUID, ConversationBrain.Kind> kinds = new java.util.concurrent.ConcurrentHashMap<>();
     private final ContactRepository contacts;
     private final TransactionTemplate tx;
 
     public TestCallService(VoiceCallRepository calls, VoiceScriptRepository scriptRepo, VoiceCallService callService,
-                           VoiceScriptService scripts, SimulatedBrain brain, ContactRepository contacts,
+                           VoiceScriptService scripts, Brains brains, ContactRepository contacts,
                            TransactionTemplate tx) {
         this.calls = calls;
         this.scriptRepo = scriptRepo;
         this.callService = callService;
         this.scripts = scripts;
-        this.brain = brain;
+        this.brains = brains;
         this.contacts = contacts;
         this.tx = tx;
     }
@@ -81,6 +83,15 @@ public class TestCallService {
             Map<String, String> vars = callService.variables(contact);
             return new Started(call.getId(), VoiceScriptService.render(script.getOpeningLine(), vars));
         });
+        ConversationBrain.Kind kind = req.brain() == null ? brains.defaultKind() : req.brain();
+        ConversationBrain brain;
+        try {
+            brain = brains.begin(started.id(), kind);
+        } catch (ApiException e) {
+            tx.executeWithoutResult(s -> callService.close(testCall(started.id()), CallStatus.COMPLETED, "TEST_ENDED"));
+            throw e;
+        }
+        kinds.put(started.id(), kind);
         List<Line> added = brain.open(started.id(), started.opening());
         return append(started.id(), added);
     }
@@ -102,6 +113,7 @@ public class TestCallService {
         });
         List<Line> added = new ArrayList<>();
         added.add(Line.caller(req.text().trim()));
+        ConversationBrain brain = brains.of(callId);
         added.addAll(brain.respond(callId, req.text()));
         TestCall result = append(callId, added);
         return brain.over(callId) ? end(callId, result.added()) : result;
@@ -118,7 +130,7 @@ public class TestCallService {
     }
 
     private TestCall end(UUID callId, List<Line> added) {
-        brain.forget(callId);
+        brains.finished(callId);
         return tx.execute(s -> {
             VoiceCall call = testCall(callId);
             if (call.getStatus().live()) {
@@ -142,7 +154,8 @@ public class TestCallService {
         String name = call.getContactId() == null ? null
                 : contacts.findById(call.getContactId()).map(Contact::getFullName).orElse(null);
         return new TestCall(call.getId(), call.getScriptName(), name, call.getVerificationLevel() >= 1,
-                call.getOutcome(), !call.getStatus().live(), callService.lines(call), added);
+                call.getOutcome(), !call.getStatus().live(), callService.lines(call), added,
+                kinds.getOrDefault(call.getId(), ConversationBrain.Kind.SIMULATED).name());
     }
 
     private VoiceCall testCall(UUID callId) {

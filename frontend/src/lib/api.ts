@@ -159,3 +159,21 @@ export async function downloadProtected(path: string, fileName: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+
+/** POSTs JSON to a protected endpoint that answers with binary data (e.g. synthesized speech) and returns it. */
+export async function postForBlob(path: string, body: unknown): Promise<Blob> {
+  const load = () =>
+    fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+      body: JSON.stringify(body),
+      credentials: "same-origin",
+    });
+  let res = await load();
+  if (res.status === 401 && (await refreshSession())) res = await load();
+  if (!res.ok) {
+    const text = await res.text();
+    throw new ApiError(res.status, text ? (safeJson(text) as ProblemBody) : {});
+  }
+  return res.blob();
+}

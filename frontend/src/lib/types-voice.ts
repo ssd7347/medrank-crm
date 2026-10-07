@@ -222,6 +222,16 @@ export type TestCall = {
   over: boolean;
   transcript: TranscriptLine[];
   added: TranscriptLine[];
+  brain: BrainKind;
+};
+
+/** Which brain holds the conversation: rules, our own open model, or Claude. */
+export type BrainKind = "SIMULATED" | "LOCAL" | "CLAUDE";
+export type BrainOption = { kind: BrainKind; label: string; available: boolean; detail: string };
+export type AiStatus = {
+  speech: { available: boolean; detail: string; sttModel: string | null; voice: string | null };
+  brains: BrainOption[];
+  defaultBrain: BrainKind;
 };
 
 export type ProviderSetup = {

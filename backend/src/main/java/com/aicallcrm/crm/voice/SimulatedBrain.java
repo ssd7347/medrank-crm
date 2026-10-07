@@ -21,7 +21,7 @@ import com.aicallcrm.crm.voice.VoiceCallService.Line;
  * so the tools, the verification rule, the audit trail and the hand-overs work exactly as with a live platform.
  */
 @Component
-public class SimulatedBrain {
+public class SimulatedBrain implements ConversationBrain {
 
     private static final String OFFER_CALLBACK = " Would you like a member of our team to call you back?";
 
@@ -66,17 +66,20 @@ public class SimulatedBrain {
         this.executor = executor;
     }
 
-    void forget(UUID callId) {
+    @Override
+    public void forget(UUID callId) {
         sessions.remove(callId);
     }
 
-    boolean over(UUID callId) {
+    @Override
+    public boolean over(UUID callId) {
         Session s = sessions.get(callId);
         return s != null && s.over;
     }
 
     /** First thing on every call: read the context, then say the script's opening line. */
-    List<Line> open(UUID callId, String openingLine) {
+    @Override
+    public List<Line> open(UUID callId, String openingLine) {
         Session s = new Session();
         sessions.put(callId, s);
         List<Line> out = new ArrayList<>();
@@ -98,7 +101,8 @@ public class SimulatedBrain {
     }
 
     /** One turn: the caller said {@code said}; returns the tool calls made and what the agent replies. */
-    List<Line> respond(UUID callId, String said) {
+    @Override
+    public List<Line> respond(UUID callId, String said) {
         Session s = sessions.computeIfAbsent(callId, k -> new Session());
         List<Line> out = new ArrayList<>();
         String text = said.toLowerCase(Locale.ROOT).trim();
