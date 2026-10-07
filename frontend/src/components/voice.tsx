@@ -82,7 +82,7 @@ export function SimulatedBanner() {
     <div className="mb-4">
       <Alert tone="amber">
         <strong>Simulated mode.</strong> No telephony or voice-AI provider is connected, so no phone rings. Campaign calls are recorded as
-        &ldquo;Simulated&rdquo; and the test console uses a rule-based stand-in for the AI.
+        &ldquo;Simulated&rdquo;. In the test console you can talk to the agent with our own AI brain.
       </Alert>
     </div>
   );

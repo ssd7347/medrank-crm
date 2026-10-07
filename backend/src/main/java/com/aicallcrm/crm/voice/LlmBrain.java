@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
@@ -137,6 +138,16 @@ public class LlmBrain {
         s.history.add(Message.user("(The call has connected.)"));
         s.history.add(Message.assistant(openingLine, List.of()));
         sessions.put(callId, s);
+        // While the opening line is being spoken, the model reads the script and tools, so its first reply is quick.
+        List<ToolSpec> specs = specs();
+        List<Message> snapshot = List.copyOf(s.history);
+        CompletableFuture.runAsync(() -> {
+            try {
+                s.client.warmUp(system, snapshot, specs);
+            } catch (RuntimeException e) {
+                log.debug("Warm-up of the {} brain failed: {}", kind, e.getMessage());
+            }
+        });
         out.add(Line.agent(openingLine));
         return out;
     }
@@ -150,8 +161,7 @@ public class LlmBrain {
         }
         synchronized (s) {
             s.history.add(Message.user(said.trim()));
-            List<ToolSpec> specs = tools.all().stream()
-                    .map(t -> new ToolSpec(t.name(), t.description(), t.inputSchema())).toList();
+            List<ToolSpec> specs = specs();
             try {
                 for (int round = 0; round < MAX_ROUNDS; round++) {
                     Reply r = s.client.chat(s.system, s.history, specs);
@@ -189,6 +199,10 @@ public class LlmBrain {
             }
             return out;
         }
+    }
+
+    private List<ToolSpec> specs() {
+        return tools.all().stream().map(t -> new ToolSpec(t.name(), t.description(), t.inputSchema())).toList();
     }
 
     private void handOver(UUID callId, Session s, String why, List<Line> out) {

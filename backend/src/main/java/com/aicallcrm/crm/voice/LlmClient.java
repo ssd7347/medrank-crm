@@ -37,6 +37,13 @@ public interface LlmClient {
 
     Reply chat(String system, List<Message> messages, List<ToolSpec> tools);
 
+    /**
+     * Lets the model read the script and tools ahead of the first reply, so that reply comes quickly. Open-model
+     * servers keep what they have read; hosted APIs need nothing.
+     */
+    default void warmUp(String system, List<Message> messages, List<ToolSpec> tools) {
+    }
+
     /** For screens and logs: "Claude (claude-haiku-4-5…)" or "Local model (qwen2.5:3b)". */
     String describe();
 }

@@ -143,8 +143,20 @@ final class LlmClients {
         }
 
         @Override
+        public void warmUp(String system, List<Message> messages, List<ToolSpec> tools) {
+            post(mapper, props.localUrl() + "/v1/chat/completions", Map.of(), body(system, messages, tools, 1),
+                    props.timeoutSeconds() * 2);
+        }
+
+        @Override
         @SuppressWarnings("unchecked")
         public Reply chat(String system, List<Message> messages, List<ToolSpec> tools) {
+            Map<String, Object> res = post(mapper, props.localUrl() + "/v1/chat/completions", Map.of(),
+                    body(system, messages, tools, props.maxReplyTokens()), props.timeoutSeconds());
+            return parse(res);
+        }
+
+        private Map<String, Object> body(String system, List<Message> messages, List<ToolSpec> tools, int maxTokens) {
             List<Map<String, Object>> msgs = new ArrayList<>();
             msgs.add(Map.of("role", "system", "content", system));
             for (Message m : messages) {
@@ -164,13 +176,18 @@ final class LlmClients {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", props.localModel());
             body.put("messages", msgs);
-            body.put("max_tokens", props.maxReplyTokens());
+            body.put("max_tokens", maxTokens);
             body.put("temperature", 0.3);
             body.put("stream", false);
             body.put("tools", tools.stream().map(t -> Map.of("type", "function", "function",
                     Map.of("name", t.name(), "description", t.description(), "parameters", t.inputSchema()))).toList());
-            Map<String, Object> res = post(mapper, props.localUrl() + "/v1/chat/completions", Map.of(), body,
-                    props.timeoutSeconds());
+            // Keep the model loaded between turns of a call.
+            body.put("keep_alive", "30m");
+            return body;
+        }
+
+        @SuppressWarnings("unchecked")
+        private Reply parse(Map<String, Object> res) {
             List<?> choices = res.get("choices") instanceof List<?> l ? l : List.of();
             if (choices.isEmpty()) {
                 return new Reply("", List.of());
