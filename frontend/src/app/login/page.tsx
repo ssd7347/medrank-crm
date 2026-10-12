@@ -274,23 +274,23 @@ export default function LoginPage() {
   const [startPhone, setStartPhone] = useState("");
   return (
     <main className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-      <div className="relative hidden flex-col justify-between overflow-hidden border-r border-line bg-gradient-to-br from-surface via-brand-50 to-brand-100 p-12 lg:flex">
-        {/* A soft gold glow and a fine frame: the brand's quiet signature. */}
-        <div aria-hidden className="pointer-events-none absolute -top-40 -right-40 h-[28rem] w-[28rem] rounded-full bg-brand-300/40 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute inset-6 rounded-lg border border-brand-600/30" />
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-navy via-brand-800 to-brand-700 p-12 text-white lg:flex">
+        {/* Deep royal blue with a soft glow and a fine silver frame: the brand's quiet signature. */}
+        <div aria-hidden className="pointer-events-none absolute -top-40 -right-40 h-[28rem] w-[28rem] rounded-full bg-brand-400/30 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute inset-6 rounded-lg border border-white/15" />
         <div className="relative">
-          <Logo light />
+          <Logo onDark />
         </div>
         <div className="relative max-w-lg">
-          <div className="mb-6 h-px w-16 bg-brand-600" />
-          <p className="font-display text-[2.75rem] leading-[1.1] font-semibold tracking-wide text-navy">
+          <div className="mb-6 h-px w-16 bg-white/60" />
+          <p className="font-display text-[2.75rem] leading-[1.1] font-semibold tracking-wide text-white">
             Every NEET aspirant, every round, every deadline — in one place.
           </p>
-          <p className="mt-6 text-[0.95rem] leading-relaxed text-ink-soft">
+          <p className="mt-6 text-[0.95rem] leading-relaxed text-white/80">
             Leads, NEET profiles, college and seat-matrix data for AIQ, State, Management and NRI counselling.
           </p>
         </div>
-        <p className="eyebrow relative text-brand-800">Private and secure · Every action is logged</p>
+        <p className="eyebrow relative text-white/60">Private and secure · Every action is logged</p>
       </div>
       <div className="flex items-center justify-center px-5 py-12">
         <div className="w-full max-w-sm">

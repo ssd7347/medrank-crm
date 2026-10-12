@@ -4,8 +4,8 @@ import { Inbox } from "lucide-react";
 import Link from "next/link";
 import { Children, cloneElement, isValidElement, useEffect, useId, useRef } from "react";
 
-// Small UI kit. Colours, fonts and shadows come from the theme tokens in globals.css: understated luxury,
-// charcoal surfaces, ivory text, champagne gold kept for what matters (primary actions, active states).
+// Small UI kit. Colours, fonts and shadows come from the theme tokens in globals.css: royal and calm,
+// porcelain and white surfaces, navy text, royal sapphire kept for what matters (primary actions, active states).
 
 export function cx(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(" ");
@@ -21,9 +21,9 @@ const buttonBase =
   "inline-flex items-center justify-center gap-2 rounded-md font-semibold tracking-[0.01em] whitespace-nowrap transition duration-200 ease-out disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none disabled:translate-y-0";
 
 const buttonVariants = {
-  // Champagne gold with a soft sheen; lifts a hair on hover.
+  // Royal sapphire with a soft sheen; lifts a hair on hover.
   primary:
-    "bg-gradient-to-b from-brand-500 to-brand-600 text-on-brand shadow-gold ring-1 ring-inset ring-black/5 hover:-translate-y-px hover:from-brand-400 hover:to-brand-600 hover:shadow-[0_12px_24px_-12px_rgb(150_115_50/0.7)] active:translate-y-0",
+    "bg-gradient-to-b from-brand-500 to-brand-600 text-on-brand shadow-gold ring-1 ring-inset ring-black/5 hover:-translate-y-px hover:from-brand-500 hover:to-brand-700 hover:shadow-[0_12px_24px_-10px_rgb(43_63_158/0.6)] active:translate-y-0",
   secondary: "border border-line-strong bg-surface text-ink shadow-[0_1px_2px_rgb(30_58_110/0.05)] hover:border-brand-400 hover:bg-brand-50 hover:text-brand-900",
   danger: "bg-red-700 text-white hover:bg-red-800",
   ghost: "text-ink-soft hover:bg-muted hover:text-ink",
@@ -114,7 +114,7 @@ export function Select({
       className={cx(
         inputBase,
         "appearance-none bg-[length:12px] bg-[right_0.75rem_center] bg-no-repeat pr-9",
-        "bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c9a96e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")]",
+        "bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232b3f9e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")]",
         rest.className,
       )}
     >
@@ -173,7 +173,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 }
 
 const BADGE_TONES = {
-  gray: "border-line-strong bg-slate-100 text-slate-700",
+  gray: "border-line-strong bg-muted text-ink-soft",
   blue: "border-sky-200 bg-sky-100 text-sky-800",
   indigo: "border-indigo-100 bg-indigo-100 text-indigo-800",
   green: "border-emerald-200 bg-emerald-100 text-emerald-800",

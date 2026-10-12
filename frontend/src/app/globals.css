@@ -1,46 +1,46 @@
 @import "tailwindcss";
 
 /*
- * Design tokens: understated, light luxury. Warm ivory canvas, white surfaces, royal navy text and a muted
- * champagne gold used sparingly (primary actions, active states, key figures, fine rules).
+ * Design tokens: royal and calm. Cool porcelain canvas, white surfaces, deep navy text and a royal sapphire
+ * blue for what matters (primary actions, active states, key figures), with fine silver-blue rules.
  * Every text colour here passes WCAG AA on the surfaces it is used on.
  *
  * The brand-* scale is the customer's colour (Company settings) and is rebuilt at runtime by
- * BrandingProvider; these values are the champagne-gold default: 50–300 are pale tints for backgrounds,
+ * BrandingProvider; these values are the royal-sapphire default: 50–300 are pale tints for backgrounds,
  * 700–900 deep tones that are readable as text.
  */
 @theme {
-  --color-brand-50: color-mix(in srgb, #c9a96e 9%, white);
-  --color-brand-100: color-mix(in srgb, #c9a96e 16%, white);
-  --color-brand-200: color-mix(in srgb, #c9a96e 30%, white);
-  --color-brand-300: color-mix(in srgb, #c9a96e 50%, white);
-  --color-brand-400: color-mix(in srgb, #c9a96e 75%, white);
-  --color-brand-500: color-mix(in srgb, #c9a96e 88%, white);
-  --color-brand-600: #c9a96e;
-  --color-brand-700: color-mix(in srgb, #c9a96e 62%, black);
-  --color-brand-800: color-mix(in srgb, #c9a96e 50%, black);
-  --color-brand-900: color-mix(in srgb, #c9a96e 40%, black);
+  --color-brand-50: color-mix(in srgb, #2b3f9e 9%, white);
+  --color-brand-100: color-mix(in srgb, #2b3f9e 16%, white);
+  --color-brand-200: color-mix(in srgb, #2b3f9e 30%, white);
+  --color-brand-300: color-mix(in srgb, #2b3f9e 50%, white);
+  --color-brand-400: color-mix(in srgb, #2b3f9e 75%, white);
+  --color-brand-500: color-mix(in srgb, #2b3f9e 88%, white);
+  --color-brand-600: #2b3f9e;
+  --color-brand-700: color-mix(in srgb, #2b3f9e 62%, black);
+  --color-brand-800: color-mix(in srgb, #2b3f9e 50%, black);
+  --color-brand-900: color-mix(in srgb, #2b3f9e 40%, black);
   /* Text placed on a brand-600 background. */
-  --color-on-brand: #1b1408;
+  --color-on-brand: #ffffff;
 
-  --color-canvas: #f7f4ee;
+  --color-canvas: #f4f6fb;
   --color-surface: #ffffff;
-  --color-raised: #fbf9f5;
-  --color-muted: #f1ece2;
-  --color-line: #e7e0d2;
-  --color-line-strong: #d6ccb9;
-  --color-ink: #1e3a6e;
-  --color-ink-soft: #3d5a8a;
-  --color-ink-faint: #55688c;
-  --color-navy: #13284b;
+  --color-raised: #f8f9fd;
+  --color-muted: #eceff8;
+  --color-line: #e0e4f0;
+  --color-line-strong: #c5cce0;
+  --color-ink: #1e3a8a;
+  --color-ink-soft: #34509e;
+  --color-ink-faint: #5468a6;
+  --color-navy: #1a3278;
 
   --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-serif), ui-serif, Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  --shadow-card: 0 1px 2px rgb(30 58 110 / 0.04), 0 10px 30px -18px rgb(30 58 110 / 0.18);
-  --shadow-lift: 0 2px 4px rgb(30 58 110 / 0.05), 0 18px 40px -18px rgb(30 58 110 / 0.28);
-  --shadow-gold: 0 8px 20px -12px rgb(150 115 50 / 0.55);
+  --shadow-card: 0 1px 2px rgb(22 33 74 / 0.04), 0 10px 30px -18px rgb(22 33 74 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(22 33 74 / 0.05), 0 18px 40px -18px rgb(22 33 74 / 0.28);
+  --shadow-gold: 0 8px 20px -10px rgb(43 63 158 / 0.55);
 }
 
 :root {
@@ -49,8 +49,8 @@
 
 body {
   background:
-    radial-gradient(1100px 520px at 88% -14%, rgb(201 169 110 / 0.12), transparent 60%),
-    radial-gradient(900px 480px at -12% 112%, rgb(30 58 110 / 0.05), transparent 60%),
+    radial-gradient(1100px 520px at 88% -14%, rgb(43 63 158 / 0.10), transparent 60%),
+    radial-gradient(900px 480px at -12% 112%, rgb(110 90 190 / 0.06), transparent 60%),
     var(--color-canvas);
   background-attachment: fixed;
   color: var(--color-ink);
@@ -58,19 +58,19 @@ body {
 }
 
 ::selection {
-  background: rgb(201 169 110 / 0.3);
-  color: #13284b;
+  background: rgb(43 63 158 / 0.18);
+  color: #1a3278;
 }
 
 /* Quiet scrollbars that belong to the theme. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d6ccb9 transparent;
+  scrollbar-color: #c5cce0 transparent;
 }
 
-/* Keyboard focus: a fine gold ring everywhere, never the browser's default blue. */
+/* Keyboard focus: a fine royal-blue ring everywhere, never the browser's default blue. */
 :focus-visible {
-  outline: 2px solid rgb(176 141 79 / 0.9);
+  outline: 2px solid rgb(43 63 158 / 0.75);
   outline-offset: 2px;
 }
 
@@ -79,10 +79,10 @@ body {
   font-variant-numeric: lining-nums tabular-nums;
 }
 
-/* A hairline of gold under display headings and the like. */
+/* A hairline of royal blue fading to silver under display headings and the like. */
 .gold-rule {
   height: 1px;
-  background: linear-gradient(90deg, rgb(201 169 110 / 0.9), rgb(201 169 110 / 0.25) 45%, transparent);
+  background: linear-gradient(90deg, rgb(43 63 158 / 0.85), rgb(150 160 200 / 0.35) 45%, transparent);
 }
 
 /* Small-caps labels: section names, table headings, eyebrows. */
@@ -137,7 +137,7 @@ body {
 
 /* Native <dialog> centring and scroll lock. */
 dialog::backdrop {
-  background: rgb(19 40 75 / 0.35);
+  background: rgb(17 26 61 / 0.35);
   backdrop-filter: blur(3px);
 }
 html:has(dialog[open]) {

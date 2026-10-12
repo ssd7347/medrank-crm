@@ -1,5 +1,5 @@
-/** The product mark: a fine gold-framed monogram and the name in the display serif. */
-export function Logo({ light }: { light?: boolean }) {
+/** The product mark: a fine royal-framed monogram and the name in the display serif. */
+export function Logo({ light, onDark }: { light?: boolean; onDark?: boolean }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
       <span
@@ -10,10 +10,10 @@ export function Logo({ light }: { light?: boolean }) {
         <span className="absolute inset-[3px] rounded-[4px] border border-brand-600/30" />
       </span>
       <span className="min-w-0">
-        <span className={`block truncate font-display text-[1.08rem] leading-tight font-semibold tracking-wide ${light ? "text-navy" : "text-ink"}`}>
+        <span className={`block truncate font-display text-[1.08rem] leading-tight font-semibold tracking-wide ${onDark ? "text-white" : light ? "text-navy" : "text-ink"}`}>
           Counselling CRM
         </span>
-        <span className="eyebrow block text-[0.58rem] text-brand-700">MBBS · BDS</span>
+        <span className={`eyebrow block text-[0.58rem] ${onDark ? "text-white/65" : "text-brand-700"}`}>MBBS · BDS</span>
       </span>
     </div>
   );

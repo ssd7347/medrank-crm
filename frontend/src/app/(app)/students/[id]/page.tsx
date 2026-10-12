@@ -242,7 +242,7 @@ function StudentView() {
               {s.eligibility.quotas.map((q) => (
                 <li key={q.quota} className="flex items-start gap-3 py-2.5">
                   <span
-                    className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-xs font-bold ${q.eligible ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                    className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-xs font-bold ${q.eligible ? "bg-emerald-100 text-emerald-700" : "bg-muted text-ink-faint"}`}
                     aria-label={q.eligible ? "Eligible" : "Not eligible"}
                   >
                     {q.eligible ? "✓" : "–"}
