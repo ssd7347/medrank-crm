@@ -2,8 +2,8 @@
 
 import { useBranding } from "@/lib/branding";
 
-/** The customer's uploaded logo, or a monogram of their name in a fine gold frame. */
-export function Logo({ light }: { light?: boolean }) {
+/** The customer's uploaded logo, or a monogram of their name in a fine royal-blue frame. */
+export function Logo({ light, onDark }: { light?: boolean; onDark?: boolean }) {
   const { companyName, logoUrl } = useBranding();
   const initial = companyName.trim().charAt(0).toUpperCase() || "A";
   return (
@@ -21,10 +21,10 @@ export function Logo({ light }: { light?: boolean }) {
         </span>
       )}
       <span className="min-w-0">
-        <span className={`block truncate font-display text-[1.2rem] leading-tight font-semibold tracking-wide ${light ? "text-navy" : "text-ink"}`}>
+        <span className={`block truncate font-display text-[1.2rem] leading-tight font-semibold tracking-wide ${onDark ? "text-white" : light ? "text-navy" : "text-ink"}`}>
           {companyName}
         </span>
-        <span className="eyebrow block text-[0.58rem] text-brand-700">Business suite</span>
+        <span className={`eyebrow block text-[0.58rem] ${onDark ? "text-white/65" : "text-brand-700"}`}>Business suite</span>
       </span>
     </div>
   );

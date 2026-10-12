@@ -123,7 +123,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       active ? "bg-gradient-to-r from-brand-100 to-brand-50/0 font-semibold text-ink" : "text-ink-soft hover:bg-brand-50 hover:text-ink",
                     )}
                   >
-                    {/* The active page carries a fine gold bar at its left edge. */}
+                    {/* The active page carries a fine royal-blue bar at its left edge. */}
                     <span
                       aria-hidden
                       className={cx("absolute top-1.5 bottom-1.5 left-0 w-[2px] rounded-full bg-brand-600 transition-opacity", active ? "opacity-100" : "opacity-0")}

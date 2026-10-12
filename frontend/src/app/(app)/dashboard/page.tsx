@@ -114,7 +114,7 @@ function Stat({ icon: Icon, label, value, href, tone, featured }: { icon: Lucide
         featured ? "border-brand-300" : "border-line hover:border-line-strong",
       )}
     >
-      {/* A gold hairline across the top that brightens on hover. */}
+      {/* A royal-blue hairline across the top that brightens on hover. */}
       <span
         aria-hidden
         className={cx(

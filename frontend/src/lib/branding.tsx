@@ -12,7 +12,7 @@ import { FEATURES, type Branding, type Feature } from "./types";
 const DEFAULT: Branding = {
   companyName: "AI Call CRM",
   agentName: "Asha",
-  brandColor: "#c9a96e",
+  brandColor: "#2b3f9e",
   supportPhone: null,
   contactLabel: "Contact",
   loginHeadline: null,
@@ -33,13 +33,13 @@ export function pluralOf(word: string) {
   return word + "s";
 }
 
-/** Dark text on a light brand colour (gold, sand), ivory text on a deep one (navy, teal). */
+/** Dark text on a light brand colour (sand, sky), white text on a deep one (royal blue, navy, teal). */
 function onColour(hex: string) {
   const [r, g, b] = [1, 3, 5].map((i) => {
     const v = parseInt(hex.slice(i, i + 2), 16) / 255;
     return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
   });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.3 ? "#17130c" : "#fffaf0";
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.3 ? "#1a3278" : "#ffffff";
 }
 
 export function BrandingProvider({ children }: { children: React.ReactNode }) {

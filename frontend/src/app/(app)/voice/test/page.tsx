@@ -252,7 +252,7 @@ function VoicePanel({ state, level, heard, onStop }: { state: VoiceState; level:
     <div className="mb-4 flex flex-wrap items-center gap-4 rounded-md border border-brand-300 bg-brand-50 px-4 py-3">
       <span
         className={cx("grid h-11 w-11 shrink-0 place-items-center rounded-full border transition", active ? "border-brand-600 bg-surface text-brand-800" : "border-line bg-surface text-ink-faint")}
-        style={active ? { boxShadow: `0 0 0 ${Math.round(level * 10)}px rgb(201 169 110 / 0.25)` } : undefined}
+        style={active ? { boxShadow: `0 0 0 ${Math.round(level * 10)}px rgb(43 63 158 / 0.22)` } : undefined}
       >
         {state === "speaking" ? <Volume2 className="h-5 w-5" strokeWidth={1.7} /> : <Mic className="h-5 w-5" strokeWidth={1.7} />}
       </span>

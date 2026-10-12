@@ -12,7 +12,7 @@ export function ContactStatusBadge({ status }: { status: string }) {
       style={{
         backgroundColor: `color-mix(in srgb, ${c} 10%, white)`,
         borderColor: `color-mix(in srgb, ${c} 28%, white)`,
-        color: `color-mix(in srgb, ${c} 68%, #13284b)`,
+        color: `color-mix(in srgb, ${c} 68%, #1a3278)`,
       }}
     >
       <span aria-hidden className="size-1.5 rounded-full" style={{ backgroundColor: c, boxShadow: `0 0 0 2px color-mix(in srgb, ${c} 18%, white)` }} />
