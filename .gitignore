@@ -9,3 +9,8 @@ voice-engine/.venv/
 voice-engine/voices/
 voice-engine/__pycache__/
 frontend/public/palettes.html
+
+# Training kit: generated data and trained models stay local
+training/data/
+training/out/
+training/__pycache__/

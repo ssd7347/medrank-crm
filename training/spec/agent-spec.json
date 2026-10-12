@@ -1,0 +1,152 @@
+{
+  "closing_tools" : [ "log_call_outcome", "opt_out", "request_human_handoff" ],
+  "handoff_reasons" : [ "COMPLAINT_OR_DISPUTE", "DISTRESS", "CALLER_REQUEST", "TOOL_FAILURE", "VERIFICATION_FAILED", "OUT_OF_SCOPE" ],
+  "max_tool_rounds" : 6,
+  "outcomes" : [ "ACKNOWLEDGED", "WILL_ACT", "INTERESTED", "CALLBACK_REQUESTED", "HANDED_OFF", "NOT_INTERESTED", "OPTED_OUT", "WRONG_PERSON", "NO_INTERACTION", "VERIFICATION_FAILED" ],
+  "tools" : [ {
+    "function" : {
+      "description" : "Returns why this call is happening, the caller's first name, and whether (and how) identity must be checked before private details are shared. Call it first.",
+      "name" : "get_call_context",
+      "parameters" : {
+        "properties" : { },
+        "required" : [ ],
+        "type" : "object"
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "description" : "Checks the caller's identity. Ask for their full name and, if get_call_context lists any, one of the verification questions; then call this. At most 3 attempts.",
+      "name" : "verify_identity",
+      "parameters" : {
+        "properties" : {
+          "answers" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Answers to the verification questions, keyed by the question's key.",
+            "type" : "object"
+          },
+          "full_name" : {
+            "description" : "The full name as the caller said it.",
+            "type" : "string"
+          }
+        },
+        "required" : [ ],
+        "type" : "object"
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "description" : "Returns the details about this customer that you may share (for example amount due, due date, appointment time, plan). Private details appear only after verify_identity. Never state a detail this tool did not return.",
+      "name" : "get_contact_details",
+      "parameters" : {
+        "properties" : { },
+        "required" : [ ],
+        "type" : "object"
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "description" : "Searches the company's approved answers to general questions (opening hours, prices, policies). Answer only from what it returns.",
+      "name" : "search_faq",
+      "parameters" : {
+        "properties" : {
+          "query" : {
+            "description" : "The caller's question in their own words.",
+            "type" : "string"
+          }
+        },
+        "required" : [ "query" ],
+        "type" : "object"
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "description" : "Books a call-back from a member of the team when the caller is busy or wants to talk to a person later.",
+      "name" : "schedule_callback",
+      "parameters" : {
+        "properties" : {
+          "caller_name" : {
+            "description" : "The caller's name, if they are not already known.",
+            "type" : "string"
+          },
+          "preferred_time_text" : {
+            "description" : "When the caller would like the call, in their words.",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Why they want the call-back, in one sentence.",
+            "type" : "string"
+          }
+        },
+        "required" : [ ],
+        "type" : "object"
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "description" : "Use when the caller complains, disputes a charge, asks for a refund or mentions legal action, sounds distressed, asks for a person, or a tool failed twice.",
+      "name" : "request_human_handoff",
+      "parameters" : {
+        "properties" : {
+          "reason_code" : {
+            "description" : "Why a person is needed.",
+            "enum" : [ "COMPLAINT_OR_DISPUTE", "DISTRESS", "CALLER_REQUEST", "TOOL_FAILURE", "VERIFICATION_FAILED", "OUT_OF_SCOPE" ],
+            "type" : "string"
+          },
+          "summary" : {
+            "description" : "One or two sentences for the team member.",
+            "type" : "string"
+          }
+        },
+        "required" : [ "reason_code", "summary" ],
+        "type" : "object"
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "description" : "Records how the call ended. Call it once, just before saying goodbye. Use WILL_ACT with the promised date in the note when they promise to pay or act; INTERESTED when they want to go ahead.",
+      "name" : "log_call_outcome",
+      "parameters" : {
+        "properties" : {
+          "note" : {
+            "description" : "Anything the team should know, such as a promised date or a feedback score.",
+            "type" : "string"
+          },
+          "outcome_code" : {
+            "description" : "How the call ended.",
+            "enum" : [ "ACKNOWLEDGED", "WILL_ACT", "INTERESTED", "CALLBACK_REQUESTED", "HANDED_OFF", "NOT_INTERESTED", "OPTED_OUT", "WRONG_PERSON", "NO_INTERACTION", "VERIFICATION_FAILED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "outcome_code" ],
+        "type" : "object"
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "description" : "Use at once when the caller asks not to be called again. Confirm it to them.",
+      "name" : "opt_out",
+      "parameters" : {
+        "properties" : {
+          "scope" : {
+            "description" : "What to stop.",
+            "enum" : [ "AI_CALLS", "ALL_CALLS" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "scope" ],
+        "type" : "object"
+      }
+    },
+    "type" : "function"
+  } ],
+  "voice_rules" : "\nLIVE PHONE CALL\n- What you write is spoken aloud by a text-to-speech voice. Reply in one to three short sentences of plain spoken English: no lists, no markdown, no symbols, no emojis.\n- You have already said the opening line. Continue from the caller's reply.\n- Use the tools for every fact. Never make up amounts, dates, names or policies.\n- When the call is finished, call log_call_outcome (or opt_out or request_human_handoff when those apply), then say one short goodbye.\n"
+}
