@@ -44,7 +44,7 @@ class TrainingSpecTest {
         spec.put("max_tool_rounds", LlmBrain.MAX_ROUNDS);
         spec.put("closing_tools", LlmBrain.CLOSING_TOOLS.stream().sorted().toList());
         // The same wire format the local brain sends (LlmClients.OpenAiCompatible), in the same order.
-        List<Map<String, Object>> wire = tools.all().stream().map(t -> Map.<String, Object>of("type", "function",
+        List<Map<String, Object>> wire = LlmBrain.offered(tools).stream().map(t -> Map.<String, Object>of("type", "function",
                 "function", Map.of("name", t.name(), "description", t.description(), "parameters", t.inputSchema()))).toList();
         spec.put("tools", wire);
         spec.put("outcomes", List.of(Voice.Outcome.values()).stream().map(Enum::name).toList());

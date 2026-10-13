@@ -95,7 +95,26 @@ class AiBrainIntegrationTest {
         List<Map<String, Object>> messages = cast(last.get("messages"));
         assertThat(String.valueOf(messages.get(0).get("content"))).contains("LIVE PHONE CALL").contains("CALL CONTEXT");
         assertThat(messages.stream().anyMatch(m -> "tool".equals(m.get("role")))).isTrue();
-        assertThat(String.valueOf(last.get("tools"))).contains("verify_identity").contains("opt_out");
+        assertThat(String.valueOf(last.get("tools"))).contains("verify_identity").contains("opt_out")
+                // Its answer is already in the prompt, so the model is not offered it.
+                .doesNotContain("name=get_call_context");
+    }
+
+    @Test
+    void aGoodbyeWithoutAnOutcomeGoesToAPersonForReview() throws Exception {
+        String admin = admin();
+        long contact = contact(admin);
+        String callId = JsonPath.read(mvc.perform(auth(post("/api/voice/test-calls"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contactId\":" + contact + ",\"scriptName\":\"Enquiry follow-up\",\"brain\":\"LOCAL\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        mvc.perform(auth(post("/api/voice/test-calls/" + callId + "/say"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"okay, just say goodbye\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.over").value(true))
+                .andExpect(jsonPath("$.added[*].tool").value(Matchers.hasItem("request_human_handoff")))
+                // Five sentences from the model: the caller hears three, ending with the last one.
+                .andExpect(jsonPath("$.added[?(@.role == 'agent')].text").value(Matchers.hasItem(
+                        "Thanks for your time. Dr. Rao will be glad to hear it. Goodbye.")));
     }
 
     @Test
@@ -119,6 +138,15 @@ class AiBrainIntegrationTest {
                         .content("{\"scriptName\":\"Incoming calls\",\"brain\":\"CLAUDE\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value(Matchers.containsString("Anthropic API key")));
+    }
+
+    @Test
+    void longRepliesAreCutToThreeSentences() {
+        assertThat(LlmBrain.brief("One. Two. Three.")).isEqualTo("One. Two. Three.");
+        assertThat(LlmBrain.brief("One. Two! Three. Four. When can you pay?")).isEqualTo("One. Two! When can you pay?");
+        // "Dr." does not end a sentence.
+        assertThat(LlmBrain.brief("Your doctor is Dr. Meera Rao. It is at 4 pm. Bring your card.")).isEqualTo(
+                "Your doctor is Dr. Meera Rao. It is at 4 pm. Bring your card.");
     }
 
     @Test
@@ -149,6 +177,11 @@ class AiBrainIntegrationTest {
         Map<String, Object> lastMsg = messages.get(messages.size() - 1);
         if (String.valueOf(lastMsg.get("content")).contains("break")) {
             reply(ex, 500, "{\"error\":\"model crashed\"}");
+            return;
+        }
+        if (String.valueOf(lastMsg.get("content")).contains("say goodbye")) {
+            reply(ex, 200, "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Thanks for your time. "
+                    + "Dr. Rao will be glad to hear it. We will be in touch. Have a lovely day. Goodbye.\"}}]}");
             return;
         }
         if ("tool".equals(lastMsg.get("role"))) {

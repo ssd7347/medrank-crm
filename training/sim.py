@@ -77,7 +77,14 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                 flipped.append({"role": "user", "content": m["content"]})
             elif m["role"] == "user":
                 flipped.append({"role": "assistant", "content": m["content"]})
-        said = clean_caller(ollama_chat(caller_model, flipped, temperature=0.9, url=url, max_tokens=80)["content"])
+        said = ""
+        for attempt in range(3):
+            # A reply that is only a stage direction ("*hangs up*") cleans to nothing: ask again for spoken words.
+            said = clean_caller(ollama_chat(caller_model, flipped + ([{"role": "user", "content":
+                    "(Reply with the words you say out loud, nothing else.)"}] if attempt else []),
+                    temperature=0.9, url=url, max_tokens=80)["content"])
+            if said:
+                break
         if not said:
             return None, "the caller said nothing"
         history.append({"role": "user", "content": said})

@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +38,13 @@ public class LlmBrain {
     static final int MAX_ROUNDS = 6;
     /** Tools that wrap a call up: once one succeeds, the next thing the agent says is its goodbye. */
     static final Set<String> CLOSING_TOOLS = Set.of("log_call_outcome", "opt_out", "request_human_handoff");
+    /** Not offered to the model: its answer is already in the prompt, so asking for it again only wastes a turn. */
+    static final Set<String> NOT_OFFERED = Set.of("get_call_context");
+    /** A caller cannot follow more than this in one go; a longer reply is cut down before it is spoken. */
+    static final int MAX_SENTENCES = 3;
+    /** The space after a sentence; "Dr. Rao" and the like are not sentence ends. */
+    private static final Pattern SENTENCE_END = Pattern.compile("(?<!\\b(?:Dr|Mr|Mrs|Ms|St)\\.)(?<=[.!?])\\s+(?=\\S)");
+    private static final Pattern GOODBYE = Pattern.compile("\\b(good\\s?bye|bye)\\b", Pattern.CASE_INSENSITIVE);
 
     /** Added to every script: the agent is being heard, not read. */
     static final String VOICE_RULES = """
@@ -178,7 +186,7 @@ public class LlmBrain {
                 for (int round = 0; round < MAX_ROUNDS; round++) {
                     Reply r = s.client.chat(s.system, s.history, specs);
                     if (r.toolCalls().isEmpty()) {
-                        String text = spoken(r.text());
+                        String text = brief(spoken(r.text()));
                         if (text.isEmpty()) {
                             text = "Sorry, could you say that again?";
                         }
@@ -186,12 +194,19 @@ public class LlmBrain {
                         out.add(Line.agent(text));
                         if (s.closing) {
                             s.over = true;
+                        } else if (GOODBYE.matcher(text).find()) {
+                            // The model said goodbye without recording how the call went: a person reviews it, so
+                            // nobody is left without a follow-up and the call is not simply retried.
+                            ToolResult h = executor.execute(callId, "request_human_handoff", Map.of("reason_code", "OUT_OF_SCOPE",
+                                    "summary", "The AI agent ended the call without recording an outcome. Please read the transcript and follow up."));
+                            out.add(Line.tool("request_human_handoff", h.status(), h.ok() ? null : h.errorMessage()));
+                            s.over = true;
                         }
                         return out;
                     }
                     s.history.add(Message.assistant(r.text(), r.toolCalls(), r.raw()));
                     if (!spoken(r.text()).isEmpty()) {
-                        out.add(Line.agent(spoken(r.text())));
+                        out.add(Line.agent(brief(spoken(r.text()))));
                     }
                     for (ToolCall c : r.toolCalls()) {
                         ToolResult res = executor.execute(callId, c.name(), c.arguments());
@@ -214,7 +229,21 @@ public class LlmBrain {
     }
 
     private List<ToolSpec> specs() {
-        return tools.all().stream().map(t -> new ToolSpec(t.name(), t.description(), t.inputSchema())).toList();
+        return offered(tools).stream().map(t -> new ToolSpec(t.name(), t.description(), t.inputSchema())).toList();
+    }
+
+    /** The tools the model may ask for, in their fixed order. */
+    static List<VoiceTools.Tool> offered(VoiceTools tools) {
+        return tools.all().stream().filter(t -> !NOT_OFFERED.contains(t.name())).toList();
+    }
+
+    /** At most {@link #MAX_SENTENCES} are spoken: a longer reply keeps its first two and its last, usually the question. */
+    static String brief(String text) {
+        String[] parts = SENTENCE_END.split(text.trim());
+        if (parts.length <= MAX_SENTENCES) {
+            return text.trim();
+        }
+        return parts[0] + " " + parts[1] + " " + parts[parts.length - 1];
     }
 
     private void handOver(UUID callId, Session s, String why, List<Line> out) {

@@ -5,18 +5,7 @@
   "outcomes" : [ "ACKNOWLEDGED", "WILL_ACT", "INTERESTED", "CALLBACK_REQUESTED", "HANDED_OFF", "NOT_INTERESTED", "OPTED_OUT", "WRONG_PERSON", "NO_INTERACTION", "VERIFICATION_FAILED" ],
   "tools" : [ {
     "function" : {
-      "description" : "Returns why this call is happening, the caller's first name, and whether (and how) identity must be checked before private details are shared. Call it first.",
-      "name" : "get_call_context",
-      "parameters" : {
-        "properties" : { },
-        "required" : [ ],
-        "type" : "object"
-      }
-    },
-    "type" : "function"
-  }, {
-    "function" : {
-      "description" : "Checks the caller's identity. Ask for their full name and, if get_call_context lists any, one of the verification questions; then call this. At most 3 attempts.",
+      "description" : "Checks the caller's identity. Ask for their full name and, if the call context lists any, one of the verification questions; then call this. At most 3 attempts.",
       "name" : "verify_identity",
       "parameters" : {
         "properties" : {

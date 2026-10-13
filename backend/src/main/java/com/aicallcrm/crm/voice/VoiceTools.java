@@ -75,7 +75,7 @@ public class VoiceTools {
         add("get_call_context", 0, "Returns why this call is happening, the caller's first name, and whether (and how) "
                 + "identity must be checked before private details are shared. Call it first.", schema(Map.of()),
                 this::callContext);
-        add("verify_identity", 0, "Checks the caller's identity. Ask for their full name and, if get_call_context "
+        add("verify_identity", 0, "Checks the caller's identity. Ask for their full name and, if the call context "
                 + "lists any, one of the verification questions; then call this. At most 3 attempts.",
                 schema(Map.of(
                         "full_name", str("The full name as the caller said it."),

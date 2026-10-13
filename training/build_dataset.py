@@ -13,7 +13,7 @@ import hashlib
 import json
 import random
 
-from callkit import DATA, check, read_jsonl, write_jsonl
+from callkit import DATA, TOOLS, check, read_jsonl, write_jsonl
 
 
 def main() -> None:
@@ -51,7 +51,8 @@ def main() -> None:
     rng.shuffle(train)
 
     def strip(rec):
-        return {"messages": rec["messages"], "tools": rec["tools"]}
+        # Always today's tool list: calls written before a tool changed still train the model on the current tools.
+        return {"messages": rec["messages"], "tools": TOOLS}
 
     write_jsonl(DATA / "train.jsonl", map(strip, train))
     write_jsonl(DATA / "val.jsonl", map(strip, val))

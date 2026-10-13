@@ -8,7 +8,7 @@
 | Models in Ollama | `qwen3:4b-instruct` (to train, Apache 2.0), `qwen2.5:7b` (teacher, Apache 2.0), `qwen2.5:3b` (non-commercial licence: testing only) |
 | Template calls | 1,560 made → `data/train.jsonl` (1,482) + `data/val.jsonl` (78) |
 | **"Before" test of `qwen3:4b-instruct`** | **Finished: 4 of 30 calls handled correctly (13%).** This is the score to beat. |
-| Model-written calls (`generate.py`) | Running since 13 Oct evening (target 100; progress in `data/generate.log`). |
+| Model-written calls (`generate.py`) | Running overnight 13→14 Oct, target 40 (progress in `data/generate.log`). About 4–7 min per attempt, many rejected. |
 | Training on Colab | Not started |
 
 `data/` is not in git; it stays on the laptop. Before-test results: calls 1–24 in `data/eval-before.log`, 25–26 in
@@ -37,6 +37,15 @@ The untrained model's common mistakes, which the training data teaches against:
 - Calls `get_call_context` although the context is already in the prompt.
 
 Full lines: `data/eval-before.log` (calls 1–24), `data/eval-before-2.log` (25–26), `data/eval-before-3.log` (27–30).
+
+## Safety nets in the CRM (13 Oct, live in `LlmBrain`)
+
+Whatever the model does, on every call with our own AI or Claude:
+- `get_call_context` is no longer offered to the model (its answer is already in the prompt).
+- Replies longer than three sentences are cut to the first two plus the last (usually the question).
+- If the AI says goodbye without recording an outcome, the call goes to a person for review
+  (`request_human_handoff`, reason OUT_OF_SCOPE) instead of being silently retried.
+- Private details were already protected: the CRM's tools refuse them until the identity check passes.
 
 ## Carry on
 
