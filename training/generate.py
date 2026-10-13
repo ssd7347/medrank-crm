@@ -38,7 +38,8 @@ def main() -> None:
     pairs = [(s, sc) for s in all_scripts() if s.name not in HELD_OUT_SCRIPTS for sc in for_script(s)]
     rng.shuffle(pairs)
     print(f"{done} good conversations so far; target {a.count}. Teacher {a.teacher}, caller {a.caller or a.teacher}.")
-    started, tried = time.time(), 0
+    # Rate and time left count only this run, so earlier runs' calls do not inflate them.
+    started, tried, kept_now = time.time(), 0, 0
     for script, scenario in itertools.cycle(pairs):
         if done >= a.count:
             break
@@ -53,12 +54,13 @@ def main() -> None:
         if rec and not problems:
             write_jsonl(good_path, [rec], "a")
             done += 1
+            kept_now += 1
         elif rec:
             rec["meta"]["problems"] = problems
             write_jsonl(bad_path, [rec], "a")
         status = "kept" if not problems else "rejected: " + "; ".join(problems[:2])
-        rate = done / max(tried, 1)
-        eta = (a.count - done) * (time.time() - started) / max(done, 1) / 60 if done else float("nan")
+        rate = kept_now / tried
+        eta = (a.count - done) * (time.time() - started) / kept_now / 60 if kept_now else float("nan")
         print(f"[{done}/{a.count}] {script.name} / {scenario.id}: {status} ({took:.0f}s, {rate:.0%} kept, ~{eta:.0f} min left)")
         if a.show and rec:
             print(transcript(rec), "\n")
