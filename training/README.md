@@ -46,7 +46,7 @@ We sell the CRM, so the model we train must be licensed for commercial use.
 
 ```bash
 cd training
-python -m unittest test_callkit              # the checks themselves are tested
+python -m unittest test_callkit test_sim     # the checks and the simulator are tested (run after every change)
 ollama pull qwen2.5:7b                       # teacher, once
 ollama pull qwen3:4b-instruct                # base of our model, once
 
