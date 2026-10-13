@@ -30,7 +30,7 @@ def main() -> None:
     template = re.search(r'^TEMPLATE """(.*?)"""', text, re.S | re.M)
     if not template:
         raise SystemExit(f"{a.base} has no chat template in Ollama")
-    params = [p for p in re.findall(r"^PARAMETER .*$", text, re.M) if not re.match(r"PARAMETER (temperature|num_ctx)", p)]
+    params = [p for p in re.findall(r"^PARAMETER .*$", text, re.M) if not re.match(r"PARAMETER (temperature|num_ctx)\b", p)]
     licence = re.search(r'^LICENSE """(.*?)"""', text, re.S | re.M)
 
     out = [f"FROM {gguf}", f'TEMPLATE """{template.group(1)}"""', *params,

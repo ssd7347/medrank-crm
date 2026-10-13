@@ -141,6 +141,28 @@ class AiBrainIntegrationTest {
     }
 
     @Test
+    void aToolCallWrittenAsTextIsMadeNotSpoken() {
+        List<LlmClient.ToolSpec> tools = List.of(
+                new LlmClient.ToolSpec("log_call_outcome", "Records how the call ended.", Map.of("type", "object")),
+                new LlmClient.ToolSpec("opt_out", "Stops the calls.", Map.of("type", "object")));
+        // As small models write it, underscores and all lost.
+        LlmClient.Reply r = LlmClients.recoverWrittenCalls(
+                "Thank you. logcalloutcome({\"outcome_code\": \"CALLBACK_REQUESTED\", \"note\": \"5 PM\"})", tools, JSON);
+        assertThat(r.toolCalls()).singleElement().satisfies(c -> {
+            assertThat(c.name()).isEqualTo("log_call_outcome");
+            assertThat(c.arguments()).containsEntry("outcome_code", "CALLBACK_REQUESTED");
+        });
+        assertThat(r.text()).isEqualTo("Thank you.");
+        // Qwen's own tool-call format, left in the text.
+        r = LlmClients.recoverWrittenCalls("<tool_call>\n{\"name\": \"opt_out\", \"arguments\": {\"scope\": \"AI_CALLS\"}}\n</tool_call>", tools, JSON);
+        assertThat(r.toolCalls()).singleElement().satisfies(c -> assertThat(c.name()).isEqualTo("opt_out"));
+        assertThat(r.text()).isEmpty();
+        // Ordinary speech, or a call to a tool that does not exist, is left alone.
+        assertThat(LlmClients.recoverWrittenCalls("We are open from 9 to 6.", tools, JSON).toolCalls()).isEmpty();
+        assertThat(LlmClients.recoverWrittenCalls("delete_everything({\"all\": true})", tools, JSON).toolCalls()).isEmpty();
+    }
+
+    @Test
     void longRepliesAreCutToThreeSentences() {
         assertThat(LlmBrain.brief("One. Two. Three.")).isEqualTo("One. Two. Three.");
         assertThat(LlmBrain.brief("One. Two! Three. Four. When can you pay?")).isEqualTo("One. Two! When can you pay?");

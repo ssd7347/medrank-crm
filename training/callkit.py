@@ -659,7 +659,44 @@ def ollama_chat(model: str, messages: list[dict], tools: list[dict] | None = Non
         except json.JSONDecodeError:
             args = {"_unparsed": raw}
         calls.append({"id": c.get("id") or f"call_{i}", "type": "function", "function": {"name": c["function"]["name"], "arguments": args}})
-    return {"content": msg.get("content") or "", "tool_calls": calls}
+    content = msg.get("content") or ""
+    if not calls and tools:
+        content, calls = recover_written_calls(content, [t["function"]["name"] for t in tools])
+    return {"content": content, "tool_calls": calls}
+
+
+WRITTEN_FUNCTION = re.compile(r"(?s)\b([A-Za-z_]+)\s*\(\s*(\{.*?\})\s*\)")
+WRITTEN_JSON = re.compile(r"(?s)(?:<tool_call>\s*)?(\{\s*\"name\"\s*:.*\})\s*(?:</tool_call>)?")
+
+
+def recover_written_calls(text: str, names: list[str]) -> tuple[str, list[dict]]:
+    """LlmClients.recoverWrittenCalls(): a tool call the model wrote as text is made, never spoken."""
+    if "{" not in text:
+        return text, []
+    known = {n: n for n in names} | {n.replace("_", "").lower(): n for n in names}
+    calls, spans = [], []
+    for m in WRITTEN_FUNCTION.finditer(text):
+        tool = known.get(m.group(1)) or known.get(m.group(1).replace("_", "").lower())
+        try:
+            args = json.loads(m.group(2))
+        except json.JSONDecodeError:
+            continue
+        if tool and isinstance(args, dict):
+            calls.append({"id": f"call_w{len(calls)}", "type": "function", "function": {"name": tool, "arguments": args}})
+            spans.append(m.span())
+    if not calls:
+        m = WRITTEN_JSON.search(text)
+        try:
+            obj = json.loads(m.group(1)) if m else None
+        except json.JSONDecodeError:
+            obj = None
+        if isinstance(obj, dict) and known.get(str(obj.get("name"))) and isinstance(obj.get("arguments", {}), dict):
+            calls.append({"id": "call_w0", "type": "function",
+                          "function": {"name": known[str(obj["name"])], "arguments": obj.get("arguments", {})}})
+            spans.append(m.span())
+    for start, end in reversed(spans):
+        text = text[:start] + text[end:]
+    return re.sub(r"\s{2,}", " ", text).strip(), calls
 
 
 def installed_models(url: str = "http://localhost:11434") -> list[str]:

@@ -10,6 +10,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import com.aicallcrm.crm.voice.LlmClient.Reply;
+import com.aicallcrm.crm.voice.LlmClient.ToolCall;
+import com.aicallcrm.crm.voice.LlmClient.ToolSpec;
 
 import tools.jackson.databind.ObjectMapper;
 
@@ -74,7 +80,8 @@ final class LlmClients {
         public Reply chat(String system, List<Message> messages, List<ToolSpec> tools) {
             Map<String, Object> res = post(mapper, props.localUrl() + "/v1/chat/completions", Map.of(),
                     body(system, messages, tools, props.maxReplyTokens()), props.timeoutSeconds());
-            return parse(res);
+            Reply r = parse(res);
+            return r.toolCalls().isEmpty() ? recoverWrittenCalls(r.text(), tools, mapper) : r;
         }
 
         private Map<String, Object> body(String system, List<Message> messages, List<ToolSpec> tools, int maxTokens) {
@@ -129,6 +136,71 @@ final class LlmClients {
                 }
             }
             return new Reply(text.trim(), calls);
+        }
+    }
+
+    /** {@code <tool_call>{"name": ..., "arguments": {...}}</tool_call>}, or a bare JSON object of that shape. */
+    private static final Pattern WRITTEN_JSON = Pattern.compile("(?s)(?:<tool_call>\\s*)?(\\{\\s*\"name\"\\s*:.*\\})\\s*(?:</tool_call>)?");
+    /** {@code log_call_outcome({"outcome_code": "WILL_ACT"})}, sometimes with the underscores lost. */
+    private static final Pattern WRITTEN_FUNCTION = Pattern.compile("(?s)\\b([A-Za-z_]+)\\s*\\(\\s*(\\{.*?\\})\\s*\\)");
+
+    /**
+     * Small open models sometimes write a tool call as text instead of making it. Read aloud, that would be
+     * gibberish to the caller, and the call would never be recorded. A call to one of the offered tools is
+     * recovered and made; the rest of the text is kept. Anything unreadable is left as it is.
+     */
+    @SuppressWarnings("unchecked")
+    static Reply recoverWrittenCalls(String text, List<ToolSpec> tools, ObjectMapper mapper) {
+        if (text == null || text.indexOf('{') < 0) {
+            return new Reply(text == null ? "" : text, List.of());
+        }
+        Map<String, String> names = new LinkedHashMap<>();
+        for (ToolSpec t : tools) {
+            names.put(t.name(), t.name());
+            names.put(squash(t.name()), t.name());
+        }
+        List<ToolCall> calls = new ArrayList<>();
+        List<int[]> spans = new ArrayList<>();
+        Matcher f = WRITTEN_FUNCTION.matcher(text);
+        while (f.find()) {
+            String tool = names.getOrDefault(f.group(1), names.get(squash(f.group(1))));
+            Map<String, Object> args = readObject(f.group(2), mapper);
+            if (tool != null && args != null) {
+                calls.add(new ToolCall("call_" + UUID.randomUUID(), tool, args));
+                spans.add(new int[] {f.start(), f.end()});
+            }
+        }
+        if (calls.isEmpty()) {
+            Matcher j = WRITTEN_JSON.matcher(text);
+            if (j.find()) {
+                Map<String, Object> obj = readObject(j.group(1), mapper);
+                String tool = obj == null || obj.get("name") == null ? null : names.get(String.valueOf(obj.get("name")));
+                if (tool != null && obj.getOrDefault("arguments", Map.of()) instanceof Map<?, ?> a) {
+                    calls.add(new ToolCall("call_" + UUID.randomUUID(), tool, (Map<String, Object>) a));
+                    spans.add(new int[] {j.start(), j.end()});
+                }
+            }
+        }
+        if (calls.isEmpty()) {
+            return new Reply(text, List.of());
+        }
+        StringBuilder rest = new StringBuilder(text);
+        for (int i = spans.size() - 1; i >= 0; i--) {
+            rest.delete(spans.get(i)[0], spans.get(i)[1]);
+        }
+        return new Reply(rest.toString().replaceAll("\\s{2,}", " ").trim(), calls);
+    }
+
+    private static String squash(String name) {
+        return name.replace("_", "").toLowerCase(java.util.Locale.ROOT);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> readObject(String json, ObjectMapper mapper) {
+        try {
+            return mapper.readValue(json, Map.class);
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 }

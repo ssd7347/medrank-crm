@@ -97,7 +97,7 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                 if not text:
                     return None, "the agent gave an empty reply"
                 history.append({"role": "assistant", "content": text})
-                if not call.closing and re.search(r"(goodbye|bye)", text, re.I):
+                if not call.closing and re.search(r"\b(goodbye|bye)\b", text, re.I):
                     return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id,
                                   scenario.expect), "the agent said goodbye without recording how the call ended"
                 break
