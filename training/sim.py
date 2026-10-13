@@ -17,17 +17,23 @@ from scenarios import Scenario
 MAX_CALLER_TURNS = 12
 
 REMIND_CLOSE = """
-REMINDER (private): you were about to say goodbye without recording the call. First call log_call_outcome with
-the right outcome_code (or schedule_callback first if the caller wants a call later, or opt_out /
-request_human_handoff when those apply). Only after the tool has answered, say one short goodbye.
+REMINDER (private): you were about to promise an action or end the call without using the tool for it. Saying it
+does nothing: call the tool now. A person wanted, a complaint or distress: request_human_handoff. A call later:
+schedule_callback. No more calls: opt_out. Otherwise, when the call is done: log_call_outcome with the right
+outcome_code. Only after the tool has answered, say one short goodbye.
 """
+# Words that end a call or promise an action; said with no tool behind them, the call is never recorded.
+CLOSING_WORDS = re.compile(r"\b(good\s?bye|bye|have a (great|good|nice|lovely|wonderful) day|take care|"
+                           r"transfer|connect(ing)? you|call you back|call back|someone will (call|contact)|"
+                           r"(team|person) will (call|contact|reach))", re.I)
 
 COACH = """
 TRAINER NOTES (private, never mention them): the caller in this practice call may behave like this: {brief}
 React only to what the caller actually says. Keep every rule above: check identity with verify_identity before any
 private detail, answer general questions only from search_faq, one to three short spoken sentences per reply, and
-never call get_call_context (its result is already above). When the call is finished, call log_call_outcome (or
-opt_out or request_human_handoff when those apply) and then say one short goodbye.
+never call get_call_context (its result is already above). Never promise an action (a transfer, a call-back,
+noting a date) without calling its tool in that same reply: saying it does nothing. When the call is finished,
+call log_call_outcome (or opt_out or request_human_handoff when those apply) and then say one short goodbye.
 """
 
 CALLER = """You are {name}, an ordinary person in India. Your mobile rang and you answered: the voice on the line
@@ -103,12 +109,12 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                 text = spoken(r["content"])
                 if not text:
                     return None, "the agent gave an empty reply"
+                if not call.closing and coach and not reminder and CLOSING_WORDS.search(text):
+                    # Writing training calls: drop this reply and ask again with a private reminder, so only the
+                    # corrected turn is kept. (Never while testing: there the mistake must count.)
+                    reminder = REMIND_CLOSE
+                    continue
                 if not call.closing and re.search(r"\b(goodbye|bye)\b", text, re.I):
-                    if coach and not reminder:
-                        # Writing training calls: drop this reply and ask again with a private reminder, so only
-                        # the corrected turn is kept. (Never while testing: there the mistake must count.)
-                        reminder = REMIND_CLOSE
-                        continue
                     history.append({"role": "assistant", "content": text})
                     return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id,
                                   scenario.expect), "the agent said goodbye without recording how the call ended"
