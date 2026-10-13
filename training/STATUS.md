@@ -1,18 +1,35 @@
-# Training status — updated 13 October 2026 (evening)
+# Training status — saved 13 October 2026, 10:45 pm
 
 ## Where we are
 
 | Step | State |
 |---|---|
-| Training kit (`training/`) | Done, committed. 12 kit tests + 54 backend tests pass. |
+| Training kit (`training/`) | Done. 19 kit tests (`test_callkit`, `test_sim`) + 57 backend tests pass. |
 | Models in Ollama | `qwen3:4b-instruct` (to train, Apache 2.0), `qwen2.5:7b` (teacher, Apache 2.0), `qwen2.5:3b` (non-commercial licence: testing only) |
 | Template calls | 1,560 made → `data/train.jsonl` (1,482) + `data/val.jsonl` (78) |
 | **"Before" test of `qwen3:4b-instruct`** | **Finished: 4 of 30 calls handled correctly (13%).** This is the score to beat. |
-| Model-written calls (`generate.py`) | Running overnight 13→14 Oct, target 40 (progress in `data/generate.log`). About 4–7 min per attempt, many rejected. |
+| Model-written calls (`generate.py`, teacher `qwen2.5:7b` on the laptop) | **4 kept of 41 attempts (about 1 in 10)** by 10:45 pm; left running overnight, target 40. |
 | Training on Colab | Not started |
 
-`data/` is not in git; it stays on the laptop. Before-test results: calls 1–24 in `data/eval-before.log`, 25–26 in
-`data/eval-qwen3_4b-instruct.jsonl` (saved per call; the resume reads both automatically).
+`data/` is not in git; it stays on the laptop (`data/generated.jsonl`, `data/rejected.jsonl`, `data/generate.log`).
+
+## Model-written calls: why the laptop teacher struggles
+
+Kept: `Enquiry follow-up / ask_person`, `Appointment reminder / ask_person`, `Payment reminder / will_act`,
+`Feedback survey / opt_out`.
+
+Reasons for the 37 rejections (a call can have several):
+
+| Reason | Times |
+|---|---|
+| Said goodbye or promised an action without using the tool (no outcome recorded) | 49 |
+| Reply too long to speak (more than three sentences) | 38 |
+| Identity answers sent in the wrong format (`patient_id` loose instead of under `answers`) | 18 |
+| Missing the expected tool for the situation (call-back, hand-over, FAQ, identity check) | 33 |
+
+The 7B model is weak at tool use even with private reminders. **Recommended next step: generate on Google Colab
+with a bigger teacher (`qwen2.5:14b` or `qwen2.5:32b`, both Apache 2.0)** — GPU-fast and much better with tools.
+To be prepared and tested before the user runs it.
 
 ## "Before" results (qwen3:4b-instruct, untrained): 4/30 = 13%
 
@@ -26,44 +43,37 @@
 | opt_out | 0/2 | wrong_person | 0/2 |
 | dispute, distress, confirm_attend, cannot_attend | 0/1 each | | |
 
-Passed: `Overdue follow-up / will_act`, `Site visit reminder / busy`, `Site visit reminder / ask_person`,
-`Feedback survey / feedback_unhappy`.
-
-The untrained model's common mistakes, which the training data teaches against:
-- **Replies too long to speak** (more than three sentences, up to 47 words) — 9 calls.
-- **Ends without recording the outcome** (`log_call_outcome` / `opt_out` / hand-over) — 9 calls.
-- **Wrong or missing tool** for the situation: no hand-over for a distressed caller, no FAQ search, no call-back.
-- **Privacy slips**: looked up details after a failed identity check (verify_fail), or on a wrong number.
-- Calls `get_call_context` although the context is already in the prompt.
-
+Common mistakes: replies too long to speak, ending without recording the outcome, missing the right tool
+(hand-over, FAQ, call-back), looking up details after a failed identity check.
 Full lines: `data/eval-before.log` (calls 1–24), `data/eval-before-2.log` (25–26), `data/eval-before-3.log` (27–30).
 
-## Safety nets in the CRM (13 Oct, live in `LlmBrain`)
+## Fixes made on 13 October (all tested and pushed)
 
-Whatever the model does, on every call with our own AI or Claude:
+In the CRM (live for every call, whatever the model):
 - `get_call_context` is no longer offered to the model (its answer is already in the prompt).
 - Replies longer than three sentences are cut to the first two plus the last (usually the question).
-- If the AI says goodbye without recording an outcome, the call goes to a person for review
-  (`request_human_handoff`, reason OUT_OF_SCOPE) instead of being silently retried.
+- A goodbye without a recorded outcome goes to a person for review instead of being silently retried.
+- A tool call the model writes as text (`log_call_outcome({...})`, `<tool_call>...`) is made, never read aloud.
 - Private details were already protected: the CRM's tools refuse them until the identity check passes.
+
+In the training generator:
+- The simulated caller is asked again if it only gives a stage direction ("*hangs up*").
+- A promise or goodbye without its tool is retried once with a private reminder (only the corrected turn is kept;
+  never when testing a model).
+- Fixed: invisible backspace characters had broken two patterns. `test_sim` now scans every file for them.
 
 ## Carry on
 
 ```bash
 cd C:\Users\sivas\Desktop\AI-Call-CRM\training
+python -m unittest test_callkit test_sim     # always first
 
-# 1. (done) The before-test is finished.
-
-# 2. Let the teacher write example calls (several minutes each, hours in all; Ctrl+C stops, rerun continues).
-#    Run it after step 1, not at the same time: both share the laptop's CPU.
-python generate.py --count 100
-
-# 3. Rebuild the dataset with both kinds of calls
-python build_dataset.py
+# Overnight generation may still be running; it stops by itself at 40 kept. Ctrl+C is safe, rerun continues.
+python build_dataset.py                      # templates + kept calls -> data/train.jsonl, data/val.jsonl
 ```
 
-Then train on Google Colab (README.md, "Train"), load the result with `make_modelfile.py`, and run the
-"after" test: `python evaluate.py --model ourvoice` (same seed, same 30 test calls) to compare.
+Then: (optional) Colab generation with a bigger teacher → `build_dataset.py` again → train on Google Colab
+(README.md, "Train") → `make_modelfile.py` → "after" test `python evaluate.py --model ourvoice` (same 30 calls).
 
 ## Open decisions for the user
 - Switch the CRM's local default `LOCAL_LLM_MODEL` from `qwen2.5:3b` (non-commercial) to `qwen3:4b-instruct`.
