@@ -16,6 +16,12 @@ from scenarios import Scenario
 
 MAX_CALLER_TURNS = 12
 
+REMIND_CLOSE = """
+REMINDER (private): you were about to say goodbye without recording the call. First call log_call_outcome with
+the right outcome_code (or schedule_callback first if the caller wants a call later, or opt_out /
+request_human_handoff when those apply). Only after the tool has answered, say one short goodbye.
+"""
+
 COACH = """
 TRAINER NOTES (private, never mention them): the caller in this practice call may behave like this: {brief}
 React only to what the caller actually says. Keep every rule above: check identity with verify_identity before any
@@ -89,17 +95,24 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
             return None, "the caller said nothing"
         history.append({"role": "user", "content": said})
         # ---- the agent answers, using tools as often as it needs (as LlmBrain.respond does)
+        reminder = ""
         for _ in range(MAX_ROUNDS):
-            r = ollama_chat(agent_model, [{"role": "system", "content": hidden}] + history, TOOLS,
+            r = ollama_chat(agent_model, [{"role": "system", "content": hidden + reminder}] + history, TOOLS,
                             temperature=agent_temperature, url=url, max_tokens=300)
             if not r["tool_calls"]:
                 text = spoken(r["content"])
                 if not text:
                     return None, "the agent gave an empty reply"
-                history.append({"role": "assistant", "content": text})
                 if not call.closing and re.search(r"\b(goodbye|bye)\b", text, re.I):
+                    if coach and not reminder:
+                        # Writing training calls: drop this reply and ask again with a private reminder, so only
+                        # the corrected turn is kept. (Never while testing: there the mistake must count.)
+                        reminder = REMIND_CLOSE
+                        continue
+                    history.append({"role": "assistant", "content": text})
                     return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id,
                                   scenario.expect), "the agent said goodbye without recording how the call ended"
+                history.append({"role": "assistant", "content": text})
                 break
             calls = []
             for c in r["tool_calls"]:
