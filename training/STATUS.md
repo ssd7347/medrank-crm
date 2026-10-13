@@ -1,4 +1,4 @@
-# Training status — saved 13 October 2026 (morning)
+# Training status — updated 13 October 2026 (evening)
 
 ## Where we are
 
@@ -7,14 +7,24 @@
 | Training kit (`training/`) | Done, committed. 12 kit tests + 54 backend tests pass. |
 | Models in Ollama | `qwen3:4b-instruct` (to train, Apache 2.0), `qwen2.5:7b` (teacher, Apache 2.0), `qwen2.5:3b` (non-commercial licence: testing only) |
 | Template calls | 1,560 made → `data/train.jsonl` (1,482) + `data/val.jsonl` (78) |
-| **"Before" test of `qwen3:4b-instruct`** | **26 of 30 calls done, 4 passed (15%).** Stopped on purpose; calls 27–30 left. |
-| Model-written calls (`generate.py`) | Started on 13 Oct, stopped on purpose before the first call finished: 0 of 100. |
+| **"Before" test of `qwen3:4b-instruct`** | **Finished: 4 of 30 calls handled correctly (13%).** This is the score to beat. |
+| Model-written calls (`generate.py`) | Running since 13 Oct evening (target 100; progress in `data/generate.log`). |
 | Training on Colab | Not started |
 
 `data/` is not in git; it stays on the laptop. Before-test results: calls 1–24 in `data/eval-before.log`, 25–26 in
 `data/eval-qwen3_4b-instruct.jsonl` (saved per call; the resume reads both automatically).
 
-## "Before" results so far (qwen3:4b-instruct, untrained)
+## "Before" results (qwen3:4b-instruct, untrained): 4/30 = 13%
+
+| Scenario | Passed | Scenario | Passed |
+|---|---|---|---|
+| will_act | 1/1 | verify_fail | 0/3 |
+| feedback_unhappy | 1/1 | verify_retry | 0/2 |
+| ask_person | 1/2 | injection | 0/3 |
+| busy | 1/2 | faq | 0/3 |
+| are_you_human | 0/3 | faq_unknown | 0/2 |
+| opt_out | 0/2 | wrong_person | 0/2 |
+| dispute, distress, confirm_attend, cannot_attend | 0/1 each | | |
 
 Passed: `Overdue follow-up / will_act`, `Site visit reminder / busy`, `Site visit reminder / ask_person`,
 `Feedback survey / feedback_unhappy`.
@@ -26,16 +36,14 @@ The untrained model's common mistakes, which the training data teaches against:
 - **Privacy slips**: looked up details after a failed identity check (verify_fail), or on a wrong number.
 - Calls `get_call_context` although the context is already in the prompt.
 
-Full lines: `training/data/eval-before.log` (calls 1–24) and `data/eval-before-2.log` (25–26).
+Full lines: `data/eval-before.log` (calls 1–24), `data/eval-before-2.log` (25–26), `data/eval-before-3.log` (27–30).
 
-## Next session (13 October evening): carry on
+## Carry on
 
 ```bash
 cd C:\Users\sivas\Desktop\AI-Call-CRM\training
 
-# 1. Finish the before-test: skips calls 1-26 and runs 27-30 (about 30 minutes).
-#    Log to a NEW file so the earlier logs are not overwritten.
-python -u evaluate.py --model qwen3:4b-instruct --resume-log data/eval-before.log > data/eval-before-3.log
+# 1. (done) The before-test is finished.
 
 # 2. Let the teacher write example calls (several minutes each, hours in all; Ctrl+C stops, rerun continues).
 #    Run it after step 1, not at the same time: both share the laptop's CPU.
