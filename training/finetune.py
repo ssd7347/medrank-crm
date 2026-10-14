@@ -13,6 +13,7 @@ The base model must allow commercial use, because the CRM is sold: Qwen3-4B-Inst
 """
 
 import argparse
+import gc
 import glob
 import inspect
 import json
@@ -46,6 +47,12 @@ def load(path: str, tok, max_len: int) -> Dataset:
     print(f"{path}: {len(texts)} calls" + (f" ({skipped} too long, left out)" if skipped else ""))
     # Built from plain strings: nested tool arguments would otherwise be forced into one shared schema.
     return Dataset.from_list(texts)
+
+
+def free_gpu() -> None:
+    """Hands unused GPU memory back before the next big step (checking, building the model file)."""
+    gc.collect()
+    torch.cuda.empty_cache()
 
 
 def only_supported(cls, **kwargs):
@@ -86,6 +93,8 @@ def main() -> None:
     cfg = SFTConfig(**only_supported(
         SFTConfig, output_dir=checkpoints, dataset_text_field="text", max_seq_length=a.max_len,
         max_length=a.max_len, packing=False, per_device_train_batch_size=2, gradient_accumulation_steps=8,
+        # One call at a time when checking: 8 at once (the default) runs a T4 out of memory (14 Oct).
+        per_device_eval_batch_size=1,
         num_train_epochs=a.epochs, learning_rate=2e-4, lr_scheduler_type="cosine", warmup_ratio=0.03,
         weight_decay=0.01, optim="adamw_8bit", bf16=bf16, fp16=not bf16, logging_steps=5,
         # Checked once at the end, not during: on a free GPU every minute counts.
@@ -105,7 +114,13 @@ def main() -> None:
     tok.save_pretrained(f"{keep}/ourvoice-lora")
     print(f"Trained adapter saved to {keep}/ourvoice-lora")
     print(f"Training done in {stats.metrics.get('train_runtime', 0) / 60:.0f} min; final loss {stats.metrics.get('train_loss', 0):.3f}")
-    print("Validation:", trainer.evaluate())
+    free_gpu()
+    try:
+        print("Validation:", trainer.evaluate())
+    except torch.cuda.OutOfMemoryError:
+        # Only a score to look at; the trained model is already saved, so carry on and build it.
+        free_gpu()
+        print("Validation skipped: not enough GPU memory to check the held-back calls.")
 
     # A quick look: the trained model continues one validation call.
     FastLanguageModel.for_inference(model)
@@ -118,6 +133,8 @@ def main() -> None:
     print("\nCaller said:", row["messages"][upto - 1]["content"][:200])
     print("Our model replies:", tok.decode(out[0][ids["input_ids"].shape[1]:], skip_special_tokens=True))
 
+    del trainer
+    free_gpu()
     model.save_pretrained_gguf(f"{a.out}/ourvoice-gguf", tok, quantization_method=a.quant)
     # Unsloth versions differ in where they put the file (the folder itself, or one named ..._gguf beside it).
     gguf = [g for g in glob.glob(f"{a.out}*/**/*.gguf", recursive=True)]

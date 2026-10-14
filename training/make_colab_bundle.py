@@ -92,7 +92,7 @@ it carries on from the last saved step.
 """),
         code(f"""
 {here}
-!grep -q " 0 with problems" check.log && python finetune.py --train data/train.jsonl --val data/val.jsonl --epochs {EPOCHS} --keep {KEEP} || echo "Not trained: run cell 4 first; it must say '0 with problems'"
+!if grep -q " 0 with problems" check.log; then python finetune.py --train data/train.jsonl --val data/val.jsonl --epochs {EPOCHS} --keep {KEEP}; else echo "Not trained: run cell 4 first; it must say '0 with problems'"; fi
 """),
         md("## 6. Copy the trained model to Google Drive\nAbout 2.5 GB. Download it from Drive to the laptop afterwards."),
         code(f"""
