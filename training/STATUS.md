@@ -11,12 +11,11 @@
   ~67 s/step the planned 2 epochs × 186 steps needed **~3 h 17 min** — too long for a free session. Stopped at step
   16 when the user shut the laptop. Nothing saved yet.
 
-**Next session:**
-1. Notebook for a **short run**: `make_templates.py --per 6` (~740 train calls), `--epochs 1` (~47 steps, ~50 min);
-   skip the generation cells; save checkpoints to Google Drive during training so a disconnect does not lose it.
-2. Tighten `callkit.check()`: reject any amount (any currency/format), date, weekday or time the agent says that no
-   tool or the caller gave. Only then use model-written calls again.
-3. After training: `make_modelfile.py` → "after" test vs the untrained 13%.
+**Evening 14 Oct — done and tested:** the short-run notebook (templates `--per 6` = 741 train calls, 1 epoch,
+~47 steps, ~50 min, checkpoints to `MyDrive/ourvoice-training` every 10 steps, resume on rerun, training gated on
+the format check) and the stricter checker (numbers / currency / days / months / durations must have been heard in
+the call; no spoken tool calls; no goodbye before the call is recorded). Fresh copies of both Colab files are in
+`Desktop\Colab training`. **Next:** the user runs the new notebook; then `make_modelfile.py` → "after" test vs 13%.
 
 ---
 
