@@ -1,4 +1,18 @@
-# Training status — 14 October 2026, 5:30 pm (laptop shut down)
+# Training status — 14 October 2026, 8:45 pm: OUR FIRST MODEL IS TRAINED
+
+- Trained on Colab (14 Oct evening): 741 template calls, 1 epoch, 47 steps, ~50 min. The final check then ran out of
+  GPU memory (fixed: one call at a time, skipped rather than fatal); rerunning cell 5 resumed from checkpoint-47 and
+  built the model file. Google Drive turned out to be full, so the file was downloaded straight from Colab.
+- `C:\Users\sivas\Downloads\Qwen3-4B-Instruct-2507.Q4_K_M.gguf` (2.5 GB, GGUF v3) is loaded in Ollama as **`ourvoice`**
+  (`make_modelfile.py --create`). Trained adapter also kept in Google Drive `MyDrive/ourvoice-training/ourvoice-lora`.
+- **"After" test running:** `python -u evaluate.py --model ourvoice > data/eval-after.log` (same 30 calls as the
+  "before" test; saves per call; rerun the same command to carry on). Note the checker is stricter now than when the
+  untrained model scored 13%, so the comparison is tougher on `ourvoice`, not easier.
+- Google Drive: delete `MyDrive/ourvoice-training/checkpoints` and the partial `.gguf` there, keep `ourvoice-lora`.
+
+---
+
+# Earlier: 14 October 2026, 5:30 pm (laptop shut down)
 
 **First Colab session (14 Oct afternoon):**
 - Cells 1–3 worked (T4 GPU, 21 tests OK, Ollama + qwen2.5:14b, 1,560 templates). One runtime disconnect at the
