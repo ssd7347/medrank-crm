@@ -1,6 +1,28 @@
-# Training status — 14 October 2026, morning
+# Training status — 14 October 2026, 5:30 pm (laptop shut down)
 
-**Now:** the Colab kit is ready and tested (`out/colab-kit.zip`, `out/train-on-colab.ipynb`, made by
+**First Colab session (14 Oct afternoon):**
+- Cells 1–3 worked (T4 GPU, 21 tests OK, Ollama + qwen2.5:14b, 1,560 templates). One runtime disconnect at the
+  start of generation; memory was fine (GPU 11.5/15 GB, RAM 2.5/12 GB with the 14B loaded).
+- **Model-written calls dropped for this round.** The 14B teacher wrote calls fast (44–94 s each) but most were
+  rejected (replies too long, loose identity arguments), and an audit found the checker **lets made-up facts
+  through** in kept calls ("$125 due March 15th", "EMI $250 due October 5th": amounts only checked when written as
+  "rupees"). Training uses the 1,560 template calls only (1,482 train / 77 val).
+- Training started correctly (format check: 1,482 calls, 0 problems; LoRA 0.81% of weights; first loss 1.382) but at
+  ~67 s/step the planned 2 epochs × 186 steps needed **~3 h 17 min** — too long for a free session. Stopped at step
+  16 when the user shut the laptop. Nothing saved yet.
+
+**Next session:**
+1. Notebook for a **short run**: `make_templates.py --per 6` (~740 train calls), `--epochs 1` (~47 steps, ~50 min);
+   skip the generation cells; save checkpoints to Google Drive during training so a disconnect does not lose it.
+2. Tighten `callkit.check()`: reject any amount (any currency/format), date, weekday or time the agent says that no
+   tool or the caller gave. Only then use model-written calls again.
+3. After training: `make_modelfile.py` → "after" test vs the untrained 13%.
+
+---
+
+# Earlier: 14 October 2026, morning
+
+**Then:** the Colab kit is ready and tested (`out/colab-kit.zip`, `out/train-on-colab.ipynb`, made by
 `make_colab_bundle.py`). Laptop generation stopped with **9 kept calls**. Next: the user runs the notebook on
 Colab (README.md, "Train"); then `make_modelfile.py` and the "after" test.
 
