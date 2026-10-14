@@ -1,4 +1,16 @@
-# Training status — saved 13 October 2026, 10:45 pm
+# Training status — 14 October 2026, morning
+
+**Now:** the Colab kit is ready and tested (`out/colab-kit.zip`, `out/train-on-colab.ipynb`, made by
+`make_colab_bundle.py`). Laptop generation stopped with **9 kept calls**. Next: the user runs the notebook on
+Colab (README.md, "Train"); then `make_modelfile.py` and the "after" test.
+
+Checked on 14 Oct before any GPU time: `check_chat_format.py` with the real Qwen3 tokenizer — 1,499 calls, 0
+problems, longest 2,326 tokens. It found and we fixed: an empty `<think></think>` block the HF template adds (Ollama's
+has none, so it is stripped), and four template scenarios where the caller spoke twice in a row.
+
+---
+
+# Earlier: saved 13 October 2026, 10:45 pm
 
 ## Where we are
 
