@@ -507,6 +507,43 @@ def sentences(text: str) -> int:
     return len([s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if re.search(r"\w", s)])
 
 
+WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
+          "november", "december")
+NUMBER_WORDS = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+                "fifteen", "twenty", "thirty", "few", "couple of")
+DURATION = re.compile(r"\b(\d+|" + "|".join(NUMBER_WORDS) + r")\s+(minute|hour|day|week|month|year)s?\b")
+# Code in a spoken reply: name(...) or a JSON object.
+WRITTEN_CALL = re.compile(r"\b[a-z_]+\s*\(\s*[\"'{]|\{\s*\"\w+\"\s*:", re.I)
+CURRENCY = re.compile(r"\$|\busd\b|\bdollars?\b|\brs\.?\s*\d|₹|\blakhs?\b|\bcrores?\b")
+
+
+def ungrounded(said: str, heard: str) -> list[str]:
+    """Facts in an agent reply that nothing earlier in the call gave it: the script, the caller or a tool.
+
+    A small model's worst habit on a phone call is inventing an amount, a date or a deadline; every number,
+    currency, weekday, month and length of time the agent says must already have been heard in the call.
+    ``said`` and ``heard`` are lower case.
+    """
+    out = []
+    numbers_heard = set(re.findall(r"\d+", heard))
+    for n in re.findall(r"\d+", said):
+        if n not in numbers_heard:
+            out.append(f"says a number nothing in the call gave ({n})")
+    if (m := CURRENCY.search(said)) and not CURRENCY.search(heard):
+        out.append(f"names a currency nothing in the call used ({m.group(0)})")
+    for word in WEEKDAYS + MONTHS:
+        if re.search(rf"\b{word}\b", said) and not re.search(rf"\b{word}\b", heard):
+            # "may" is also an ordinary word ("may I have your name"): only a date counts.
+            if word == "may" and not re.search(r"\b(\d+\s+may|may\s+\d+)\b", said):
+                continue
+            out.append(f"names a day or month nothing in the call gave ({word})")
+    for m in DURATION.finditer(said):
+        if m.group(0) not in heard:
+            out.append(f"states a length of time nothing in the call gave ({m.group(0)})")
+    return out
+
+
 def check(rec: dict) -> list[str]:
     """Every reason this conversation must not be trained on; empty when it is a good example."""
     problems: list[str] = []
@@ -518,6 +555,7 @@ def check(rec: dict) -> list[str]:
     never = [v for v in meta.get("never_values", []) if v and len(v) >= 4]
     tool_text = ""
     faq_text = ""          # general answers may contain the same words as a private detail ("6 pm")
+    heard = msgs[0]["content"].lower()   # what the agent may state: the script, the caller's words, tool results
     verified = False
     closing_at = None
     pending: set[str] = set()
@@ -528,6 +566,7 @@ def check(rec: dict) -> list[str]:
                 problems.append(f"message {i}: tool result without a call")
             pending.discard(m.get("tool_call_id"))
             tool_text += m["content"]
+            heard += " " + m["content"].lower()
             if m.get("name") == "search_faq":
                 faq_text += m["content"].lower()
             res = json.loads(m["content"])
@@ -545,6 +584,7 @@ def check(rec: dict) -> list[str]:
             if msgs[i - 1]["role"] == "user":
                 # On a real call every caller turn gets the agent's answer before the caller speaks again.
                 problems.append(f"message {i}: the caller speaks twice in a row")
+            heard += " " + (m.get("content") or "").lower()
             continue
         text = m.get("content") or ""
         if closing_at is not None and (m.get("tool_calls") or i != len(msgs) - 1):
@@ -573,6 +613,11 @@ def check(rec: dict) -> list[str]:
             for amount in re.findall(r"\d[\d,]*(?:\.\d+)? rupees", text):
                 if not re.search(r"(?<![\d,.])" + re.escape(amount), tool_text):
                     problems.append(f"message {i}: says an amount no tool returned ({amount})")
+            problems += [f"message {i}: {p}" for p in ungrounded(low, heard)]
+            if WRITTEN_CALL.search(text) or any(n.replace("_", "") in low.replace("_", "") for n in TOOL_NAMES):
+                problems.append(f"message {i}: speaks a tool call aloud")
+            if closing_at is None and re.search(r"\b(good\s?bye|bye)\b", low):
+                problems.append(f"message {i}: says goodbye before the call is recorded")
             if re.search(r"\b(i am|i'm) (a )?(human|real person)\b", low):
                 problems.append(f"message {i}: claims to be human")
     last = msgs[-1]

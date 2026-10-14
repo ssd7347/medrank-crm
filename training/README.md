@@ -59,8 +59,7 @@ python evaluate.py --model qwen3:4b-instruct # score BEFORE training, to compare
 
 ### Train (free, on Google Colab)
 
-The laptop has no NVIDIA GPU, so Colab's free T4 GPU does the heavy work: it also writes model-written calls with
-a bigger teacher (`qwen2.5:14b`, Apache 2.0) far faster than the laptop can. The data is made-up people only.
+The laptop has no NVIDIA GPU, so training runs on Colab's free T4 GPU. The data is made-up people only.
 
 ```bash
 python make_colab_bundle.py      # -> out/colab-kit.zip and out/train-on-colab.ipynb
@@ -69,9 +68,16 @@ python make_colab_bundle.py      # -> out/colab-kit.zip and out/train-on-colab.i
 1. Open <https://colab.research.google.com>, **File → Upload notebook**, choose `out/train-on-colab.ipynb`.
 2. **Runtime → Change runtime type → T4 GPU**, then **Save**.
 3. In the Files panel on the left, upload `out/colab-kit.zip`.
-4. Run the cells from the top, one at a time (about 2½ hours in all): tests, Ollama with the teacher,
-   templates, 80 minutes of model-written calls (a copy is downloaded to your computer), the dataset, training,
-   and finally the trained model copied to your Google Drive (about 2.5 GB). Download it from Drive.
+4. Run the cells from the top, one at a time (about 1¼ hours): tests, Google Drive, the training tool, the data
+   and its format check, training (~47 steps, ~50 min, progress saved to Drive every 10 steps), and the trained
+   model copied to `MyDrive/ourvoice-training` (about 2.5 GB). Download it from Drive.
+
+If Colab disconnects, upload the zip again and run the cells from the top: training carries on from Drive.
+
+Model-written calls (`generate.py`, on Colab with `qwen2.5:14b`) are left out for now: on 14 October some kept calls
+contained invented amounts and dates. `callkit.check()` now rejects any number, currency, day, month or length of
+time that nothing in the call gave, any spoken tool call and any early goodbye; audit kept calls by hand before
+using them again.
 
 ### Use the trained model
 

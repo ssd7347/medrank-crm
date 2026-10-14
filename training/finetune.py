@@ -59,10 +59,14 @@ def main() -> None:
     ap.add_argument("--base", default=os.environ.get("BASE_MODEL", "unsloth/Qwen3-4B-Instruct-2507"))
     ap.add_argument("--train", default="train.jsonl")
     ap.add_argument("--val", default="val.jsonl")
-    ap.add_argument("--epochs", type=float, default=2)
+    ap.add_argument("--epochs", type=float, default=1, help="passes over the data (1 fits a free Colab session)")
     ap.add_argument("--max-len", type=int, default=4096)
     ap.add_argument("--rank", type=int, default=16, help="LoRA rank: higher learns more but needs more memory")
-    ap.add_argument("--out", default="out")
+    ap.add_argument("--out", default="out", help="where the merged model and the .gguf file are written")
+    ap.add_argument("--keep", default=None,
+                    help="folder that survives a disconnect (Google Drive): progress is saved there every --save-steps "
+                         "and a rerun carries on from it; the trained adapter is kept there too")
+    ap.add_argument("--save-steps", type=int, default=10)
     ap.add_argument("--quant", default="q4_k_m", help="GGUF quantisation for Ollama (q4_k_m is small and fast)")
     a = ap.parse_args()
 
@@ -76,19 +80,30 @@ def main() -> None:
         use_gradient_checkpointing="unsloth")
 
     train, val = load(a.train, tok, a.max_len), load(a.val, tok, a.max_len)
+    keep = a.keep or a.out
+    checkpoints = f"{keep}/checkpoints"
     bf16 = torch.cuda.is_bf16_supported()
     cfg = SFTConfig(**only_supported(
-        SFTConfig, output_dir=f"{a.out}/checkpoints", dataset_text_field="text", max_seq_length=a.max_len,
+        SFTConfig, output_dir=checkpoints, dataset_text_field="text", max_seq_length=a.max_len,
         max_length=a.max_len, packing=False, per_device_train_batch_size=2, gradient_accumulation_steps=8,
         num_train_epochs=a.epochs, learning_rate=2e-4, lr_scheduler_type="cosine", warmup_ratio=0.03,
-        weight_decay=0.01, optim="adamw_8bit", bf16=bf16, fp16=not bf16, logging_steps=10, eval_strategy="steps",
-        eval_steps=50, save_strategy="no", report_to="none", seed=3407))
+        weight_decay=0.01, optim="adamw_8bit", bf16=bf16, fp16=not bf16, logging_steps=5,
+        # Checked once at the end, not during: on a free GPU every minute counts.
+        eval_strategy="no", save_strategy="steps", save_steps=a.save_steps, save_total_limit=2,
+        report_to="none", seed=3407))
     trainer = SFTTrainer(**only_supported(SFTTrainer, model=model, processing_class=tok, tokenizer=tok,
                                           train_dataset=train, eval_dataset=val, args=cfg))
     # Learn only the agent's turns (replies and tool calls); the script, caller and tool results are context.
     trainer = train_on_responses_only(trainer, instruction_part="<|im_start|>user\n",
                                       response_part="<|im_start|>assistant\n")
-    stats = trainer.train()
+    # After a disconnect, the same command carries on from the last saved step instead of starting again.
+    saved = sorted(glob.glob(f"{checkpoints}/checkpoint-*"), key=lambda p: int(p.rsplit("-", 1)[-1]))
+    if saved:
+        print(f"Carrying on from {saved[-1]}")
+    stats = trainer.train(resume_from_checkpoint=saved[-1] if saved else None)
+    model.save_pretrained(f"{keep}/ourvoice-lora")
+    tok.save_pretrained(f"{keep}/ourvoice-lora")
+    print(f"Trained adapter saved to {keep}/ourvoice-lora")
     print(f"Training done in {stats.metrics.get('train_runtime', 0) / 60:.0f} min; final loss {stats.metrics.get('train_loss', 0):.3f}")
     print("Validation:", trainer.evaluate())
 
@@ -103,15 +118,13 @@ def main() -> None:
     print("\nCaller said:", row["messages"][upto - 1]["content"][:200])
     print("Our model replies:", tok.decode(out[0][ids["input_ids"].shape[1]:], skip_special_tokens=True))
 
-    model.save_pretrained(f"{a.out}/ourvoice-lora")
-    tok.save_pretrained(f"{a.out}/ourvoice-lora")
     model.save_pretrained_gguf(f"{a.out}/ourvoice-gguf", tok, quantization_method=a.quant)
     # Unsloth versions differ in where they put the file (the folder itself, or one named ..._gguf beside it).
-    gguf = [g for g in glob.glob("**/*.gguf", recursive=True) if "ourvoice" in g or g.startswith(a.out)]
+    gguf = [g for g in glob.glob(f"{a.out}*/**/*.gguf", recursive=True)]
     if not gguf:
-        sys.exit("Training finished but no .gguf file was written; the LoRA adapter is in " + f"{a.out}/ourvoice-lora")
-    print("\nSaved:", f"{a.out}/ourvoice-lora", *gguf, sep="\n  ")
-    print("Download the .gguf file and follow README.md, 'Use the trained model'.")
+        sys.exit(f"Training finished but no .gguf file was written; the trained adapter is in {keep}/ourvoice-lora")
+    print("\nSaved:", f"{keep}/ourvoice-lora", *gguf, sep="\n  ")
+    print("Copy the .gguf file to the laptop and follow README.md, 'Use the trained model'.")
 
 
 if __name__ == "__main__":

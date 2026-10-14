@@ -64,6 +64,28 @@ class FakeCrmTest(unittest.TestCase):
                 return "<|im_start|>assistant\n" + EMPTY_THINK + "Goodbye.<|im_end|>\n"
         self.assertEqual(render_for_training(Tok(), {"messages": [], "tools": []}), "<|im_start|>assistant\nGoodbye.<|im_end|>\n")
 
+    def test_made_up_amounts_dates_and_deadlines_are_caught(self):
+        # As seen in real model-written calls: invented amounts in dollars, dates and deadlines.
+        for invented in ["The amount due is $125 and it's due on March 15th.",
+                         "Your EMI amount is 250 and it is due soon.",
+                         "Our records show your next check-up is due in two weeks.",
+                         "Your appointment is on Wednesday."]:
+            rec = good()
+            rec["messages"][first_reply(rec)]["content"] = invented
+            self.assertTrue(any("nothing in the call gave" in p or "nothing in the call used" in p for p in check(rec)), invented)
+        # "May I" is an ordinary question, not a month.
+        rec = good()
+        rec["messages"][first_reply(rec)]["content"] = "May I have your full name, please?"
+        self.assertFalse(any("day or month" in p for p in check(rec)))
+
+    def test_a_tool_call_spoken_aloud_or_an_early_goodbye_is_caught(self):
+        rec = good()
+        rec["messages"][first_reply(rec)]["content"] = 'logcalloutcome("Caller requested human handoff.")'
+        self.assertTrue(any("speaks a tool call aloud" in p for p in check(rec)))
+        rec = good()
+        rec["messages"][first_reply(rec)]["content"] = "Okay, goodbye."
+        self.assertTrue(any("goodbye before the call is recorded" in p for p in check(rec)))
+
     def test_the_caller_never_speaks_twice_in_a_row(self):
         rec = good()
         i = first_reply(rec)
