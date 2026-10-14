@@ -27,6 +27,8 @@ import torch
 from datasets import Dataset
 from trl import SFTConfig, SFTTrainer
 
+from callkit import render_for_training
+
 
 def load(path: str, tok, max_len: int) -> Dataset:
     """Each call becomes one text in the model's own chat format. Calls longer than max_len tokens are left out."""
@@ -36,7 +38,7 @@ def load(path: str, tok, max_len: int) -> Dataset:
             if not line.strip():
                 continue
             row = json.loads(line)
-            text = tok.apply_chat_template(row["messages"], tools=row["tools"], tokenize=False)
+            text = render_for_training(tok, row)
             if len(tok(text, add_special_tokens=False)["input_ids"]) > max_len:
                 skipped += 1
                 continue
@@ -95,7 +97,7 @@ def main() -> None:
     with open(a.val, encoding="utf-8") as f:
         row = json.loads(f.readline())
     upto = next(i for i, m in enumerate(row["messages"]) if i > 3 and m["role"] == "assistant")
-    prompt = tok.apply_chat_template(row["messages"][:upto], tools=row["tools"], tokenize=False, add_generation_prompt=True)
+    prompt = render_for_training(tok, {"messages": row["messages"][:upto], "tools": row["tools"]}, generation_prompt=True)
     ids = tok(prompt, return_tensors="pt").to("cuda")
     out = model.generate(**ids, max_new_tokens=120, do_sample=False)
     print("\nCaller said:", row["messages"][upto - 1]["content"][:200])

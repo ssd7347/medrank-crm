@@ -472,6 +472,20 @@ def new_call(script: Script, rng: random.Random, known: bool = True) -> FakeCrm:
     return FakeCrm(script, person, rng.choice(COMPANIES[script.industry]), rng.choice(AGENTS), rng, desk_open=rng.random() < 0.3)
 
 
+# --------------------------------------------------------------------------------------------- training text
+
+# Qwen3's Hugging Face template puts an empty thinking block before the last reply. Ollama's template (what runs on
+# real calls) has none, so training must not either: otherwise the model learns to say "<think></think>".
+EMPTY_THINK = "<think>\n\n</think>\n\n"
+
+
+def render_for_training(tok, row: dict, generation_prompt: bool = False) -> str:
+    """One call as the model reads it on a real call: the tokenizer's chat format, without the empty thinking block."""
+    text = tok.apply_chat_template(row["messages"], tools=row["tools"], tokenize=False,
+                                   add_generation_prompt=generation_prompt)
+    return text.replace(EMPTY_THINK, "")
+
+
 # --------------------------------------------------------------------------------------------- spoken text
 
 def spoken(text: str | None) -> str:
@@ -528,6 +542,9 @@ def check(rec: dict) -> list[str]:
         if role == "user":
             if closing_at is not None:
                 problems.append("the caller spoke after the call was being closed")
+            if msgs[i - 1]["role"] == "user":
+                # On a real call every caller turn gets the agent's answer before the caller speaks again.
+                problems.append(f"message {i}: the caller speaks twice in a row")
             continue
         text = m.get("content") or ""
         if closing_at is not None and (m.get("tool_calls") or i != len(msgs) - 1):

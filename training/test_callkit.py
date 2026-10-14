@@ -8,7 +8,7 @@ import json
 import random
 import unittest
 
-from callkit import FieldDef, all_scripts, answer_matches, check, new_call, spoken_amount
+from callkit import EMPTY_THINK, FieldDef, all_scripts, answer_matches, check, new_call, render_for_training, spoken_amount
 from scenarios import SCENARIOS, build, for_script
 
 
@@ -57,6 +57,18 @@ class FakeCrmTest(unittest.TestCase):
         self.assertTrue(answer_matches(dob, "1985-03-12", "12th March 1985"))
         self.assertTrue(answer_matches(dob, "1985-03-12", "12/03/1985"))
         self.assertFalse(answer_matches(dob, "1985-03-12", "13/03/1985"))
+
+    def test_training_text_has_no_empty_thinking_block(self):
+        class Tok:  # stands in for Qwen3's tokenizer, which adds the block before the last reply
+            def apply_chat_template(self, messages, tools, tokenize, add_generation_prompt=False):
+                return "<|im_start|>assistant\n" + EMPTY_THINK + "Goodbye.<|im_end|>\n"
+        self.assertEqual(render_for_training(Tok(), {"messages": [], "tools": []}), "<|im_start|>assistant\nGoodbye.<|im_end|>\n")
+
+    def test_the_caller_never_speaks_twice_in_a_row(self):
+        rec = good()
+        i = first_reply(rec)
+        rec["messages"][i] = {"role": "user", "content": "Hello?"}
+        self.assertTrue(any("speaks twice in a row" in p for p in check(rec)))
 
     def test_amounts_are_spoken_the_indian_way(self):
         self.assertEqual(spoken_amount(4500000), "45,00,000 rupees")

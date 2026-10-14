@@ -111,11 +111,16 @@ files.download("/content/generated_colab.jsonl")
 """),
         md("## 5. Build the training data"),
         code("!python build_dataset.py"),
-        md("## 6. Train (about 45–75 minutes)\nOllama is stopped first so the GPU is free for training."),
+        md("""
+## 6. Train (about 45–75 minutes)
+
+Ollama is stopped first so the GPU is free. Before training starts, every call is checked in the model's own
+chat format; if any is laid out wrongly, training does not start.
+"""),
         code("""
 !pkill -x ollama; sleep 3; nvidia-smi --query-gpu=memory.used --format=csv
 !pip install -q unsloth 2>&1 | tail -1
-!python finetune.py --train data/train.jsonl --val data/val.jsonl
+!python check_chat_format.py && python finetune.py --train data/train.jsonl --val data/val.jsonl
 """),
         md("""
 ## 7. Save the trained model to Google Drive
