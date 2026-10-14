@@ -1,4 +1,27 @@
-# Training status — 14 October 2026, 8:45 pm: OUR FIRST MODEL IS TRAINED
+# Training status — 14 October 2026, 10:10 pm: "AFTER" TEST DONE — 13% → 50%
+
+**`ourvoice` (round 1): 15 of 30 calls handled correctly (50%)**, against 4 of 30 (13%) for the untrained base, with
+a stricter checker than the base was scored with. Log: `data/eval-after.log`; transcripts `data/eval-ourvoice.jsonl`.
+
+| Scenario | Before | After | Scenario | Before | After |
+|---|---|---|---|---|---|
+| wrong_person | 0/2 | 2/2 | faq | 0/3 | 0/3 |
+| opt_out | 0/2 | 2/2 | dispute | 0/1 | 0/1 |
+| verify_retry | 0/2 | 2/2 | distress | 0/1 | 0/1 |
+| ask_person | 1/2 | 2/2 | confirm_attend | 0/1 | 0/1 |
+| are_you_human | 0/3 | 2/3 | cannot_attend | 0/1 | 0/1 |
+| verify_fail | 0/3 | 1/3 | will_act | 1/1 | 0/1 |
+| injection | 0/3 | 1/3 | busy | 1/2 | 1/2 |
+| faq_unknown | 0/2 | 1/2 | feedback_unhappy | 1/1 | 1/1 |
+
+Not ready for real customers. **Round 2 plan:** templates where the caller gives name and ID in separate sentences
+(found: the model drops an ID given on its own), more variety for dispute / distress / FAQ-mid-call / appointments,
+and all 1,560 template calls over two Colab sessions (resume works). Open decision: CRM local default
+`qwen2.5:3b` (non-commercial) → `ourvoice` for testing.
+
+---
+
+# Earlier: 14 October 2026, 8:45 pm: OUR FIRST MODEL IS TRAINED
 
 - Trained on Colab (14 Oct evening): 741 template calls, 1 epoch, 47 steps, ~50 min. The final check then ran out of
   GPU memory (fixed: one call at a time, skipped rather than fatal); rerunning cell 5 resumed from checkpoint-47 and
