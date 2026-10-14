@@ -59,17 +59,19 @@ python evaluate.py --model qwen3:4b-instruct # score BEFORE training, to compare
 
 ### Train (free, on Google Colab)
 
-The laptop has no NVIDIA GPU, so training runs on Colab's free T4 GPU. The data is made-up people only.
+The laptop has no NVIDIA GPU, so Colab's free T4 GPU does the heavy work: it also writes model-written calls with
+a bigger teacher (`qwen2.5:14b`, Apache 2.0) far faster than the laptop can. The data is made-up people only.
 
-1. Open <https://colab.research.google.com>, **New notebook**, then **Runtime → Change runtime type → T4 GPU**.
-2. In the Files panel on the left, upload `data/train.jsonl`, `data/val.jsonl` and `finetune.py`.
-3. Run these two cells:
-   ```
-   !pip install unsloth
-   !python finetune.py
-   ```
-   About 30–60 minutes. At the end it shows one reply from the trained model.
-4. Download the `.gguf` file from `out/ourvoice-gguf/` (about 2.5 GB).
+```bash
+python make_colab_bundle.py      # -> out/colab-kit.zip and out/train-on-colab.ipynb
+```
+
+1. Open <https://colab.research.google.com>, **File → Upload notebook**, choose `out/train-on-colab.ipynb`.
+2. **Runtime → Change runtime type → T4 GPU**, then **Save**.
+3. In the Files panel on the left, upload `out/colab-kit.zip`.
+4. Run the cells from the top, one at a time (about 2½ hours in all): tests, Ollama with the teacher,
+   templates, 80 minutes of model-written calls (a copy is downloaded to your computer), the dataset, training,
+   and finally the trained model copied to your Google Drive (about 2.5 GB). Download it from Drive.
 
 ### Use the trained model
 

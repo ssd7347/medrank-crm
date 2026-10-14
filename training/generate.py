@@ -25,6 +25,9 @@ def main() -> None:
     ap.add_argument("--url", default="http://localhost:11434")
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--show", action="store_true", help="print every conversation")
+    ap.add_argument("--minutes", type=float, default=None,
+                    help="stop after this many minutes (on Colab, so there is time left to train)")
+    ap.add_argument("--out", default="generated.jsonl", help="file in data/ for the kept calls (default generated.jsonl)")
     a = ap.parse_args()
 
     models = installed_models(a.url)
@@ -32,7 +35,7 @@ def main() -> None:
         if m not in models and m + ":latest" not in models:
             raise SystemExit(f"Model {m} is not installed. Run:  ollama pull {m}\nInstalled: {', '.join(models)}")
 
-    good_path, bad_path = DATA / "generated.jsonl", DATA / "rejected.jsonl"
+    good_path, bad_path = DATA / a.out, DATA / "rejected.jsonl"
     done = len(read_jsonl(good_path))
     rng = random.Random(a.seed if a.seed is not None else time.time_ns())
     pairs = [(s, sc) for s in all_scripts() if s.name not in HELD_OUT_SCRIPTS for sc in for_script(s)]
@@ -42,6 +45,9 @@ def main() -> None:
     started, tried, kept_now = time.time(), 0, 0
     for script, scenario in itertools.cycle(pairs):
         if done >= a.count:
+            break
+        if a.minutes is not None and time.time() - started >= a.minutes * 60:
+            print(f"Time limit of {a.minutes:g} minutes reached: {kept_now} kept in this run, {done} in total.")
             break
         tried += 1
         t0 = time.time()

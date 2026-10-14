@@ -13,6 +13,7 @@ The base model must allow commercial use, because the CRM is sold: Qwen3-4B-Inst
 """
 
 import argparse
+import glob
 import inspect
 import json
 import os
@@ -103,8 +104,11 @@ def main() -> None:
     model.save_pretrained(f"{a.out}/ourvoice-lora")
     tok.save_pretrained(f"{a.out}/ourvoice-lora")
     model.save_pretrained_gguf(f"{a.out}/ourvoice-gguf", tok, quantization_method=a.quant)
-    gguf = [f for f in os.listdir(f"{a.out}/ourvoice-gguf") if f.endswith(".gguf")] if os.path.isdir(f"{a.out}/ourvoice-gguf") else []
-    print("\nSaved:", f"{a.out}/ourvoice-lora", *[f"{a.out}/ourvoice-gguf/{g}" for g in gguf], sep="\n  ")
+    # Unsloth versions differ in where they put the file (the folder itself, or one named ..._gguf beside it).
+    gguf = [g for g in glob.glob("**/*.gguf", recursive=True) if "ourvoice" in g or g.startswith(a.out)]
+    if not gguf:
+        sys.exit("Training finished but no .gguf file was written; the LoRA adapter is in " + f"{a.out}/ourvoice-lora")
+    print("\nSaved:", f"{a.out}/ourvoice-lora", *gguf, sep="\n  ")
     print("Download the .gguf file and follow README.md, 'Use the trained model'.")
 
 

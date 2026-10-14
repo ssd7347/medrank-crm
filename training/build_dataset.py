@@ -24,7 +24,9 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=11)
     a = ap.parse_args()
 
-    sources = {"templates.jsonl": 1, "generated.jsonl": a.generated_weight, "hand_written.jsonl": 3}
+    # Every generated*.jsonl counts: the laptop's and Colab's model-written calls alike.
+    sources = {"templates.jsonl": 1, **{p.name: a.generated_weight for p in sorted(DATA.glob("generated*.jsonl"))},
+               "hand_written.jsonl": 3}
     rows: list[tuple[dict, int]] = []
     seen, dropped = set(), collections.Counter()
     for name, weight in sources.items():
