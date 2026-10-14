@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import random
 import re
+import urllib.error
 
 from callkit import CONNECTED, MAX_ROUNDS, TOOLS, FakeCrm, new_call, ollama_chat, record, spoken
 from scenarios import Scenario
@@ -103,8 +104,14 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
         # ---- the agent answers, using tools as often as it needs (as LlmBrain.respond does)
         reminder = ""
         for _ in range(MAX_ROUNDS):
-            r = ollama_chat(agent_model, [{"role": "system", "content": hidden + reminder}] + history, TOOLS,
-                            temperature=agent_temperature, url=url, max_tokens=300)
+            try:
+                r = ollama_chat(agent_model, [{"role": "system", "content": hidden + reminder}] + history, TOOLS,
+                                temperature=agent_temperature, url=url, max_tokens=300)
+            except urllib.error.HTTPError as e:
+                # Ollama could not read the model's reply (usually a broken tool call): the model's mistake, so it
+                # counts against this call. On a real call the CRM hands over to a person in this case.
+                return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id,
+                              scenario.expect), f"the model's reply could not be read (Ollama error {e.code})"
             if not r["tool_calls"]:
                 text = spoken(r["content"])
                 if not text:

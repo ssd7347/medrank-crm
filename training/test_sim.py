@@ -92,6 +92,15 @@ class SimTest(unittest.TestCase):
         self.assertEqual(why, "")
         self.assertEqual(rec["messages"][3], {"role": "user", "content": "No, I'm not interested anymore."})
 
+    def test_an_unreadable_model_reply_fails_the_call_instead_of_stopping_the_test(self):
+        import urllib.error
+
+        def agent(msgs, reminded):
+            raise urllib.error.HTTPError("http://localhost:11434", 500, "Internal Server Error", {}, None)
+        rec, why = self.run_call(FakeModel(lambda m: "Yes, speaking.", agent), "Enquiry follow-up", "busy", coach=False)
+        self.assertEqual(why, "the model's reply could not be read (Ollama error 500)")
+        self.assertIsNotNone(rec)
+
     def test_a_tool_call_written_as_text_becomes_a_real_call(self):
         names = [t["function"]["name"] for t in callkit.TOOLS]
         text, calls = callkit.recover_written_calls('Thanks. logcalloutcome({"outcome_code": "NOT_INTERESTED"})', names)
