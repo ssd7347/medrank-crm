@@ -111,7 +111,16 @@ class Conv:
                 if bad:
                     said = self.rng.choice(["4 4 5 5 6 6", "12 June 1990", "889123", "I think it is 554433"]) if q.type != "DATE" else "3 March 1979"
                 answers[q.key] = said
-                self.caller(self.pick("It's {name}, and {said}.", "{name}. {said}.", "Sure. {name}, {said}.", name=name, said=said))
+                if self.rng.random() < 0.5:
+                    # Callers often give their name first and the number only when asked again: the agent must
+                    # wait for both and send both (round 1 sent the name alone and failed real callers).
+                    self.caller(self.pick("It's {name}.", "My name is {name}.", "This is {name}.", "{name}.", name=name))
+                    self.agent(self.pick("Thank you. And your {label}?", "Thanks, {first}. Could you also tell me your {label}?",
+                                         "Got it. And what is your {label}, please?", label=label_text(q.label)))
+                    self.caller(self.pick("It's {said}.", "{said}.", "Yes, it is {said}.", "One second. {said}.", said=said))
+                else:
+                    self.caller(self.pick("It's {name}, and {said}.", "{name}. {said}.", "Sure. {name}, {said}.",
+                                          "My name is {name} and it's {said}.", name=name, said=said))
             else:
                 if bad:
                     name = self.rng.choice(["Ramesh", "Sunil Varma"])
@@ -149,7 +158,10 @@ class Conv:
     def faq_question(self) -> tuple[str, str]:
         """What the caller says, and the question the agent searches for."""
         f = self.rng.choice(self.call.script.faqs)
-        return self.pick(f["question"], "Can I ask something? " + f["question"], "One question. " + f["question"]), f["question"]
+        q = f["question"]
+        low = q[0].lower() + q[1:]
+        return self.pick(q, "Can I ask something? " + q, "One question. " + q, "Before that, " + low,
+                         "Actually, I wanted to know. " + q, "Quick question. " + q, "Okay, but tell me, " + low), q
 
     def lead(self) -> str:
         """Thanks the caller and says why we are calling, unless the opening line already did."""
@@ -169,7 +181,7 @@ class Conv:
 # --------------------------------------------------------------------------------------------- flows
 
 WHEN_PAY = ["by this Friday", "tomorrow evening", "on the 20th", "by next Monday", "after my salary comes on the 1st",
-            "today itself", "this weekend"]
+            "today itself", "this weekend", "within two days", "by the end of this week", "on the 25th"]
 WHEN_CALL = ["this evening", "tomorrow morning", "after 5 pm", "Saturday morning", "in two hours", "tomorrow after lunch"]
 
 
@@ -204,31 +216,62 @@ def f_verify_retry(c: Conv) -> None:
     f_will_act(c, wrong=1)
 
 
-def f_dispute(c: Conv) -> None:
+DISPUTES = ["I already paid this last week, why are you calling me?", "That amount is wrong, I was charged twice.",
+            "I never agreed to this charge. I want a refund.", "This is not correct, I'm going to complain about this.",
+            "I have the receipt, I paid it on time. Your records are wrong.", "Why is it so high? This is not what I agreed to.",
+            "I want my money back for the extra charge.", "This is harassment, I'll talk to a lawyer about it.",
+            "I closed this account months ago. This is a mistake.", "Somebody else must have used my name, this isn't mine."]
+DISTRESS = ["I lost my job last month. I don't know how I will pay anything, everything is falling apart.",
+            "My father is in hospital and I have no money left. I really can't handle this right now.",
+            "Please, I'm already so stressed. I can't sleep because of these payments.",
+            "I'm going through a very bad time. My husband passed away and I can't think about this.",
+            "I don't know what to do anymore. I have nothing left, please stop.",
+            "My business shut down. I'm crying every day, I can't pay this now."]
+
+
+def payment_opening(c: Conv) -> bool:
+    """The caller answers, proves who they are and hears what is due; False if the identity check failed."""
     c.answer_opening()
     if c.needs_check() and not c.identity(0, c.lead()):
-        return fail_close(c)
+        fail_close(c)
+        return False
     rows = c.details()
-    c.agent(c.tell(rows) + " " + c.pick("When do you think you will be able to pay?", "Could you tell me when you plan to pay?"))
-    why = c.rng.choice(["I already paid this last week, why are you calling me?", "That amount is wrong, I was charged twice.",
-                        "I never agreed to this charge. I want a refund.", "This is not correct, I'm going to complain about this."])
-    c.caller(why)
+    c.agent(c.tell(rows) + " " + c.pick("When do you think you will be able to pay?", "Could you tell me when you plan to pay?",
+                                        "When would it be convenient to pay?"))
+    return True
+
+
+def f_dispute(c: Conv) -> None:
+    why = c.rng.choice(DISPUTES)
+    if c.rng.random() < 0.35:
+        # Disputed straight away, before any detail is shared: hand over at once, no identity check needed.
+        c.answer_opening()
+        c.intro()
+        c.caller(why)
+    elif payment_opening(c):
+        c.caller(why)
+    else:
+        return
     res = c.tool("request_human_handoff", {"reason_code": "COMPLAINT_OR_DISPUTE", "summary": f"Caller disputes the amount: \"{why}\""})
-    c.handover(res, c.pick("I understand, and I'm sorry for the trouble.", "I'm sorry about this, a person from our team will look into it."))
+    c.handover(res, c.pick("I understand, and I'm sorry for the trouble.", "I'm sorry about this, a person from our team will look into it.",
+                           "I understand, I'll make sure the right person checks this for you."))
 
 
 def f_distress(c: Conv) -> None:
-    c.answer_opening()
-    if c.needs_check() and not c.identity(0, c.lead()):
-        return fail_close(c)
-    rows = c.details()
-    c.agent(c.tell(rows) + " " + c.pick("When do you think you will be able to pay?", "When would it be convenient to pay?"))
-    c.caller(c.rng.choice(["I lost my job last month. I don't know how I will pay anything, everything is falling apart.",
-                           "My father is in hospital and I have no money left. I really can't handle this right now.",
-                           "Please, I'm already so stressed. I can't sleep because of these payments."]))
+    said = c.rng.choice(DISTRESS)
+    if c.rng.random() < 0.35:
+        c.answer_opening()
+        c.intro()
+        c.caller(said)
+    elif payment_opening(c):
+        c.caller(said)
+    else:
+        return
     res = c.tool("request_human_handoff", {"reason_code": "DISTRESS", "summary": "Caller is in financial and emotional difficulty and needs a person to talk to about options."},
-                 c.pick("I'm really sorry to hear that. That sounds very hard.", "I'm so sorry you are going through this."))
-    c.handover(res, c.pick("Someone from our team will talk you through your options.", "Please don't worry about this call."), "Take care, goodbye.")
+                 c.pick("I'm really sorry to hear that. That sounds very hard.", "I'm so sorry you are going through this.",
+                        "I'm sorry, that sounds really difficult."))
+    c.handover(res, c.pick("Someone from our team will talk you through your options.", "Please don't worry about this call.",
+                           "A person from our team will help you with this."), "Take care, goodbye.")
 
 
 def f_confirm_attend(c: Conv, wrong: int = 0) -> None:
@@ -236,10 +279,13 @@ def f_confirm_attend(c: Conv, wrong: int = 0) -> None:
     if c.needs_check() and not c.identity(wrong, c.lead()):
         return fail_close(c)
     rows = c.details()
-    c.agent(c.tell(rows) + c.pick(" Will you be able to come?", " Can you make it?", " Will that time work for you?"))
-    c.caller(c.pick("Yes, I'll be there.", "Yes, that works.", "Yes, I remember. I will come.", "Sure, I'll come on time."))
+    c.agent(c.tell(rows) + c.pick(" Will you be able to come?", " Can you make it?", " Will that time work for you?",
+                                  " Is that still fine for you?"))
+    c.caller(c.pick("Yes, I'll be there.", "Yes, that works.", "Yes, I remember. I will come.", "Sure, I'll come on time.",
+                    "Yes yes, no problem.", "Okay, I'll come. Thanks for reminding me.", "Yes, I'll be there with my documents."))
     c.close("ACKNOWLEDGED", "Confirmed they will attend.",
-            c.pick("Wonderful, we'll see you then. Thank you, goodbye.", "Thank you for confirming, {first}. See you then, goodbye."))
+            c.pick("Wonderful, we'll see you then. Thank you, goodbye.", "Thank you for confirming, {first}. See you then, goodbye.",
+                   "Great, that's noted. Thank you and goodbye."))
 
 
 def f_cannot_attend(c: Conv) -> None:
@@ -247,8 +293,10 @@ def f_cannot_attend(c: Conv) -> None:
     if c.needs_check() and not c.identity(0, c.lead()):
         return fail_close(c)
     rows = c.details()
-    c.agent(c.tell(rows) + c.pick(" Will you be able to come?", " Can you make it?"))
-    c.caller(c.pick("No, I can't make it that day.", "Actually I'm travelling then. Can we change it?", "That doesn't work for me, sorry."))
+    c.agent(c.tell(rows) + c.pick(" Will you be able to come?", " Can you make it?", " Is that still fine for you?"))
+    c.caller(c.pick("No, I can't make it that day.", "Actually I'm travelling then. Can we change it?", "That doesn't work for me, sorry.",
+                    "I have office that day. Can I come another day?", "No, something came up. I need a different time.",
+                    "I'm not well, I can't come. Please move it."))
     c.agent(c.pick("No problem. I can ask our team to call you to rebook. When is a good time for them to call?",
                    "That's fine. Shall someone from our team call you to find a new time? When suits you?"))
     when = c.rng.choice(WHEN_CALL)
@@ -469,6 +517,7 @@ class Scenario:
     known: bool = True
     wrong_answers: int = 0          # for the simulated caller: how many wrong identity answers to give
     extra: dict = field(default_factory=dict)
+    weight: int = 1                 # how many times more template calls than the others (set in WEIGHTS)
 
 
 S = Scenario
@@ -520,6 +569,12 @@ SCENARIOS = [
       "You are a new customer who rang to ask a general question, then you want someone to call you back. Give your name when asked.",
       known=False),
 ]
+
+# Round 2 (15 Oct): twice as many examples of what round 1 got wrong in the "after" test.
+WEIGHTS = {"dispute": 2, "distress": 2, "faq": 2, "confirm_attend": 2, "cannot_attend": 2, "will_act": 2,
+           "verify_fail": 2, "injection": 2}
+for _s in SCENARIOS:
+    _s.weight = WEIGHTS.get(_s.id, 1)
 
 # Scenarios held back from training so evaluate.py tests the model on something it has not memorised.
 HELD_OUT_SCRIPTS = {"Overdue follow-up", "Site visit reminder"}

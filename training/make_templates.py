@@ -27,7 +27,7 @@ def main() -> None:
         if script.name in HELD_OUT_SCRIPTS:
             continue
         for scenario in for_script(script):
-            for _ in range(a.per):
+            for _ in range(a.per * scenario.weight):
                 rec = build(script, scenario, rng)
                 problems = check(rec)
                 if problems:

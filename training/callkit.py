@@ -214,7 +214,11 @@ def make_person(script: Script, rng: random.Random) -> Person:
                 d = dt.date(rng.randint(1962, 2004), rng.randint(1, 12), rng.randint(1, 28))
                 said[k] = rng.choice([f"{d.day} {d:%B} {d.year}", f"{d.day:02d}/{d.month:02d}/{d.year}", f"{d:%B} {d.day}, {d.year}"])
             else:
+                # Each date different: a public date equal to a private one would look like a privacy leak.
+                taken = set(values.values())
                 d = TODAY + dt.timedelta(days=rng.randint(2, 20))
+                while d.isoformat() in taken:
+                    d += dt.timedelta(days=1)
                 said[k] = spoken_date(d)
             values[k] = d.isoformat()
         elif f.type == "AMOUNT":

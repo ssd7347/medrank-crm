@@ -1,4 +1,22 @@
-# Training status — 14 October 2026, 10:10 pm: "AFTER" TEST DONE — 13% → 50%
+# Training status — 15 October 2026: ROUND 2 DATA READY
+
+Round 2 templates (tested: 1,062 calls pass every check over 5 seeds; 24 kit tests OK; real-tokenizer format check
+1,009 train calls, 0 problems, longest 2,323 tokens):
+- the caller gives their name first and the ID only when asked again (round 1 dropped an ID given on its own);
+- 10 dispute and 6 distress phrasings, a third of them before any detail is shared (hand over at once);
+- more phrasings for FAQ questions mid-call, appointments (confirm / cannot attend) and payment promises;
+- double weight for what round 1 failed: dispute, distress, faq, confirm_attend, cannot_attend, will_act,
+  verify_fail, injection;
+- each person's dates are distinct (a public date equal to a private one looked like a privacy leak).
+Colab notebook: new Drive folder `MyDrive/ourvoice-training-r2` (reusing round 1's would resume at its finished
+checkpoint and skip training), a Drive free-space check (≥1.5 GB) before training, ~64 steps ≈ 70 min, and the model
+file renamed `ourvoice-r2.Q4_K_M.gguf` for a direct download from the Files panel. Files: `Desktop\Colab training`.
+**Next:** free Drive space (delete `MyDrive/ourvoice-training/checkpoints` and its `.gguf`, empty Trash), run the
+notebook, download the file, `make_modelfile.py <file> --name ourvoice-r2 --create`, `evaluate.py --model ourvoice-r2`.
+
+---
+
+# Earlier: 14 October 2026, 10:10 pm: "AFTER" TEST DONE — 13% → 50%
 
 **`ourvoice` (round 1): 15 of 30 calls handled correctly (50%)**, against 4 of 30 (13%) for the untrained base, with
 a stricter checker than the base was scored with. Log: `data/eval-after.log`; transcripts `data/eval-ourvoice.jsonl`.
