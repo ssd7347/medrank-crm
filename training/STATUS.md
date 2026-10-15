@@ -1,4 +1,22 @@
-# Training status — 15 October 2026: ROUND 2 DATA READY
+# Training status — 15 October 2026, 1:15 pm: ROUND 2 TRAINED, MODEL FILE NOT BUILT YET
+
+Round 2 trained on Colab (1,009 calls, 64 steps, ~55 s/step; loss 1.654 → 0.633 → 0.244 → 0.157 at step 25 →
+0.115 at step 35). The runtime then disconnected while converting to GGUF, and Colab refused a new GPU (daily free
+usage limit). **Saved on Google Drive (user checked): `MyDrive/ourvoice-training-r2/ourvoice-lora` and
+`checkpoints/checkpoint-64`.**
+
+**Next session (after the GPU limit resets, ~24 h):** open the same notebook (Drive `train-on-colab.ipynb`, the
+"Round 2" one), Runtime → T4 GPU, upload `Desktop\Colab training\colab-kit.zip`, run cells 1–4, then cell 5 — it must
+say "Carrying on from …/ourvoice-training-r2/checkpoints/checkpoint-64", skips training and only builds the model
+file (~25 min) — then cell 6 and download `ourvoice-r2.Q4_K_M.gguf` from the Files panel. On the laptop:
+`python make_modelfile.py C:\Users\sivas\Downloads\ourvoice-r2.Q4_K_M.gguf --name ourvoice-r2 --create`, then
+`python -u evaluate.py --model ourvoice-r2 > data/eval-r2.log` and compare with round 1 (50%).
+Fallback if Colab keeps refusing a GPU: build the GGUF from `ourvoice-lora` on a CPU (peft merge + llama.cpp) — new
+code, test it first.
+
+---
+
+# Earlier: 15 October 2026 — ROUND 2 DATA READY
 
 Round 2 templates (tested: 1,062 calls pass every check over 5 seeds; 24 kit tests OK; real-tokenizer format check
 1,009 train calls, 0 problems, longest 2,323 tokens):
