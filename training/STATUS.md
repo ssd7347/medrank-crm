@@ -1,4 +1,22 @@
-# Training status — 15 October 2026, 1:15 pm: ROUND 2 TRAINED, MODEL FILE NOT BUILT YET
+# Training status — 21 October 2026, 10:40 pm: ROUND 2 "AFTER" TEST AT 26/30
+
+Round 2 model built (Colab resumed at checkpoint-64 and only built the file) and loaded as **`ourvoice-r2`**
+(`C:\Users\sivas\Downloads\ourvoice-r2.Q4_K_M.gguf`, GGUF v3, 398 tensors). "After" test stopped at 26 of 30 when
+the laptop was shut down: **10 of 26 passed (38%)** — round 1 had 13 of 26 at the same point (final 15/30 = 50%).
+Finish it: `python -u evaluate.py --model ourvoice-r2 > data/eval-r2b.log` (skips the 26 done; per-call results in
+`data/eval-ourvoice-r2.jsonl`, log `data/eval-r2.log`).
+
+Round 2 vs round 1 so far: better on dispute (✅ vs ❌) and are_you_human (2/2); worse on opt_out, busy,
+wrong_person, faq_unknown — mostly **calls ending without log_call_outcome**.
+**New round 2 bug:** verify_identity puts the answers inside the name, e.g.
+`{"full_name": "Rahul Fernandes, answers: {'loan_account_number': '756166'}"}` → genuine callers fail the check.
+Also the identity question repeats the script ("After verification, I can share the amount…") → too long.
+Plan (after the test, test everything first): CRM safety net to read answers written inside full_name; checker
+rule rejecting it; round 3 with 2 epochs (one pass was not enough to fix the nested `answers` format).
+
+---
+
+# Earlier: 15 October 2026, 1:15 pm: ROUND 2 TRAINED, MODEL FILE NOT BUILT YET
 
 Round 2 trained on Colab (1,009 calls, 64 steps, ~55 s/step; loss 1.654 → 0.633 → 0.244 → 0.157 at step 25 →
 0.115 at step 35). The runtime then disconnected while converting to GGUF, and Colab refused a new GPU (daily free
