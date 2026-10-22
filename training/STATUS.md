@@ -1,4 +1,23 @@
-# Training status — 21 October 2026, 10:40 pm: ROUND 2 "AFTER" TEST AT 26/30
+# Training status — 22 October 2026: ROUND 2 FINAL 12/30 (40%) — ROUND 1 STAYS THE BEST
+
+| Model | Score on the 30 test calls |
+|---|---|
+| untrained qwen3:4b-instruct | 4/30 (13%) |
+| **`ourvoice` (round 1)** | **15/30 (50%) — best so far, keep it** |
+| `ourvoice-r2` (round 2) | 12/30 (40%) |
+
+Round 2 per scenario: are_you_human 3/3, ask_person 2/2, dispute 1/1, feedback_unhappy 1/1, faq 1/3, opt_out 1/2,
+verify_fail 1/3, verify_retry 1/2, wrong_person 1/2; busy 0/2, faq_unknown 0/2, injection 0/3, cannot_attend 0/1,
+confirm_attend 0/1, distress 0/1, will_act 0/1. Log `data/eval-r2.log` + `data/eval-r2b.log`.
+Main failures: calls end without log_call_outcome; verify_identity with the answers written inside full_name;
+the identity question repeats the script (too long); one unreadable reply (Ollama 500).
+**Before any round 3** (decide with the user; test everything first): find out why round 2 lost the "record the
+outcome" habit (compare its transcripts with round 1's on the same tests), add the CRM safety net for answers
+inside full_name and a checker rule for it, then consider 2 epochs on the round 2 data.
+
+---
+
+# Earlier: 21 October 2026, 10:40 pm: ROUND 2 "AFTER" TEST AT 26/30
 
 Round 2 model built (Colab resumed at checkpoint-64 and only built the file) and loaded as **`ourvoice-r2`**
 (`C:\Users\sivas\Downloads\ourvoice-r2.Q4_K_M.gguf`, GGUF v3, 398 tensors). "After" test stopped at 26 of 30 when
