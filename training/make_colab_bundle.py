@@ -21,11 +21,13 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 OUT = HERE / "out"
 
-PER = 6                     # variations of each script x scenario (x2 for weak ones): ~1,010 calls, ~64 steps, ~70 min
-EPOCHS = 1
+ROUND = 3
+PER = 6                     # variations of each script x scenario (x2-3 for weak ones): ~1,020 calls, ~64 steps, ~70 min
+EPOCHS = 1                  # round 1 (the best so far) used 1; round 2's loss was already ~0.1 by step 35
 # Survives a disconnect. A new folder per round: training "carries on" from any checkpoint it finds, so reusing
-# round 1's folder would skip round 2 entirely.
-KEEP = "/content/drive/MyDrive/ourvoice-training-r2"
+# an earlier round's folder would skip this round's training entirely.
+KEEP = f"/content/drive/MyDrive/ourvoice-training-r{ROUND}"
+GGUF = f"ourvoice-r{ROUND}.Q4_K_M.gguf"
 NEED_GB = 1.5               # Drive space for two checkpoints and the trained adapter
 KIT = "/content/kit/training"
 
@@ -54,7 +56,7 @@ def notebook() -> dict:
         md(f"""
 # Train our own voice-agent model
 
-Round 2. Free Google Colab GPU, **about 1½ hours**. Run the cells **in order, from the top**, one at a time.
+Round {ROUND}. Free Google Colab GPU, **about 1½ hours**. Run the cells **in order, from the top**, one at a time.
 
 1. **Runtime → Change runtime type → T4 GPU**, then **Save**.
 2. Upload **colab-kit.zip** in the Files panel on the left (folder icon).
@@ -80,8 +82,9 @@ drive.mount("/content/drive")
 free_gb = shutil.disk_usage("/content/drive/MyDrive").free / 1e9
 print(f"Google Drive free space: {{free_gb:.1f}} GB")
 if free_gb < {NEED_GB}:
-    raise SystemExit("Not enough Google Drive space (need {NEED_GB} GB). In Drive, delete MyDrive/ourvoice-training/checkpoints "
-                     "and any .gguf file there, empty the Trash, then run this cell again.")
+    raise SystemExit("Not enough Google Drive space (need {NEED_GB} GB). In Drive, delete the checkpoints folders inside "
+                     "MyDrive/ourvoice-training and MyDrive/ourvoice-training-r2 (keep ourvoice-lora) and any .gguf file there, "
+                     "empty the Trash, then run this cell again.")
 !mkdir -p {KEEP} && echo "Saving to {KEEP}"
 """),
         md("## 3. Install the training tool (3–5 minutes)"),
@@ -103,21 +106,21 @@ it carries on from the last saved step.
 {here}
 !if grep -q " 0 with problems" check.log; then python finetune.py --train data/train.jsonl --val data/val.jsonl --epochs {EPOCHS} --keep {KEEP}; else echo "Not trained: run cell 4 first; it must say '0 with problems'"; fi
 """),
-        md("""
+        md(f"""
 ## 6. Download the trained model
 
 About 2.5 GB. This cell gives it a clear name; then download it from the **Files** panel on the left: open the
-folder it names, right-click **ourvoice-r2.Q4_K_M.gguf** → **Download**, and keep this tab open until it finishes.
+folder it names, right-click **{GGUF}** → **Download**, and keep this tab open until it finishes.
 """),
         code(f"""
 import glob, os, shutil
-found = [f for f in glob.glob("{KIT}/**/*.gguf", recursive=True) if not f.endswith("ourvoice-r2.Q4_K_M.gguf")]
-if not found and not glob.glob("{KIT}/**/ourvoice-r2.Q4_K_M.gguf", recursive=True):
+found = [f for f in glob.glob("{KIT}/**/*.gguf", recursive=True) if not f.endswith("{GGUF}")]
+if not found and not glob.glob("{KIT}/**/{GGUF}", recursive=True):
     print("No .gguf file found: send a screenshot of cell 5")
 for f in found:
-    target = os.path.join(os.path.dirname(f), "ourvoice-r2.Q4_K_M.gguf")
+    target = os.path.join(os.path.dirname(f), "{GGUF}")
     shutil.move(f, target)
-for f in glob.glob("{KIT}/**/ourvoice-r2.Q4_K_M.gguf", recursive=True):
+for f in glob.glob("{KIT}/**/{GGUF}", recursive=True):
     print(f"Ready to download ({{os.path.getsize(f) / 1e9:.1f}} GB):", f.replace("/content/", "Files panel → "))
 """),
     ]

@@ -226,7 +226,11 @@ DISTRESS = ["I lost my job last month. I don't know how I will pay anything, eve
             "Please, I'm already so stressed. I can't sleep because of these payments.",
             "I'm going through a very bad time. My husband passed away and I can't think about this.",
             "I don't know what to do anymore. I have nothing left, please stop.",
-            "My business shut down. I'm crying every day, I can't pay this now."]
+            "My business shut down. I'm crying every day, I can't pay this now.",
+            # Round 3: quieter hardship is DISTRESS too, not a dispute (round 2 called a lay-off a dispute).
+            "I was recently laid off and I'm not sure how I'll manage this payment. Can you help me?",
+            "I have no income right now. I really don't know how I will pay this.",
+            "We have big medical bills at home. I'm struggling to pay anything this month."]
 
 
 def payment_opening(c: Conv) -> bool:
@@ -281,8 +285,18 @@ def f_confirm_attend(c: Conv, wrong: int = 0) -> None:
     rows = c.details()
     c.agent(c.tell(rows) + c.pick(" Will you be able to come?", " Can you make it?", " Will that time work for you?",
                                   " Is that still fine for you?"))
-    c.caller(c.pick("Yes, I'll be there.", "Yes, that works.", "Yes, I remember. I will come.", "Sure, I'll come on time.",
-                    "Yes yes, no problem.", "Okay, I'll come. Thanks for reminding me.", "Yes, I'll be there with my documents."))
+    yes = c.pick("Yes, I'll be there.", "Yes, that works.", "Yes, I remember. I will come.", "Sure, I'll come on time.",
+                 "Yes yes, no problem.", "Okay, I'll come. Thanks for reminding me.", "Yes, I'll be there with my documents.",
+                 # Round 3: "I will be coming" is a confirmation (ACKNOWLEDGED); round 1 logged it as WILL_ACT.
+                 "Yes, that's correct. I will be coming on that date.", "Yes, I'm still planning to attend.")
+    if c.call.script.faqs and c.rng.random() < 0.3:
+        # Round 3: a question asked while confirming is answered from search_faq before the call is closed
+        # (round 1 said goodbye and left "When and where do I need to be there?" unanswered).
+        said, q = c.faq_question()
+        c.caller(yes + " " + said)
+        res = c.tool("search_faq", {"query": q})
+        c.agent((res.get("say") or "I'm sorry, I don't have that information.") + c.pick(" Is there anything else?", " Does that help?"))
+        c.caller(c.pick("No, that's all. Thank you.", "Okay, that helps. Thanks."))
     c.close("ACKNOWLEDGED", "Confirmed they will attend.",
             c.pick("Wonderful, we'll see you then. Thank you, goodbye.", "Thank you for confirming, {first}. See you then, goodbye.",
                    "Great, that's noted. Thank you and goodbye."))
@@ -294,14 +308,26 @@ def f_cannot_attend(c: Conv) -> None:
         return fail_close(c)
     rows = c.details()
     c.agent(c.tell(rows) + c.pick(" Will you be able to come?", " Can you make it?", " Is that still fine for you?"))
-    c.caller(c.pick("No, I can't make it that day.", "Actually I'm travelling then. Can we change it?", "That doesn't work for me, sorry.",
-                    "I have office that day. Can I come another day?", "No, something came up. I need a different time.",
-                    "I'm not well, I can't come. Please move it."))
-    c.agent(c.pick("No problem. I can ask our team to call you to rebook. When is a good time for them to call?",
-                   "That's fine. Shall someone from our team call you to find a new time? When suits you?"))
+    reason = "Cannot attend and wants to rebook."
+    if c.rng.random() < 0.4:
+        # Round 3: the caller suggests a day. The agent cannot rebook and never offers a date of its own (round 1
+        # invented "Thursday, 20th"); it passes the wish to the team with a call-back.
+        day = c.rng.choice(["Saturday", "next Monday", "next week", "Sunday morning", "the 28th"])
+        c.caller(c.pick("Can you reschedule it? My week is tight. Can I come {day} instead?",
+                        "That day is difficult. Can we move it to {day}?", "Can I come {day} instead?", day=day))
+        c.agent(c.pick("I can't change the booking myself, but our team can. When should they call you to fix {day}?",
+                       "I'm not able to rebook it here, but I'll ask our team to arrange {day}. When is a good time for them to call?",
+                       day=day))
+        reason = f"Cannot attend; would like to come {day} instead."
+    else:
+        c.caller(c.pick("No, I can't make it that day.", "Actually I'm travelling then. Can we change it?", "That doesn't work for me, sorry.",
+                        "I have office that day. Can I come another day?", "No, something came up. I need a different time.",
+                        "I'm not well, I can't come. Please move it.", "Can you reschedule it? My schedule is tight this week."))
+        c.agent(c.pick("No problem. I can ask our team to call you to rebook. When is a good time for them to call?",
+                       "That's fine. Shall someone from our team call you to find a new time? When suits you?"))
     when = c.rng.choice(WHEN_CALL)
     c.caller(c.pick("{when} is fine.", "Please call {when}.", "Yes, {when} works.", when=when))
-    res = c.tool("schedule_callback", {"preferred_time_text": when, "reason": "Cannot attend and wants to rebook."})
+    res = c.tool("schedule_callback", {"preferred_time_text": when, "reason": reason})
     c.close("CALLBACK_REQUESTED", f"Wants to rebook; asked for a call {when}.", f"{res.get('say', '')} Thank you, goodbye.")
 
 
@@ -354,9 +380,13 @@ def f_opt_out(c: Conv) -> None:
     c.answer_opening()
     c.intro()
     all_calls = c.rng.random() < 0.4
-    c.caller(c.pick("Don't call me at all again. Remove my number.", "Please never call this number again.") if all_calls
+    # Round 3: an annoyed "stop calling me" is still an opt-out, not a complaint (round 1 handed it over as a dispute).
+    c.caller(c.pick("Don't call me at all again. Remove my number.", "Please never call this number again.",
+                    "Why do you keep calling? Take my number off your list.", "I'm fed up with these calls. Never call me again.")
+             if all_calls
              else c.pick("Please stop these AI calls.", "I don't want calls from a robot. Don't call me again.",
-                         "Stop calling me with these recorded calls."))
+                         "Stop calling me with these recorded calls.", "Can you please stop calling me like this? It's annoying.",
+                         "You people call too often. Please stop these calls.", "Stop calling me so frequently, I don't want these calls."))
     res = c.tool("opt_out", {"scope": "ALL_CALLS" if all_calls else "AI_CALLS"})
     c.agent(c.pick("{say} Sorry for the trouble, goodbye.", "{say} Have a good day, goodbye.", say=res.get("say", "")))
 
@@ -367,8 +397,11 @@ def f_ask_person(c: Conv) -> None:
     else:
         c.answer_opening()
         c.intro()
+        # Round 3: wanting a person, even said crossly, is CALLER_REQUEST (round 2 called it a dispute).
         c.caller(c.pick("Can I talk to a real person please?", "I'd rather speak to someone from your office.",
-                        "Put me through to a human."))
+                        "Put me through to a human.", "Why aren't you sending an actual human? Can I speak to someone?",
+                        "I don't want to talk to a machine. Give me a person.",
+                        "Is there someone from your team I can talk to about my account?"))
     res = c.tool("request_human_handoff", {"reason_code": "CALLER_REQUEST", "summary": f"Asked to speak to a person about {c.topic}."})
     c.handover(res, c.pick("Of course.", "Sure, no problem."))
 
@@ -571,7 +604,10 @@ SCENARIOS = [
 ]
 
 # Round 2 (15 Oct): twice as many examples of what round 1 got wrong in the "after" test.
-WEIGHTS = {"dispute": 2, "distress": 2, "faq": 2, "confirm_attend": 2, "cannot_attend": 2, "will_act": 2,
+# Round 3 (23 Oct): dispute back to 1 (double weight made round 2 call every hand-over a dispute); ask_person and
+# opt_out stay at 1 as in round 1, which got both right, now with the phrasings round 1/2 misread; the two
+# appointment scenarios (only three scripts have them) get 3.
+WEIGHTS = {"distress": 2, "faq": 2, "confirm_attend": 3, "cannot_attend": 3, "will_act": 2,
            "verify_fail": 2, "injection": 2}
 for _s in SCENARIOS:
     _s.weight = WEIGHTS.get(_s.id, 1)

@@ -1,7 +1,43 @@
 <!-- LIVE PROGRESS START -->
-## Live re-score progress (updated 23 Oct 2026, 06:53 PM by status_watch.py)
-- `eval-base-fixed.log`: 1 of 30 calls done in this log, 0 passed (a resumed run only lists the calls it ran). Latest: [2] FAIL Overdue follow-up / verify_retry: message 4: too long to speak (36 words)
+## Live re-score progress (updated 23 Oct 2026, 07:16 PM by status_watch.py)
+- `eval-base-fixed.log`: 8 of 30 calls done in this log, 2 passed (a resumed run only lists the calls it ran). Latest: [9] PASS Overdue follow-up / ask_person
 <!-- LIVE PROGRESS END -->
+
+# DELIVERY PLAN (agreed 23 Oct 2026): client hand-over ~23 Nov 2026, real phone calls
+
+Brain: our own model; **checkpoint 6 Nov** — pass mark ≥ 85% of a 60-call test (with the CRM safety net), zero
+private details before verification, reply starts within ~2 s on a phone; otherwise switch to the Claude API.
+| Week | Work | User |
+|---|---|---|
+| 1 (– 30 Oct) | round 3 data; reply-speed test; phone-platform comparison; endpoint the platform calls | pick provider, start sign-up/KYC |
+| 2 (– 6 Nov) | 60-call test; connect platform; first real call to the user's phone | run round 3 on Colab |
+| 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
+| 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
+
+# 23 October 2026, night: ROUND 3 KIT READY (user runs it on Colab)
+
+Built from the failed re-score transcripts (`scenarios.py`, comments marked "Round 3"):
+- annoyed opt-outs ("stop calling me like this, it's annoying") → `opt_out`, not a dispute hand-over;
+- a person wanted, said crossly ("why aren't you sending an actual human?") → hand-over CALLER_REQUEST;
+- quieter hardship (laid off, no income, medical bills) → DISTRESS;
+- "I will be coming / still planning to attend" → ACKNOWLEDGED; 30% of confirmations also ask a question →
+  `search_faq`, answer, then close;
+- cannot attend: 40% of callers propose their own day → the agent says it cannot rebook, never offers a date, and
+  books a call-back with that wish;
+- weights: dispute back to 1 (round 2's double weight → every hand-over called a dispute); ask_person and opt_out
+  1 as in round 1; confirm_attend and cannot_attend 3.
+Checked: 1,074 template calls pass every check over 5 seeds; 28 kit tests OK, also from a clean unzip of the kit
+(1,021 train / 53 val calls, ~64 steps, ~70 min, 1 epoch). The real-tokenizer format check could not run on the laptop
+(`transformers` not installed); the notebook runs it as a gate before training (must say "0 with problems").
+Kit: `make_colab_bundle.py` now `ROUND = 3` → Drive folder `MyDrive/ourvoice-training-r3`, file
+`ourvoice-r3.Q4_K_M.gguf`. Fresh copies in `Desktop\Colab training` (19:16).
+**User:** Drive needs ≥ 1.5 GB free (else delete `MyDrive/ourvoice-training-r2/checkpoints`, keep `ourvoice-lora`,
+empty Trash); upload the notebook to Colab, T4 GPU, upload colab-kit.zip, run cells 1–6, download the .gguf to
+Downloads. **Then me:** `python make_modelfile.py C:\Users\sivas\Downloads\ourvoice-r3.Q4_K_M.gguf --name ourvoice-r3 --create`
+and the 60-call test. To decide before that test: `evaluate.py --calls 60` fills the extra 30 with training scripts
+(new callers, but scripts the model has seen) — consider holding out more scripts instead.
+
+---
 
 # 23 October 2026, evening: CRM SAFETY NET ADDED (call-back / identity lock-out)
 
