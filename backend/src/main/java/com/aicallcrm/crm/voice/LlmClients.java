@@ -84,9 +84,15 @@ final class LlmClients {
             return r.toolCalls().isEmpty() ? recoverWrittenCalls(r.text(), tools, mapper) : r;
         }
 
+        /**
+         * The tools travel inside the system prompt, written exactly as our model saw them in training, and are not
+         * sent as {@code tools}: Ollama's own tool support mangles nested arguments (verify_identity's
+         * {@code {"full_name": ..., "answers": {...}}} came back as {@code {"full_name": "Name, answers: {"}} although
+         * the model wrote it correctly). The model's {@code <tool_call>} text is read by {@link #recoverWrittenCalls}.
+         */
         private Map<String, Object> body(String system, List<Message> messages, List<ToolSpec> tools, int maxTokens) {
             List<Map<String, Object>> msgs = new ArrayList<>();
-            msgs.add(Map.of("role", "system", "content", system));
+            msgs.add(Map.of("role", "system", "content", tools.isEmpty() ? system : system + "\n\n" + toolsInText(tools)));
             for (Message m : messages) {
                 Map<String, Object> x = new LinkedHashMap<>();
                 x.put("role", m.role());
@@ -107,8 +113,6 @@ final class LlmClients {
             body.put("max_tokens", maxTokens);
             body.put("temperature", 0.3);
             body.put("stream", false);
-            body.put("tools", tools.stream().map(t -> Map.of("type", "function", "function",
-                    Map.of("name", t.name(), "description", t.description(), "parameters", t.inputSchema()))).toList());
             // Keep the model loaded between turns of a call.
             body.put("keep_alive", "30m");
             return body;
@@ -139,6 +143,71 @@ final class LlmClients {
         }
     }
 
+    /**
+     * The tool list as the Qwen3 chat template writes it, and so as the training text has it
+     * ({@code training/callkit.py} tools_in_system): one tool per line, keys sorted, Python's JSON spacing.
+     */
+    static String toolsInText(List<ToolSpec> tools) {
+        StringBuilder s = new StringBuilder("# Tools\n\nYou may call one or more functions to assist with the user query.\n\n"
+                + "You are provided with function signatures within <tools></tools> XML tags:\n<tools>");
+        for (ToolSpec t : tools) {
+            s.append('\n').append(pythonJson(Map.of("type", "function", "function",
+                    Map.of("name", t.name(), "description", t.description(), "parameters", t.inputSchema()))));
+        }
+        return s.append("\n</tools>\n\nFor each function call, return a json object with function name and arguments within "
+                + "<tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call>")
+                .toString();
+    }
+
+    /** JSON as Python's {@code json.dumps(x, ensure_ascii=False)} writes it, with the keys sorted. */
+    static String pythonJson(Object x) {
+        if (x instanceof Map<?, ?> m) {
+            StringBuilder s = new StringBuilder("{");
+            new java.util.TreeMap<>(m).forEach((k, v) -> s.append(s.length() > 1 ? ", " : "")
+                    .append(pythonJson(String.valueOf(k))).append(": ").append(pythonJson(v)));
+            return s.append('}').toString();
+        }
+        if (x instanceof Iterable<?> list) {
+            StringBuilder s = new StringBuilder("[");
+            for (Object v : list) {
+                s.append(s.length() > 1 ? ", " : "").append(pythonJson(v));
+            }
+            return s.append(']').toString();
+        }
+        if (x instanceof Object[] arr) {
+            return pythonJson(List.of(arr));
+        }
+        if (x instanceof CharSequence str) {
+            StringBuilder s = new StringBuilder("\"");
+            str.chars().forEach(c -> {
+                switch (c) {
+                    case '"' -> s.append("\\\"");
+                    case '\\' -> s.append("\\\\");
+                    case '\n' -> s.append("\\n");
+                    case '\r' -> s.append("\\r");
+                    case '\t' -> s.append("\\t");
+                    case '\b' -> s.append("\\b");
+                    case '\f' -> s.append("\\f");
+                    default -> s.append(c < 0x20 ? String.format("\\u%04x", c) : String.valueOf((char) c));
+                }
+            });
+            return s.append('"').toString();
+        }
+        if (x == null) {
+            return "null";
+        }
+        if (x instanceof Boolean || x instanceof Integer || x instanceof Long || x instanceof Short) {
+            return String.valueOf(x);
+        }
+        if (x instanceof Number n) {
+            double d = n.doubleValue();
+            return d == Math.rint(d) && !Double.isInfinite(d) ? (long) d + ".0" : String.valueOf(d);
+        }
+        return pythonJson(String.valueOf(x));
+    }
+
+    /** Qwen's own format: every {@code <tool_call>{"name": ..., "arguments": {...}}</tool_call>} in a reply. */
+    private static final Pattern TOOL_CALL_TAG = Pattern.compile("(?s)<tool_call>\\s*(\\{.*?\\})\\s*</tool_call>");
     /** {@code <tool_call>{"name": ..., "arguments": {...}}</tool_call>}, or a bare JSON object of that shape. */
     private static final Pattern WRITTEN_JSON = Pattern.compile("(?s)(?:<tool_call>\\s*)?(\\{\\s*\"name\"\\s*:.*\\})\\s*(?:</tool_call>)?");
     /** {@code log_call_outcome({"outcome_code": "WILL_ACT"})}, sometimes with the underscores lost. */
@@ -161,8 +230,22 @@ final class LlmClients {
         }
         List<ToolCall> calls = new ArrayList<>();
         List<int[]> spans = new ArrayList<>();
+        Matcher tag = TOOL_CALL_TAG.matcher(text);
+        while (tag.find()) {
+            Map<String, Object> obj = readObject(tag.group(1), mapper);
+            String tool = obj == null || obj.get("name") == null ? null : names.get(String.valueOf(obj.get("name")));
+            Object a = obj == null ? null : obj.getOrDefault("arguments", Map.of());
+            if (a instanceof String json) {
+                a = readObject(json, mapper);
+            }
+            if (tool != null && a instanceof Map<?, ?> args) {
+                calls.add(new ToolCall("call_" + UUID.randomUUID(), tool, (Map<String, Object>) args));
+                spans.add(new int[] {tag.start(), tag.end()});
+            }
+        }
         Matcher f = WRITTEN_FUNCTION.matcher(text);
-        while (f.find()) {
+        boolean tagged = !calls.isEmpty();
+        while (!tagged && f.find()) {
             String tool = names.getOrDefault(f.group(1), names.get(squash(f.group(1))));
             Map<String, Object> args = readObject(f.group(2), mapper);
             if (tool != null && args != null) {

@@ -1,3 +1,97 @@
+<!-- LIVE PROGRESS START -->
+## Live re-score progress (updated 22 Oct 2026, 11:50 PM by status_watch.py)
+- `eval-r1-fixed.log`: **finished — 17/30**
+- `eval-r2-fixed.log`: **finished — 15/30**
+<!-- LIVE PROGRESS END -->
+
+# 23 October 2026, morning: RE-SCORE DONE — ROUND 1 17/30 (57%), ROUND 2 15/30 (50%)
+
+| Model | Old score (Ollama tools) | Re-scored (fixed harness) |
+|---|---|---|
+| untrained qwen3:4b-instruct | 4/30 | not re-scored yet |
+| **`ourvoice` (round 1)** | 15/30 | **17/30 (57%) — still the best** |
+| `ourvoice-r2` (round 2) | 12/30 | 15/30 (50%) |
+
+| Scenario | R1 | R2 | Scenario | R1 | R2 |
+|---|---|---|---|---|---|
+| are_you_human | 3/3 | 2/3 | faq | 1/3 | 3/3 |
+| ask_person | 2/2 | 0/2 | faq_unknown | 2/2 | 2/2 |
+| busy | 1/2 | 0/2 | feedback_unhappy | 1/1 | 1/1 |
+| cannot_attend | 0/1 | 1/1 | injection | 0/3 | 0/3 |
+| confirm_attend | 0/1 | 0/1 | opt_out | 1/2 | 1/2 |
+| dispute | 1/1 | 1/1 | verify_fail | 1/3 | 0/3 |
+| distress | 0/1 | 0/1 | verify_retry | 1/2 | 1/2 |
+| will_act | 1/1 | 1/1 | wrong_person | 2/2 | 2/2 |
+
+What is left, now that identity checks work:
+- **Asks for private details after a failed identity check** (`get_contact_details` → VERIFICATION_REQUIRED; the CRM
+  refuses, nothing leaks) — most verify_fail / injection failures, both rounds (R2 0/6).
+- **No outcome after `schedule_callback`** (busy, both rounds).
+- Round 2 hands over with the wrong reason or invents one (`WRONG_PERSON`), and once forgot to say it is an AI.
+- Round 1 sometimes says goodbye twice after the closing tool.
+- Some fails are the simulated caller not playing its part (e.g. a genuine caller in "injection"); with only 30 calls
+  a difference of 2 is within noise.
+Logs: `data/eval-r1-fixed.log`, `data/eval-r2-fixed.log`; transcripts `data/eval-ourvoice.jsonl`,
+`data/eval-ourvoice-r2.jsonl`.
+
+**CRM fixed too (23 Oct):** `LlmClients.OpenAiCompatible` no longer sends `tools`; `toolsInText()` writes them into
+the system prompt (checked identical to `callkit.tools_in_system`, 3,886 chars) and `recoverWrittenCalls` now reads
+every `<tool_call>` block first. 2 new tests, 59 backend tests OK (Maven needs JAVA_HOME = Adoptium jdk-21); a one-off
+real call to `ourvoice` through the CRM client gave correct nested answers.
+
+**Next (decide with the user):** re-score the untrained base; round 3 from round 1's recipe, with more failed-verification and busy calls rather than
+double weight on dispute/distress, or CRM safety nets for the two habits above.
+
+---
+
+# 22 October 2026, late: HARNESS FIXED, BOTH ROUNDS BEING RE-SCORED
+
+`callkit.ollama_chat` no longer passes `tools` to Ollama: `tools_in_system()` writes the tool list into the system
+message exactly like the training text, and `read_tool_call_tags()` reads the `<tool_call>` blocks from the reply
+(older written-call recovery kept as a fallback). 2 new tests, 26 kit tests OK; smoke test on the Sanjay call gives
+`{"full_name": "Sanjay Chandran", "answers": {"loan_account_number": "407122"}}`.
+Old results kept as `data/eval-ourvoice-ollama-tools.jsonl` and `data/eval-ourvoice-r2-ollama-tools.jsonl`.
+**Re-score running** (round 1 first, then round 2; rerun the same command after a shutdown, it carries on):
+`python -u evaluate.py --model ourvoice > data/eval-r1-fixed.log`, then
+`python -u evaluate.py --model ourvoice-r2 > data/eval-r2-fixed.log`.
+**Progress at 9:22 pm:** round 1 call 1 PASS (will_act — it failed in the old run), call 2 FAIL (verify_retry: "more
+than one goodbye after the closing tool"). About 5–10 min per call. Internet goes off at 11 pm; the run is local and
+keeps going if the laptop stays on (plugged in, sleep = Never). If it was shut down, rerun the two commands above.
+**Tomorrow:** read `data/eval-r1-fixed.log` and `data/eval-r2-fixed.log`, compare with the old 15/30 and 12/30 per
+scenario, then decide: CRM fix, base re-score, round 3.
+Note the untrained base's 4/30 was also scored through Ollama's tool support (re-score it too for a fair baseline).
+The CRM backend still passes `tools` (`LlmClients.OpenAiCompatible.body`) — same fix pending there.
+
+---
+
+# 22 October 2026, evening: THE full_name BUG IS OLLAMA, NOT THE MODEL
+
+Found by sending the same call to `ourvoice-r2` both ways (6 samples each, scripts were in the session scratchpad):
+- **Raw prompt (exact training format, `/api/generate raw`): 6/6 correct** —
+  `{"full_name": "Sanjay Chandran", "answers": {"loan_account_number": "407122"}}`.
+- **Through Ollama's tool support (`/api/chat` or `/v1/chat/completions` with `tools`, Ollama 0.40.5): 6/6 broken** —
+  `{"full_name": "Sanjay Chandran, answers: {"}`. Ollama's tool-call reader mangles the nested `answers` object.
+  (Ollama also drops `additionalProperties` from the schema it shows — prompt token count matches exactly — but the
+  model still answers correctly with that shortened schema raw, so the reader is the culprit.)
+- Round 1 has the same bug (EMI injection R1 transcript), so **both scores (15/30, 12/30) are pulled down** by genuine
+  callers failing the identity check; the round 1 vs round 2 comparison is not reliable yet.
+- **Workaround tested (2/2):** put the tool list in the system message in the training format, do NOT pass `tools`,
+  and read `<tool_call>…</tool_call>` from the text ourselves → correct nested answers. The CRM already reads written
+  tool calls (`LlmClients.recoverWrittenCalls`); the change is in `OpenAiCompatible.body` (local model only).
+  Evaluation harness: `callkit.py` around line 703 (`/v1/chat/completions` with `body["tools"]`).
+
+Separate, genuinely the model's: after `schedule_callback` it says goodbye without `log_call_outcome` — raw output does
+the same (3 of 4 samples), although every busy training call does schedule → log → goodbye. One epoch did not fix it.
+Also round 2 over-uses `request_human_handoff` (opt_out → "dispute", wrong_person → "distress"), likely from the double
+weight on dispute/distress.
+
+**Next (needs the user's go-ahead):** apply the workaround in `callkit.py` (+ test), rerun the 30-call test for
+`ourvoice` and `ourvoice-r2` to get true scores, then the same change in the CRM backend (+ tests). Only then decide
+round 3 (2 epochs; CRM safety net that records CALLBACK_REQUESTED when a call ends after a successful callback with no
+outcome).
+
+---
+
 # Training status — 22 October 2026: ROUND 2 FINAL 12/30 (40%) — ROUND 1 STAYS THE BEST
 
 | Model | Score on the 30 test calls |

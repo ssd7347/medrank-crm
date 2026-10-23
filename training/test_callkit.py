@@ -8,7 +8,8 @@ import json
 import random
 import unittest
 
-from callkit import EMPTY_THINK, FieldDef, all_scripts, answer_matches, check, new_call, render_for_training, spoken_amount
+from callkit import (EMPTY_THINK, TOOLS, FieldDef, all_scripts, answer_matches, check, new_call, read_tool_call_tags,
+                     render_for_training, spoken_amount, tools_in_system)
 from scenarios import SCENARIOS, build, for_script
 
 
@@ -96,6 +97,24 @@ class FakeCrmTest(unittest.TestCase):
         self.assertEqual(spoken_amount(4500000), "45,00,000 rupees")
         self.assertEqual(spoken_amount(12500), "12,500 rupees")
         self.assertEqual(spoken_amount(999), "999 rupees")
+
+    def test_tools_travel_in_the_system_message_like_the_training_text(self):
+        msgs = tools_in_system([{"role": "system", "content": "You are Neha."}, {"role": "user", "content": "Hi"}], TOOLS)
+        self.assertTrue(msgs[0]["content"].startswith("You are Neha.\n\n# Tools\n"))
+        self.assertIn("\n" + json.dumps(TOOLS[0], ensure_ascii=False) + "\n", msgs[0]["content"])
+        self.assertTrue(msgs[0]["content"].endswith("</tool_call>"))
+        self.assertEqual(msgs[1], {"role": "user", "content": "Hi"})
+
+    def test_written_tool_calls_keep_nested_answers(self):
+        names = [t["function"]["name"] for t in TOOLS]
+        text = ('<tool_call>\n{"name": "verify_identity", "arguments": {"full_name": "Sanjay Chandran", '
+                '"answers": {"loan_account_number": "407122"}}}\n</tool_call>\n'
+                '<tool_call>\n{"name": "made_up_tool", "arguments": {}}\n</tool_call>')
+        rest, calls = read_tool_call_tags(text, names)
+        self.assertEqual([c["function"] for c in calls], [{"name": "verify_identity", "arguments":
+                         {"full_name": "Sanjay Chandran", "answers": {"loan_account_number": "407122"}}}])
+        rest, calls = read_tool_call_tags("Thank you, goodbye.", names)
+        self.assertEqual((rest, calls), ("Thank you, goodbye.", []))
 
     def test_system_prompt_is_built_like_the_live_agent(self):
         call = new_call(script("Incoming calls"), random.Random(5))

@@ -95,9 +95,39 @@ class AiBrainIntegrationTest {
         List<Map<String, Object>> messages = cast(last.get("messages"));
         assertThat(String.valueOf(messages.get(0).get("content"))).contains("LIVE PHONE CALL").contains("CALL CONTEXT");
         assertThat(messages.stream().anyMatch(m -> "tool".equals(m.get("role")))).isTrue();
-        assertThat(String.valueOf(last.get("tools"))).contains("verify_identity").contains("opt_out")
+        // The tools are written into the system prompt, not sent for Ollama to handle (it mangles nested arguments).
+        assertThat(last).doesNotContainKey("tools");
+        assertThat(String.valueOf(messages.get(0).get("content"))).contains("# Tools").contains("\"name\": \"verify_identity\"")
+                .contains("\"name\": \"opt_out\"")
                 // Its answer is already in the prompt, so the model is not offered it.
-                .doesNotContain("name=get_call_context");
+                .doesNotContain("\"name\": \"get_call_context\"");
+    }
+
+    @Test
+    void toolsAreWrittenLikeTheTrainingText() {
+        // Python's json.dumps spacing, keys sorted, non-ASCII kept.
+        assertThat(LlmClients.pythonJson(Map.of("b", List.of(1, true), "a", "Rs. 500 \"due\" — é\n")))
+                .isEqualTo("{\"a\": \"Rs. 500 \\\"due\\\" — é\\n\", \"b\": [1, true]}");
+        String block = LlmClients.toolsInText(List.of(new LlmClient.ToolSpec("opt_out", "Stops the calls.",
+                Map.of("type", "object", "properties", Map.of()))));
+        assertThat(block).startsWith("# Tools\n\nYou may call one or more functions").endsWith("</tool_call>").contains(
+                "<tools>\n{\"function\": {\"description\": \"Stops the calls.\", \"name\": \"opt_out\", "
+                        + "\"parameters\": {\"properties\": {}, \"type\": \"object\"}}, \"type\": \"function\"}\n</tools>");
+    }
+
+    @Test
+    void writtenToolCallsKeepNestedAnswers() {
+        List<LlmClient.ToolSpec> tools = List.of(
+                new LlmClient.ToolSpec("verify_identity", "Checks the caller.", Map.of("type", "object")),
+                new LlmClient.ToolSpec("log_call_outcome", "Records how the call ended.", Map.of("type", "object")));
+        LlmClient.Reply r = LlmClients.recoverWrittenCalls("<tool_call>\n{\"name\": \"verify_identity\", \"arguments\": "
+                + "{\"full_name\": \"Sanjay Chandran\", \"answers\": {\"loan_account_number\": \"407122\"}}}\n</tool_call>\n"
+                + "<tool_call>\n{\"name\": \"log_call_outcome\", \"arguments\": {\"outcome_code\": \"WILL_ACT\"}}\n</tool_call>",
+                tools, JSON);
+        assertThat(r.toolCalls()).extracting(LlmClient.ToolCall::name).containsExactly("verify_identity", "log_call_outcome");
+        assertThat(r.toolCalls().get(0).arguments()).containsEntry("full_name", "Sanjay Chandran")
+                .containsEntry("answers", Map.of("loan_account_number", "407122"));
+        assertThat(r.text()).isEmpty();
     }
 
     @Test
@@ -210,8 +240,9 @@ class AiBrainIntegrationTest {
             reply(ex, 200, "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"**Let me help:** our team can call you back.\"}}]}");
             return;
         }
-        reply(ex, 200, "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"t1\",\"type\":\"function\","
-                + "\"function\":{\"name\":\"search_faq\",\"arguments\":\"{\\\"query\\\":\\\"opening hours\\\"}\"}}]}}]}");
+        // As Ollama returns it when no tools are passed: the model's own <tool_call> text.
+        reply(ex, 200, JSON.writeValueAsString(Map.of("choices", List.of(Map.of("message", Map.of("role", "assistant",
+                "content", "<tool_call>\n{\"name\": \"search_faq\", \"arguments\": {\"query\": \"opening hours\"}}\n</tool_call>"))))));
     }
 
     private static void reply(HttpExchange ex, int status, String json) throws IOException {

@@ -699,9 +699,53 @@ def record(call: FakeCrm, messages: list[dict], source: str, scenario: str, expe
 
 # --------------------------------------------------------------------------------------------- local model
 
+TOOLS_IN_TEXT = ("# Tools\n\nYou may call one or more functions to assist with the user query.\n\n"
+                 "You are provided with function signatures within <tools></tools> XML tags:\n<tools>{}\n</tools>\n\n"
+                 "For each function call, return a json object with function name and arguments within "
+                 "<tool_call></tool_call> XML tags:\n<tool_call>\n{{\"name\": <function-name>, \"arguments\": <args-json-object>}}\n</tool_call>")
+TOOL_CALL_TAG = re.compile(r"(?s)<tool_call>\s*(\{.*?\})\s*</tool_call>")
+
+
+def tools_in_system(messages: list[dict], tools: list[dict]) -> list[dict]:
+    """The tool list written into the system message exactly as the Qwen3 chat template (and training) writes it.
+
+    Ollama 0.40's own tool support mangles nested arguments: verify_identity's {"full_name": ..., "answers": {...}}
+    comes back as {"full_name": "Name, answers: {"} although the model wrote it correctly. So the tools are not
+    passed to Ollama at all and the model's <tool_call> text is read here instead."""
+    block = TOOLS_IN_TEXT.format("".join("\n" + json.dumps(t, ensure_ascii=False) for t in tools))
+    if messages and messages[0]["role"] == "system":
+        return [dict(messages[0], content=messages[0]["content"] + "\n\n" + block)] + messages[1:]
+    return [{"role": "system", "content": block}] + messages
+
+
+def read_tool_call_tags(text: str, names: list[str]) -> tuple[str, list[dict]]:
+    """Every <tool_call>{"name": ..., "arguments": {...}}</tool_call> in the reply, and the text around them."""
+    calls = []
+    for m in TOOL_CALL_TAG.finditer(text):
+        try:
+            obj = json.loads(m.group(1))
+        except json.JSONDecodeError:
+            obj = None
+        if isinstance(obj, dict) and obj.get("name") in names:
+            args = obj.get("arguments")
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except json.JSONDecodeError:
+                    args = {"_unparsed": args}
+            calls.append({"id": f"call_t{len(calls)}", "type": "function",
+                          "function": {"name": obj["name"], "arguments": args if isinstance(args, dict) else {}}})
+    rest = TOOL_CALL_TAG.sub(" ", text) if calls else text
+    return re.sub(r"\s{2,}", " ", rest).strip(), calls
+
+
 def ollama_chat(model: str, messages: list[dict], tools: list[dict] | None = None, temperature: float = 0.7,
                 url: str = "http://localhost:11434", max_tokens: int = 400, timeout: int = 300) -> dict:
-    """One OpenAI-compatible chat request to Ollama. Tool arguments go out as JSON text and come back as dicts."""
+    """One OpenAI-compatible chat request to Ollama. Tool arguments go out as JSON text and come back as dicts.
+
+    The tools travel inside the system message and the calls are read from the reply text (see tools_in_system)."""
+    if tools:
+        messages = tools_in_system(messages, tools)
     wire = []
     for m in messages:
         x = {k: v for k, v in m.items() if k != "name" or m["role"] == "tool"}
@@ -711,8 +755,6 @@ def ollama_chat(model: str, messages: list[dict], tools: list[dict] | None = Non
         wire.append(x)
     body = {"model": model, "messages": wire, "temperature": temperature, "max_tokens": max_tokens, "stream": False,
             "keep_alive": "30m"}
-    if tools:
-        body["tools"] = tools
     req = urllib.request.Request(url + "/v1/chat/completions", json.dumps(body).encode(), {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         res = json.load(r)
@@ -727,7 +769,10 @@ def ollama_chat(model: str, messages: list[dict], tools: list[dict] | None = Non
         calls.append({"id": c.get("id") or f"call_{i}", "type": "function", "function": {"name": c["function"]["name"], "arguments": args}})
     content = msg.get("content") or ""
     if not calls and tools:
-        content, calls = recover_written_calls(content, [t["function"]["name"] for t in tools])
+        names = [t["function"]["name"] for t in tools]
+        content, calls = read_tool_call_tags(content, names)
+        if not calls:
+            content, calls = recover_written_calls(content, names)
     return {"content": content, "tool_calls": calls}
 
 
