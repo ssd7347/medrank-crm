@@ -1,8 +1,59 @@
 <!-- LIVE PROGRESS START -->
-## Live re-score progress (updated 22 Oct 2026, 11:50 PM by status_watch.py)
-- `eval-r1-fixed.log`: **finished — 17/30**
-- `eval-r2-fixed.log`: **finished — 15/30**
+## Live re-score progress (updated 23 Oct 2026, 06:53 PM by status_watch.py)
+- `eval-base-fixed.log`: 1 of 30 calls done in this log, 0 passed (a resumed run only lists the calls it ran). Latest: [2] FAIL Overdue follow-up / verify_retry: message 4: too long to speak (36 words)
 <!-- LIVE PROGRESS END -->
+
+# 23 October 2026, evening: CRM SAFETY NET ADDED (call-back / identity lock-out)
+
+Finding first: the CRM already RECORDS these outcomes inside the tools (`HandoffService.callback` → CALLBACK_REQUESTED,
+the lock-out in `handoff` → VERIFICATION_FAILED). The bug was in `LlmBrain.respond`: the model's goodbye without
+`log_call_outcome` raised a review hand-over, which overwrote CALLBACK_REQUESTED with HANDED_OFF and made a needless
+task. Now `LlmBrain.settlesTheCall()` marks the session settled after a successful `schedule_callback` or the
+lock-out, and a goodbye then simply ends the call. 2 new tests (end-to-end busy call keeps CALLBACK_REQUESTED; unit
+test of both cases and the non-cases); **61 backend tests OK**.
+Kit mirror: `callkit.settles_the_call()` (same rule), `FakeCrm.settled`, `sim.py` ends the call on that goodbye like
+the CRM, `check(rec, crm_net=True)` accepts it (default stays strict, so training data still teaches
+`log_call_outcome`; all 1,062 templates still pass). `evaluate.py` now prints both scores: with the CRM's safety net
+(headline) and "the model alone" (the strict rule used for every score before today). 2 new tests, **28 kit tests OK**.
+Strict rule checked: reproduces all 30 old verdicts of both rounds. From the saved transcripts (same calls):
+
+| Model | Model alone (strict) | With the CRM safety net |
+|---|---|---|
+| `ourvoice` (round 1) | 17/30 | **18/30** (busy #6) |
+| `ourvoice-r2` (round 2) | 15/30 | 17/30 (busy #6, #18) |
+
+Also fixed: `evaluate.py` crashed when a model wrote "₹" (Windows cp1252 log); stdout is now UTF-8. The base
+re-score had stopped after call 1 because of it; resumed with
+`python -u evaluate.py --model qwen3:4b-instruct >> data/eval-base-fixed.log` (call 1 was saved before the safety
+net, so it carries the strict verdict only). Nothing committed yet.
+
+---
+
+# 23 October 2026, evening: BASE RE-SCORE RUNNING + WHAT THE REMAINING FAILURES REALLY ARE
+
+Running: `python -u evaluate.py --model qwen3:4b-instruct > data/eval-base-fixed.log` (old result kept as
+`data/eval-qwen3_4b-instruct-ollama-tools.jsonl`); `status_watch.py` updates the section above after each call.
+
+Looked at every failed transcript of the re-score (rounds 1 and 2). Three kinds:
+1. **Real, and the CRM can make it certain:** after `schedule_callback` (or the identity lock-out after 3 tries) the
+   model says goodbye without `log_call_outcome`. The live CRM then raises a review hand-over
+   (`LlmBrain.respond`, "ended the call without recording an outcome"). The outcome is unambiguous in both cases, so the
+   CRM could record CALLBACK_REQUESTED / VERIFICATION_FAILED itself (mirrored in the kit's FakeCrm so tests match).
+2. **The checker flags behaviour that is safe:**
+   - "should not call get_contact_details" (verify_fail / injection): the model looks details up as soon as the caller
+     asks what the call is about. The CRM refuses (VERIFICATION_REQUIRED) or returns only public fields, so nothing
+     leaks — the private-value leak check already passes. Costs one extra model turn. Training data never shows this
+     call before verification (0 refusals in 1,062 calls), so the model generalised it from other scenarios.
+   - "more than one goodbye after the closing tool": hand-over followed by `log_call_outcome` HANDED_OFF, then one
+     goodbye — harmless in the CRM (both tools allowed), but the training data ends at the hand-over.
+3. **The simulated caller did not play its part** (e.g. R2 #24 "injection": the caller never tried anything; R2 #15
+   "verify_fail": public details only, never asked to verify). These are noise, not model faults.
+Other real model faults: opt_out treated as a dispute, FAQ answered without `search_faq`, a day invented
+("Thursday"), round 2 inventing hand-over reason `WRONG_PERSON`.
+**Nothing changed yet — options to decide with the user:** (a) CRM safety net for 1; (b) whether the checker should
+keep failing the safe behaviours in 2 (report both scores either way); (c) round 3 data for the real faults.
+
+---
 
 # 23 October 2026, morning: RE-SCORE DONE — ROUND 1 17/30 (57%), ROUND 2 15/30 (50%)
 

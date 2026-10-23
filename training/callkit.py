@@ -304,6 +304,7 @@ class FakeCrm:
     failures: int = 0
     outcome: str | None = None
     closing: bool = False
+    settled: bool = False          # a call-back or the identity lock-out already recorded the outcome (settles_the_call)
     over: bool = False
     tool_log: list[tuple[str, dict, dict]] = field(default_factory=list)   # (name, args, parsed result)
 
@@ -357,6 +358,8 @@ class FakeCrm:
         self.tool_log.append((name, args or {}, parsed))
         if parsed["ok"] and name in CLOSING_TOOLS:
             self.closing = True
+        if settles_the_call(name, parsed):
+            self.settled = True
         return out
 
     def _callback_slot(self, minutes: int) -> str:
@@ -548,8 +551,27 @@ def ungrounded(said: str, heard: str) -> list[str]:
     return out
 
 
-def check(rec: dict) -> list[str]:
-    """Every reason this conversation must not be trained on; empty when it is a good example."""
+def settles_the_call(name: str, res: dict) -> str | None:
+    """LlmBrain.settlesTheCall(): the outcome a booked call-back or the identity lock-out already recorded, or None.
+
+    The live CRM then ends the call on the model's goodbye without a review hand-over, even if the model never
+    called log_call_outcome."""
+    if not res.get("ok"):
+        return None
+    if name == "schedule_callback":
+        return "CALLBACK_REQUESTED"
+    d = res.get("data") or {}
+    if name == "verify_identity" and d.get("verified") is False and isinstance(d.get("attempts_left"), int) and d["attempts_left"] <= 0:
+        return "VERIFICATION_FAILED"
+    return None
+
+
+def check(rec: dict, crm_net: bool = False) -> list[str]:
+    """Every reason this conversation must not be trained on; empty when it is a good example.
+
+    crm_net=True judges the call as the live CRM handles it: a goodbye after an outcome that a call-back or the
+    identity lock-out already recorded (settles_the_call) counts as recorded. Training data keeps the strict default,
+    so the model still learns to call log_call_outcome itself."""
     problems: list[str] = []
     msgs = rec["messages"]
     meta = rec.get("meta", {})
@@ -562,6 +584,7 @@ def check(rec: dict) -> list[str]:
     heard = msgs[0]["content"].lower()   # what the agent may state: the script, the caller's words, tool results
     verified = False
     closing_at = None
+    settled = None           # outcome recorded by the CRM itself (only counted with crm_net)
     pending: set[str] = set()
     for i, m in enumerate(msgs[3:], start=3):
         role = m["role"]
@@ -578,6 +601,8 @@ def check(rec: dict) -> list[str]:
                 verified = True
             if res.get("ok") and m.get("name") in CLOSING_TOOLS and closing_at is None:
                 closing_at = i
+            if crm_net and settled is None:
+                settled = settles_the_call(m.get("name"), res)
             continue
         if pending:
             problems.append(f"message {i}: tool calls left unanswered")
@@ -620,16 +645,16 @@ def check(rec: dict) -> list[str]:
             problems += [f"message {i}: {p}" for p in ungrounded(low, heard)]
             if WRITTEN_CALL.search(text) or any(n.replace("_", "") in low.replace("_", "") for n in TOOL_NAMES):
                 problems.append(f"message {i}: speaks a tool call aloud")
-            if closing_at is None and re.search(r"\b(good\s?bye|bye)\b", low):
+            if closing_at is None and settled is None and re.search(r"\b(good\s?bye|bye)\b", low):
                 problems.append(f"message {i}: says goodbye before the call is recorded")
             if re.search(r"\b(i am|i'm) (a )?(human|real person)\b", low):
                 problems.append(f"message {i}: claims to be human")
     last = msgs[-1]
     if last["role"] != "assistant" or last.get("tool_calls") or not last.get("content"):
         problems.append("does not end with the agent's goodbye")
-    if closing_at is None:
+    if closing_at is None and settled is None:
         problems.append("ends without log_call_outcome, opt_out or request_human_handoff")
-    problems += check_expectation(rec)
+    problems += check_expectation(rec, settled)
     return problems
 
 
@@ -661,10 +686,14 @@ def calls_in(rec: dict) -> list[tuple[str, dict]]:
             for c in m.get("tool_calls") or []]
 
 
-def check_expectation(rec: dict) -> list[str]:
-    """What the scenario says must happen, such as WILL_ACT being logged or a person taking over."""
+def check_expectation(rec: dict, settled: str | None = None) -> list[str]:
+    """What the scenario says must happen, such as WILL_ACT being logged or a person taking over.
+
+    ``settled``: an outcome the CRM recorded itself (see settles_the_call); it counts as that log_call_outcome."""
     expect = rec.get("meta", {}).get("expect") or {}
     calls = calls_in(rec)
+    if settled:
+        calls = calls + [("log_call_outcome", {"outcome_code": settled})]
     out = []
     for name, want in expect.get("calls", {}).items():
         hits = [a for n, a in calls if n == name]

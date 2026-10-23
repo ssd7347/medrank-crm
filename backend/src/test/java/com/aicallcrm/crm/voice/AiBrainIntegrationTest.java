@@ -148,6 +148,36 @@ class AiBrainIntegrationTest {
     }
 
     @Test
+    void aGoodbyeAfterABookedCallBackKeepsItsOutcome() throws Exception {
+        String admin = admin();
+        long contact = contact(admin);
+        String callId = JsonPath.read(mvc.perform(auth(post("/api/voice/test-calls"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contactId\":" + contact + ",\"scriptName\":\"Enquiry follow-up\",\"brain\":\"LOCAL\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        // The stand-in model books the call-back, then says goodbye without log_call_outcome.
+        mvc.perform(auth(post("/api/voice/test-calls/" + callId + "/say"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"I am driving, call me later\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.over").value(true))
+                .andExpect(jsonPath("$.added[*].tool").value(Matchers.hasItem("schedule_callback")))
+                // No review hand-over, which would have overwritten the outcome with HANDED_OFF.
+                .andExpect(jsonPath("$.added[*].tool").value(Matchers.not(Matchers.hasItem("request_human_handoff"))))
+                .andExpect(jsonPath("$.outcome").value("CALLBACK_REQUESTED"));
+    }
+
+    @Test
+    void aBookedCallBackOrTheIdentityLockOutSettlesTheCall() {
+        assertThat(LlmBrain.settlesTheCall("schedule_callback", ToolResult.ok(Map.of("callback_id", 7), null))).isTrue();
+        assertThat(LlmBrain.settlesTheCall("verify_identity",
+                ToolResult.ok(Map.of("verified", false, "attempts_left", 0, "handoff_mode", "CALLBACK_TASK"), null))).isTrue();
+        // A wrong answer with tries left, a passed check, a failed tool or any other tool settles nothing.
+        assertThat(LlmBrain.settlesTheCall("verify_identity", ToolResult.ok(Map.of("verified", false, "attempts_left", 2), null))).isFalse();
+        assertThat(LlmBrain.settlesTheCall("verify_identity", ToolResult.ok(Map.of("verified", true, "attempts_left", 3), null))).isFalse();
+        assertThat(LlmBrain.settlesTheCall("schedule_callback", ToolResult.error(ToolResult.NOT_AVAILABLE, "down"))).isFalse();
+        assertThat(LlmBrain.settlesTheCall("search_faq", ToolResult.ok(Map.of("answers", List.of()), null))).isFalse();
+    }
+
+    @Test
     void whenTheModelFailsAPersonTakesOver() throws Exception {
         String admin = admin();
         long contact = contact(admin);
@@ -234,6 +264,17 @@ class AiBrainIntegrationTest {
         if (String.valueOf(lastMsg.get("content")).contains("say goodbye")) {
             reply(ex, 200, "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Thanks for your time. "
                     + "Dr. Rao will be glad to hear it. We will be in touch. Have a lovely day. Goodbye.\"}}]}");
+            return;
+        }
+        String lastCaller = messages.stream().filter(m -> "user".equals(m.get("role"))).reduce((a, b) -> b)
+                .map(m -> String.valueOf(m.get("content"))).orElse("");
+        if (lastCaller.contains("call me later")) {
+            // Books the call-back, then forgets log_call_outcome and says goodbye.
+            String content = "tool".equals(lastMsg.get("role")) ? "Of course. Our team will call you back. Thank you, goodbye."
+                    : "<tool_call>\n{\"name\": \"schedule_callback\", \"arguments\": {\"preferred_time_text\": \"later\", "
+                    + "\"reason\": \"Busy; asked for a call later.\"}}\n</tool_call>";
+            reply(ex, 200, JSON.writeValueAsString(Map.of("choices", List.of(Map.of("message", Map.of("role", "assistant",
+                    "content", content))))));
             return;
         }
         if ("tool".equals(lastMsg.get("role"))) {

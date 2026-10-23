@@ -80,6 +80,34 @@ class SimTest(unittest.TestCase):
         self.assertEqual(why, "the agent said goodbye without recording how the call ended")
         self.assertEqual(fake.agent_calls, 1)
 
+    def test_a_goodbye_after_a_booked_call_back_ends_the_call_as_the_crm_does(self):
+        def agent(msgs, reminded):
+            if msgs[-1]["role"] == "tool":
+                return say("Our team will call you back. Thank you, goodbye.")
+            return tool("schedule_callback", preferred_time_text="this evening", reason="Busy; asked for a call later.")
+        fake = FakeModel(lambda m: "I am driving, please call me this evening.", agent)
+        rec, why = self.run_call(fake, "Enquiry follow-up", "busy", coach=False)
+        self.assertEqual(why, "")
+        self.assertEqual(rec["messages"][-1]["content"], "Our team will call you back. Thank you, goodbye.")
+        # The live CRM keeps the CALLBACK_REQUESTED outcome; the model alone still forgot log_call_outcome.
+        self.assertEqual(check(rec, crm_net=True), [])
+        self.assertIn("ends without log_call_outcome, opt_out or request_human_handoff", check(rec))
+
+    def test_a_goodbye_after_the_identity_lock_out_counts_as_verification_failed(self):
+        def agent(msgs, reminded):
+            if msgs[-1]["role"] == "tool":
+                if '"attempts_left":0' in msgs[-1]["content"]:
+                    return say("I am sorry, I could not verify your details. Goodbye.")
+                return say("That did not match our records. Could you tell me again?")
+            return tool("verify_identity", full_name="Somebody Else", answers={"customer_id": "0000"})
+        fake = FakeModel(lambda m: "It is 0000.", agent)
+        rec, why = self.run_call(fake, "Payment reminder", "verify_fail", coach=False)
+        self.assertEqual(why, "")
+        self.assertEqual(check(rec, crm_net=True), [])
+        self.assertIn("expected a call to log_call_outcome", check(rec))
+        self.assertEqual(callkit.settles_the_call("verify_identity", {"ok": True, "data": {"verified": False, "attempts_left": 2}}), None)
+        self.assertEqual(callkit.settles_the_call("schedule_callback", {"ok": False}), None)
+
     def test_a_caller_who_only_gives_a_stage_direction_is_asked_again(self):
         replies = iter(["*hangs up*", "No, I'm not interested anymore."])
         caller = lambda msgs: next(replies, "Okay.")

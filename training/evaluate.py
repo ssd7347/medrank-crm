@@ -12,6 +12,7 @@ import argparse
 import collections
 import random
 import re
+import sys
 from pathlib import Path
 
 from callkit import DATA, all_scripts, check, installed_models, read_jsonl, write_jsonl
@@ -29,6 +30,8 @@ def main() -> None:
     ap.add_argument("--show", action="store_true", help="print the failed conversations")
     ap.add_argument("--resume-log", help="log of an earlier run that was stopped: its finished calls are not run again")
     a = ap.parse_args()
+    # The log is usually redirected to a file, which Windows writes in cp1252: a model's "₹" would stop the test.
+    sys.stdout.reconfigure(encoding="utf-8")
 
     models = installed_models(a.url)
     caller = a.caller if a.caller in models else a.model
@@ -57,9 +60,12 @@ def main() -> None:
         # Each test call has its own random seed, so the same calls come out whether or not the run was stopped.
         rec, stopped = simulate(script, scenario, random.Random(a.seed * 1000 + i), a.model, caller, coach=False,
                                 agent_temperature=0.3, url=a.url)
-        problems = ([stopped] if stopped else []) + (check(rec) if rec else [])
+        # Scored as the live CRM handles the call (its safety net included); "alone" is the model with no help,
+        # the strict rule every score before 23 October 2026 used.
+        problems = ([stopped] if stopped else []) + (check(rec, crm_net=True) if rec else [])
+        alone = ([stopped] if stopped else []) + (check(rec) if rec else [])
         rec = rec or {"meta": {"script": script.name, "scenario": scenario.id}}
-        rec["meta"].update(test=i, problems=problems)
+        rec["meta"].update(test=i, problems=problems, problems_alone=alone)
         write_jsonl(out, [rec], "a")
         done[i] = rec
         ok = not problems
@@ -72,7 +78,10 @@ def main() -> None:
         by_scenario[r["meta"]["scenario"]][0] += not r["meta"]["problems"]
         by_scenario[r["meta"]["scenario"]][1] += 1
     passed = sum(ok for ok, _ in by_scenario.values())
+    # Calls saved before the CRM safety net have no "problems_alone": their only score was the strict one.
+    alone = sum(not r["meta"].get("problems_alone", r["meta"]["problems"]) for r in done.values())
     print(f"\n{a.model}: {passed}/{len(done)} calls handled correctly ({passed / max(len(done), 1):.0%})")
+    print(f"  (the model alone, without the CRM's safety net: {alone}/{len(done)})")
     for sid, (ok, n) in sorted(by_scenario.items()):
         print(f"  {sid:<18} {ok}/{n}")
 

@@ -121,11 +121,15 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                     # corrected turn is kept. (Never while testing: there the mistake must count.)
                     reminder = REMIND_CLOSE
                     continue
-                if not call.closing and re.search(r"\b(goodbye|bye)\b", text, re.I):
+                goodbye = re.search(r"\b(goodbye|bye)\b", text, re.I)
+                if not call.closing and not call.settled and goodbye:
                     history.append({"role": "assistant", "content": text})
                     return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id,
                                   scenario.expect), "the agent said goodbye without recording how the call ended"
                 history.append({"role": "assistant", "content": text})
+                if call.settled and goodbye:
+                    # As LlmBrain.respond: the call-back or the lock-out already recorded the outcome, so the call ends.
+                    call.over = True
                 break
             calls = []
             for c in r["tool_calls"]:
@@ -138,7 +142,7 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
         else:
             return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id, scenario.expect), \
                 "the agent kept using tools without answering"
-        if call.closing:
+        if call.closing or call.over:
             break
     return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id, scenario.expect), ""
 

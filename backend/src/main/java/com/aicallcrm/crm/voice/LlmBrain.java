@@ -62,6 +62,8 @@ public class LlmBrain {
         final String system;
         final List<Message> history = new ArrayList<>();
         boolean closing;
+        /** A tool already recorded how the call ended (see {@link #settlesTheCall}), so a goodbye needs no review. */
+        boolean settled;
         boolean over;
 
         Session(ConversationBrain.Kind kind, LlmClient client, String system) {
@@ -194,6 +196,10 @@ public class LlmBrain {
                         out.add(Line.agent(text));
                         if (s.closing) {
                             s.over = true;
+                        } else if (s.settled && GOODBYE.matcher(text).find()) {
+                            // The model skipped log_call_outcome, but the call-back or the identity lock-out already
+                            // recorded the outcome (CALLBACK_REQUESTED / VERIFICATION_FAILED): nothing to review.
+                            s.over = true;
                         } else if (GOODBYE.matcher(text).find()) {
                             // The model said goodbye without recording how the call went: a person reviews it, so
                             // nobody is left without a follow-up and the call is not simply retried.
@@ -215,6 +221,9 @@ public class LlmBrain {
                         if (res.ok() && CLOSING_TOOLS.contains(c.name())) {
                             s.closing = true;
                         }
+                        if (settlesTheCall(c.name(), res)) {
+                            s.settled = true;
+                        }
                     }
                 }
                 // The model kept looking things up without answering: a person takes over.
@@ -226,6 +235,23 @@ public class LlmBrain {
             }
             return out;
         }
+    }
+
+    /**
+     * A booked call-back (HandoffService.callback records CALLBACK_REQUESTED) or the identity lock-out after the last
+     * attempt (HandoffService.handoff records VERIFICATION_FAILED) settles how the call ended, even when the model
+     * then forgets log_call_outcome.
+     */
+    static boolean settlesTheCall(String tool, ToolResult res) {
+        if (!res.ok()) {
+            return false;
+        }
+        if ("schedule_callback".equals(tool)) {
+            return true;
+        }
+        Map<String, Object> d = res.data() == null ? Map.of() : res.data();
+        return "verify_identity".equals(tool) && Boolean.FALSE.equals(d.get("verified"))
+                && d.get("attempts_left") instanceof Number left && left.intValue() <= 0;
     }
 
     private List<ToolSpec> specs() {
