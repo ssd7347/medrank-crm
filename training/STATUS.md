@@ -1,6 +1,6 @@
 <!-- LIVE PROGRESS START -->
-## Live re-score progress (updated 23 Oct 2026, 08:44 PM by status_watch.py)
-- `eval-base-fixed.log`: **finished — 6/30**
+## Live re-score progress (updated 23 Oct 2026, 10:38 PM by status_watch.py)
+- `eval-r3.log`: not started yet
 <!-- LIVE PROGRESS END -->
 
 # DELIVERY PLAN (agreed 23 Oct 2026): client hand-over ~23 Nov 2026, real phone calls
@@ -13,6 +13,22 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 2 (– 6 Nov) | 60-call test; connect platform; first real call to the user's phone | run round 3 on Colab |
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
+
+# 23 October 2026, 10:40 pm: ROUND 3 TRAINED, LOADED, 30-CALL TEST RUNNING OVERNIGHT
+
+Colab: trained all 64 steps; the first runtime disconnected while idle before the download, the rerun "carried on
+from …/ourvoice-training-r3/checkpoints/checkpoint-64" (no retraining) and rebuilt the file.
+`C:\Users\sivas\Downloads\ourvoice-r3.Q4_K_M.gguf` (2,497,280,352 bytes, GGUF v3, MD5 AA693F71…, different from
+round 2's 452F588A…) loaded in Ollama as **`ourvoice-r3`**.
+**Running:** `python -u evaluate.py --model ourvoice-r3 > data/eval-r3.log` (same 30 calls; prints both scores);
+`status_watch.py data/eval-r3.log` updates the section above. If the laptop was shut down, rerun both — it carries on.
+**Warning sign to check first tomorrow:** one smoke test (the Sanjay call: name + account number + "Why do you need
+this info?") got a dispute hand-over instead of `verify_identity`; rounds 1 and 2 verified here. A 6-sample
+comparison with round 1 was started (session background task) — repeat it if its output is lost:
+6 × `ollama_chat` on that call for `ourvoice-r3` and `ourvoice`. If round 3 over-hands-over, the cause is likely the
+new hardship/complaint-like phrasings; compare its hand-over rate with round 1 across the 30 calls.
+
+---
 
 # 23 October 2026, night: BASE RE-SCORED + REPLY-SPEED TEST
 
