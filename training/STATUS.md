@@ -1,6 +1,6 @@
 <!-- LIVE PROGRESS START -->
-## Live re-score progress (updated 23 Oct 2026, 07:16 PM by status_watch.py)
-- `eval-base-fixed.log`: 8 of 30 calls done in this log, 2 passed (a resumed run only lists the calls it ran). Latest: [9] PASS Overdue follow-up / ask_person
+## Live re-score progress (updated 23 Oct 2026, 08:44 PM by status_watch.py)
+- `eval-base-fixed.log`: **finished — 6/30**
 <!-- LIVE PROGRESS END -->
 
 # DELIVERY PLAN (agreed 23 Oct 2026): client hand-over ~23 Nov 2026, real phone calls
@@ -13,6 +13,27 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 2 (– 6 Nov) | 60-call test; connect platform; first real call to the user's phone | run round 3 on Colab |
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
+
+# 23 October 2026, night: BASE RE-SCORED + REPLY-SPEED TEST
+
+**Scores, all on the same 30 calls with the fixed harness** (`data/eval-base-fixed.log`, earlier sections):
+
+| Model | Model alone | With the CRM safety net |
+|---|---|---|
+| untrained `qwen3:4b-instruct` | 6/30 (20%) | 6/30 |
+| `ourvoice` (round 1) | 17/30 | **18/30 (60%)** — best so far |
+| `ourvoice-r2` | 15/30 | 17/30 |
+
+**Reply speed of `ourvoice` on this laptop** (i5-12450H, 8 cores, 15.7 GB RAM, no GPU; other models unloaded;
+test call 1 replayed turn by turn as the CRM sends it, Ollama's own timings, two runs agree):
+- first turn of a call: **86 s** (reads the whole ~1,660-token prompt at ~23 tokens/s); the CRM's warm-up during the
+  opening line cannot hide that;
+- later turns: **6.5–21 s** (reads only the new part, then writes at **~5 tokens/s**; a 40-token reply ≈ 9 s).
+A phone call needs the reply to start within ~2 s, so **our model cannot take real calls from this laptop**: it needs
+a GPU server (or Claude). Next: measure the same replay on Colab's free T4 GPU to know what a GPU server gives before
+choosing one. Script: `latency.py` (session scratchpad; to be moved into `training/` with the GPU test).
+
+---
 
 # 23 October 2026, night: ROUND 3 KIT READY (user runs it on Colab)
 
