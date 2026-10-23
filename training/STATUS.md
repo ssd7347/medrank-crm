@@ -22,11 +22,10 @@ from …/ourvoice-training-r3/checkpoints/checkpoint-64" (no retraining) and reb
 round 2's 452F588A…) loaded in Ollama as **`ourvoice-r3`**.
 **Running:** `python -u evaluate.py --model ourvoice-r3 > data/eval-r3.log` (same 30 calls; prints both scores);
 `status_watch.py data/eval-r3.log` updates the section above. If the laptop was shut down, rerun both — it carries on.
-**Warning sign to check first tomorrow:** one smoke test (the Sanjay call: name + account number + "Why do you need
-this info?") got a dispute hand-over instead of `verify_identity`; rounds 1 and 2 verified here. A 6-sample
-comparison with round 1 was started (session background task) — repeat it if its output is lost:
-6 × `ollama_chat` on that call for `ourvoice-r3` and `ourvoice`. If round 3 over-hands-over, the cause is likely the
-new hardship/complaint-like phrasings; compare its hand-over rate with round 1 across the 30 calls.
+Smoke test, settled: on the Sanjay call (name + account number + "Why do you need this info?") round 3 called
+`verify_identity` correctly **6/6**, same as round 1 (6/6). An earlier single sample that handed over was a different
+transcript (the re-scored round 2 file, where the caller said something else), not a fair comparison. Still worth
+comparing round 3's hand-over rate with round 1's across the 30 calls, since round 3 added complaint-like phrasings.
 
 ---
 
