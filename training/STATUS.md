@@ -1,6 +1,6 @@
 <!-- LIVE PROGRESS START -->
-## Live re-score progress (updated 23 Oct 2026, 10:38 PM by status_watch.py)
-- `eval-r3.log`: not started yet
+## Live re-score progress (updated 24 Oct 2026, 12:08 AM by status_watch.py)
+- `eval-r3.log`: **finished — 18/30**
 <!-- LIVE PROGRESS END -->
 
 # DELIVERY PLAN (agreed 23 Oct 2026): client hand-over ~23 Nov 2026, real phone calls
@@ -13,6 +13,27 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 2 (– 6 Nov) | 60-call test; connect platform; first real call to the user's phone | run round 3 on Colab |
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
+
+# 24 October 2026, morning: ROUND 3 = 18/30 (60%) — NO BETTER THAN ROUND 1
+
+`data/eval-r3.log` (finished 12:08 am, no crash): **18/30 with the CRM safety net, 17/30 model alone** — identical to
+round 1. Call by call vs round 1: better on #2 verify_retry and #29 faq; worse on #11 faq_unknown and #15
+verify_fail; 11 hand-overs each. The targeted faults mostly remain:
+- #16 confirm_attend: now ACKNOWLEDGED (fixed), but **invented "Thursday, 20th April"** — it looked details up
+  before verification, got no date, and made one up. A made-up appointment date is the most dangerous fault so far;
+- #17 cannot_attend: agreed to move the visit to "the 15th" itself (WILL_ACT) instead of a call-back;
+- #8 opt_out: "stop calling me so frequently" still handed over as a complaint, although nearly that sentence was
+  trained;
+- #5 distress: offered a call-back for help (reasonable) instead of a DISTRESS hand-over;
+- #11 / #15: invented hand-over reasons `DISPUTE` / `WRONG_PERSON` (not in the list; the CRM maps them to OUT_OF_SCOPE).
+**Reading:** three rounds of template training plateau at ~60%: the model learns the templates' wording but does not
+carry it over to how the simulated caller actually talks. More of the same templates is unlikely to reach 85% by
+6 Nov. Options for the user: (1) measure Claude (Haiku 5.5 / Sonnet 5.5) on the same 30 calls now, since the speed
+test also points away from the laptop; (2) CRM guards that help any brain — refuse a spoken date/amount no tool
+returned (the checker's `ungrounded` rule, live), and retry an invalid hand-over reason; (3) a different data source
+for round 4 (more varied, model-written calls) — slower, uncertain.
+
+---
 
 # 23 October 2026, 10:40 pm: ROUND 3 TRAINED, LOADED, 30-CALL TEST RUNNING OVERNIGHT
 
