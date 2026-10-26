@@ -773,10 +773,13 @@ def read_tool_call_tags(text: str, names: list[str]) -> tuple[str, list[dict]]:
 
 
 def ollama_chat(model: str, messages: list[dict], tools: list[dict] | None = None, temperature: float = 0.7,
-                url: str = "http://localhost:11434", max_tokens: int = 400, timeout: int = 300) -> dict:
+                url: str = "http://localhost:11434", max_tokens: int = 400, timeout: int = 300,
+                think: bool | None = None) -> dict:
     """One OpenAI-compatible chat request to Ollama. Tool arguments go out as JSON text and come back as dicts.
 
-    The tools travel inside the system message and the calls are read from the reply text (see tools_in_system)."""
+    The tools travel inside the system message and the calls are read from the reply text (see tools_in_system).
+    think=False switches off the hidden reasoning of hybrid models such as qwen3:8b ("reasoning_effort": "none");
+    leave it None for models that never think (qwen3:4b-instruct): Ollama may refuse the field there."""
     if tools:
         messages = tools_in_system(messages, tools)
     wire = []
@@ -788,6 +791,8 @@ def ollama_chat(model: str, messages: list[dict], tools: list[dict] | None = Non
         wire.append(x)
     body = {"model": model, "messages": wire, "temperature": temperature, "max_tokens": max_tokens, "stream": False,
             "keep_alive": "30m"}
+    if think is False:
+        body["reasoning_effort"] = "none"
     req = urllib.request.Request(url + "/v1/chat/completions", json.dumps(body).encode(), {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         res = json.load(r)

@@ -14,6 +14,33 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 26 October 2026: NO CLAUDE FOR NOW — CRM GUARDS ADDED, BIGGER-MODEL TEST READY FOR COLAB
+
+User decision: carry on without the Claude API for now (own models only).
+**CRM guards (commit 54d1ceb, 64 backend tests OK, 31 kit tests OK):**
+- `FactGuard`: a reply naming a number, currency, weekday, month or length of time that the script, the caller and
+  the tools never gave is dropped; the model gets one private note and tries again; a second invention → a person
+  takes over. Words said alongside a tool call are spoken only if they invent nothing. Same rule as the kit's
+  checker (Java and Python give identical lists on the test sentences). Known limit: numbers in the script's own
+  rules count as heard ("under 20 words" lets a bare "20" through); the weekday/month still give a date away.
+- `request_human_handoff` with an unknown reason_code → INVALID_ARGUMENT listing the valid ones (was: filed as
+  OUT_OF_SCOPE). Mirrored in FakeCrm/sim; `evaluate.py` counts a stopped fact against "the model alone".
+**Bigger free models (Apache 2.0):** qwen3:8b (5.2 GB) and qwen3:14b (9.3 GB) are hybrid "thinking" models →
+`evaluate.py --no-think` / `speed_test.py --no-think` (sends `reasoning_effort: "none"` / `think: false`; never to
+models that do not think). The only non-thinking bigger one, qwen3:30b-instruct (19 GB), does not fit a T4.
+`speed_test.py` (new): builds one template call and replays it turn by turn; laptop: ourvoice-r3 first turn 79.6 s,
+later median 11.6 s, slowest 21.2 s.
+**Colab notebook `test-bigger-models.ipynb`** (in `Desktop\Colab training`, 21:02, with the new colab-kit.zip):
+Ollama on the T4, pulls qwen2.5:7b (caller), qwen3:4b-instruct (our base = our speed), qwen3:8b, qwen3:14b; checks
+thinking is really off (stops if not); speed test of each model alone; the same 30 test calls for 8b and 14b
+(14b may not fit beside the caller: stop it if > 3 min per call); packs `test-results.zip` (logs + transcripts)
+for the user to download. Dry-run from a clean kit on the laptop OK (1 call, log + zip). Not testable here:
+Ollama install on Colab (same commands as round 1), thinking-off (self-checked), 14b fit.
+**Next:** user runs it; then read `test-results.zip` and decide the 6 Nov path with real speed + quality numbers.
+If an 8B/14B model is chosen, the CRM needs the same no-thinking switch (`LlmClients.OpenAiCompatible.body`).
+
+---
+
 # 24 October 2026, morning: ROUND 3 = 18/30 (60%) — NO BETTER THAN ROUND 1
 
 `data/eval-r3.log` (finished 12:08 am, no crash): **18/30 with the CRM safety net, 17/30 model alone** — identical to

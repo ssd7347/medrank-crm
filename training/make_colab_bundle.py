@@ -130,6 +130,115 @@ for f in glob.glob("{KIT}/**/{GGUF}", recursive=True):
             "nbformat": 4, "nbformat_minor": 0}
 
 
+# Bigger free models to compare with ours (Apache 2.0). 8B and 14B are "hybrid" models that reason before answering
+# unless told not to (--no-think); qwen3:4b-instruct is our model's base, so its speed is ours.
+CALLER = "qwen2.5:7b"
+CANDIDATES = [("qwen3:4b-instruct", False), ("qwen3:8b", True), ("qwen3:14b", True)]   # (model, needs --no-think)
+
+
+def test_notebook() -> dict:
+    here = f"%cd {KIT}"
+    no_think = [m for m, nt in CANDIDATES if nt]
+    pulls = "\n".join(f"!ollama pull {m} 2>&1 | tail -1" for m in [CALLER] + [m for m, _ in CANDIDATES])
+    speed = "\n".join(f"stop_all()\n!python -u speed_test.py --model {m}{' --no-think' if nt else ''}\n!ollama ps"
+                      for m, nt in CANDIDATES)
+    evals = "\n".join(f"!python -u evaluate.py --model {m} --no-think > data/eval-{m.replace(':', '_')}.log 2>&1; "
+                      f"tail -20 data/eval-{m.replace(':', '_')}.log" for m in no_think)
+    cells = [
+        md(f"""
+# Test bigger free models: speed on a GPU, and the same 30 test calls
+
+Free Google Colab GPU, **about 1 hour**. Nothing is trained and nothing is saved to Google Drive.
+Run the cells **in order, from the top**, one at a time.
+
+1. **Runtime → Change runtime type → T4 GPU**, then **Save**.
+2. Upload **colab-kit.zip** in the Files panel on the left (folder icon).
+3. Run each cell with ▶ and wait for it to finish before the next. Keep this tab open.
+
+Models: {', '.join(m for m, _ in CANDIDATES)} (all Apache 2.0); the test caller is {CALLER}.
+"""),
+        md("## 1. Check the GPU and unpack the kit"),
+        code(f"""
+!nvidia-smi --query-gpu=name,memory.total --format=csv
+!unzip -o -q /content/colab-kit.zip -d /content/kit && echo "Kit unpacked"
+{here}
+!python -m unittest test_callkit test_sim 2>&1 | tail -3
+"""),
+        md("## 2. Start Ollama and download the models (5–10 minutes)"),
+        code(f"""
+!apt-get -qq install -y zstd pciutils > /dev/null
+!curl -fsSL https://ollama.com/install.sh | sh > /dev/null 2>&1 && echo "Ollama installed"
+import os, subprocess, time, urllib.request
+env = dict(os.environ, OLLAMA_CONTEXT_LENGTH="8192", OLLAMA_MAX_LOADED_MODELS="2")
+subprocess.Popen(["ollama", "serve"], env=env, stdout=open("/content/ollama.log", "w"), stderr=subprocess.STDOUT)
+for _ in range(60):
+    try:
+        urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
+        print("Ollama is running")
+        break
+    except Exception:
+        time.sleep(1)
+else:
+    raise SystemExit("Ollama did not start: see /content/ollama.log")
+!ollama --version
+{pulls}
+"""),
+        md("## 3. Check that thinking is switched off (1 minute)\nMust end with **Thinking is off**. Otherwise stop and send a screenshot."),
+        code(f"""
+{here}
+# The same request evaluate.py sends (callkit.ollama_chat, think=False): any reasoning, in the text or in a field
+# of its own, means thinking is still on.
+import json, urllib.request
+for m in {no_think!r}:
+    body = {{"model": m, "messages": [{{"role": "user", "content": "Say hello in five words."}}], "max_tokens": 60,
+            "stream": False, "reasoning_effort": "none"}}
+    req = urllib.request.Request("http://localhost:11434/v1/chat/completions", json.dumps(body).encode(), {{"Content-Type": "application/json"}})
+    res = json.load(urllib.request.urlopen(req, timeout=300))
+    msg = res["choices"][0]["message"]
+    text = msg.get("content") or ""
+    print(m, "->", repr(text[:100]), "| other fields:", [k for k in msg if k not in ("role", "content")],
+          "| reply tokens:", res.get("usage", {{}}).get("completion_tokens"))
+    if "<think>" in text or not text.strip() or any(msg.get(k) for k in msg if "reason" in k or "think" in k):
+        raise SystemExit(m + " is still thinking (or said nothing): send a screenshot of this cell")
+print("Thinking is off")
+"""),
+        md("## 4. Speed: each model alone on the GPU (about 5 minutes)\n`ollama ps` under each one must say **100% GPU**."),
+        code(f"""
+{here}
+import subprocess
+def stop_all():
+    for line in subprocess.run(["ollama", "ps"], capture_output=True, text=True).stdout.splitlines()[1:]:
+        if line.split():
+            subprocess.run(["ollama", "stop", line.split()[0]])
+{speed}
+"""),
+        md(f"""
+## 5. The same 30 test calls (about 20 minutes per model)
+
+{no_think[0]} runs first. If {no_think[-1]} then takes **more than 3 minutes per call** (it may not fit on the GPU
+next to the test caller), stop it with ■ and go on to cell 6: the {no_think[0]} result is the important one.
+"""),
+        code(f"""
+{here}
+import subprocess
+for line in subprocess.run(["ollama", "ps"], capture_output=True, text=True).stdout.splitlines()[1:]:
+    if line.split():
+        subprocess.run(["ollama", "stop", line.split()[0]])
+!mkdir -p data
+{evals}
+"""),
+        md("## 6. Download the results\nThen right-click **test-results.zip** in the Files panel → **Download**, and send it to Claude (a few hundred KB)."),
+        code(f"""
+{here}
+!cd data && zip -q /content/test-results.zip eval-*.log eval-*.jsonl && ls -l /content/test-results.zip
+"""),
+    ]
+    return {"cells": cells, "metadata": {"accelerator": "GPU", "colab": {"provenance": []},
+                                         "kernelspec": {"display_name": "Python 3", "name": "python3"},
+                                         "language_info": {"name": "python"}},
+            "nbformat": 4, "nbformat_minor": 0}
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
     zpath = OUT / "colab-kit.zip"
@@ -137,10 +246,10 @@ def main() -> None:
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         for src, name in files:
             z.write(src, name)
-    nb = OUT / "train-on-colab.ipynb"
-    nb.write_text(json.dumps(notebook(), indent=1, ensure_ascii=False), encoding="utf-8")
+    for name, nb in (("train-on-colab.ipynb", notebook()), ("test-bigger-models.ipynb", test_notebook())):
+        (OUT / name).write_text(json.dumps(nb, indent=1, ensure_ascii=False), encoding="utf-8")
+        print(f"Wrote {OUT / name}")
     print(f"Wrote {zpath} ({len(files)} files, {zpath.stat().st_size // 1024} KB)")
-    print(f"Wrote {nb}")
 
 
 if __name__ == "__main__":

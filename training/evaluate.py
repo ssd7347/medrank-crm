@@ -29,6 +29,8 @@ def main() -> None:
     ap.add_argument("--url", default="http://localhost:11434")
     ap.add_argument("--show", action="store_true", help="print the failed conversations")
     ap.add_argument("--resume-log", help="log of an earlier run that was stopped: its finished calls are not run again")
+    ap.add_argument("--no-think", action="store_true",
+                    help="switch off hidden reasoning, for hybrid models such as qwen3:8b / qwen3:14b (too slow on a phone)")
     a = ap.parse_args()
     # The log is usually redirected to a file, which Windows writes in cp1252: a model's "₹" would stop the test.
     sys.stdout.reconfigure(encoding="utf-8")
@@ -59,7 +61,7 @@ def main() -> None:
             continue
         # Each test call has its own random seed, so the same calls come out whether or not the run was stopped.
         rec, stopped = simulate(script, scenario, random.Random(a.seed * 1000 + i), a.model, caller, coach=False,
-                                agent_temperature=0.3, url=a.url)
+                                agent_temperature=0.3, url=a.url, agent_think=False if a.no_think else None)
         # Scored as the live CRM handles the call (its safety net included); "alone" is the model with no help,
         # the strict rule every score before 23 October 2026 used.
         problems = ([stopped] if stopped else []) + (check(rec, crm_net=True) if rec else [])

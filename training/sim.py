@@ -89,7 +89,8 @@ def clean_caller(text: str) -> str:
 
 
 def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, caller_model: str, coach: bool,
-             agent_temperature: float = 0.5, url: str = "http://localhost:11434") -> tuple[dict | None, str]:
+             agent_temperature: float = 0.5, url: str = "http://localhost:11434",
+             agent_think: bool | None = None) -> tuple[dict | None, str]:
     """Runs one call. Returns (record, "") or (record or None, why it stopped early)."""
     call = new_call(script, rng, known=scenario.known)
     system = call.system_prompt()
@@ -122,7 +123,7 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
         for _ in range(MAX_ROUNDS):
             try:
                 r = ollama_chat(agent_model, [{"role": "system", "content": hidden + reminder + facts_note}] + history, TOOLS,
-                                temperature=agent_temperature, url=url, max_tokens=300)
+                                temperature=agent_temperature, url=url, max_tokens=300, think=agent_think)
             except urllib.error.HTTPError as e:
                 # Ollama could not read the model's reply (usually a broken tool call): the model's mistake, so it
                 # counts against this call. On a real call the CRM hands over to a person in this case.
