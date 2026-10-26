@@ -14,6 +14,24 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 26 October 2026, 9:30 pm: GPU SPEED MEASURED (Colab T4) — FAST ENOUGH FOR THE PHONE
+
+`speed_test.py` on a free T4, each model alone, 100% GPU (`ollama ps`), one 'Overdue follow-up' call replayed:
+
+| Model | Later turns median / slowest | Writing | First turn (of which loading the model) |
+|---|---|---|---|
+| qwen3:4b-instruct (= our model's speed) | 0.5 s / 1.0 s | — | 13.9 s (mostly loading) |
+| qwen3:8b (no thinking) | **1.0 s / 1.4 s** | ~34 tok/s | 22.6 s (20.2 s loading; read 1.8 s + write 0.6 s) |
+| qwen3:14b (no thinking) | 1.5 s / 2.7 s | ~17.5 tok/s | 38.7 s (34.3 s loading; read 3.0 s + write 1.3 s) |
+
+Laptop for comparison: 6.5–21 s per turn. Loading happens once on a server (the model stays loaded), so a real
+first turn ≈ 2.4 s (8b) / 4.3 s (14b). Speed is solved on any T4-class GPU; 8b fits the ~2 s target, 14b is borderline.
+Cell 3 printed "Thinking is off" (the run reached cell 4). **Running:** the 30-call quality test for 8b, then 14b
+(cell 5); the user downloads `test-results.zip` before 11 pm (internet cut-off; Colab deletes everything on
+disconnect). If it is lost: rerun the notebook — only cell 5 matters, about 45 minutes.
+
+---
+
 # 26 October 2026: NO CLAUDE FOR NOW — CRM GUARDS ADDED, BIGGER-MODEL TEST READY FOR COLAB
 
 User decision: carry on without the Claude API for now (own models only).
