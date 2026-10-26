@@ -65,6 +65,8 @@ def main() -> None:
         problems = ([stopped] if stopped else []) + (check(rec, crm_net=True) if rec else [])
         alone = ([stopped] if stopped else []) + (check(rec) if rec else [])
         rec = rec or {"meta": {"script": script.name, "scenario": scenario.id}}
+        # A made-up fact the CRM's FactGuard stopped never reached the caller, but it is still the model's mistake.
+        alone += [f"the CRM stopped a made-up fact ({', '.join(f)})" for f in rec["meta"].get("crm_corrections", [])]
         rec["meta"].update(test=i, problems=problems, problems_alone=alone)
         write_jsonl(out, [rec], "a")
         done[i] = rec

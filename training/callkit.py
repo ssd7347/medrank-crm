@@ -307,6 +307,7 @@ class FakeCrm:
     settled: bool = False          # a call-back or the identity lock-out already recorded the outcome (settles_the_call)
     over: bool = False
     tool_log: list[tuple[str, dict, dict]] = field(default_factory=list)   # (name, args, parsed result)
+    corrections: list[list[str]] = field(default_factory=list)   # facts the CRM's FactGuard stopped (see sim.py)
 
     # ---- context and prompt
 
@@ -444,7 +445,9 @@ class FakeCrm:
     def t_request_human_handoff(self, args):
         reason = str(args.get("reason_code") or "").upper()
         if reason not in SPEC["handoff_reasons"]:
-            reason = "OUT_OF_SCOPE"
+            # VoiceTools.handoff: an invented reason is refused and the model asks again; nothing is handed over.
+            return result_json(False, code="INVALID_ARGUMENT", msg="reason_code must be one of: " + ", ".join(SPEC["handoff_reasons"])
+                               + ". A wrong person is not a hand-over: use log_call_outcome with WRONG_PERSON.")
         if reason == "VERIFICATION_FAILED":
             self.outcome = "VERIFICATION_FAILED"
         elif self.outcome not in ("OPTED_OUT", "VERIFICATION_FAILED"):
@@ -723,7 +726,8 @@ def record(call: FakeCrm, messages: list[dict], source: str, scenario: str, expe
             (private if f.access == "AFTER_VERIFY" else never if f.access == "NONE" else []).extend(forms)
     return {"messages": messages, "tools": TOOLS,
             "meta": {"source": source, "script": call.script.name, "industry": call.script.industry, "scenario": scenario,
-                     "expect": expect, "private_values": sorted(private), "never_values": sorted(never)}}
+                     "expect": expect, "private_values": sorted(private), "never_values": sorted(never),
+                     **({"crm_corrections": call.corrections} if call.corrections else {})}}
 
 
 # --------------------------------------------------------------------------------------------- local model

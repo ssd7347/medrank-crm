@@ -108,6 +108,36 @@ class SimTest(unittest.TestCase):
         self.assertEqual(callkit.settles_the_call("verify_identity", {"ok": True, "data": {"verified": False, "attempts_left": 2}}), None)
         self.assertEqual(callkit.settles_the_call("schedule_callback", {"ok": False}), None)
 
+    def test_a_made_up_date_is_never_spoken_and_the_model_tries_again(self):
+        def agent(msgs, reminded):
+            if "PRIVATE NOTE" in msgs[0]["content"]:
+                return tool("log_call_outcome", outcome_code="NOT_INTERESTED") if msgs[-1]["role"] != "tool" \
+                    else say("No problem. Thank you, goodbye.")
+            return say("Your visit is on Thursday, 20th April. Can you come?")
+        fake = FakeModel(lambda m: "No, I'm not interested anymore.", agent)
+        rec, why = self.run_call(fake, "Enquiry follow-up", "not_interested", coach=False)
+        self.assertEqual(why, "")
+        spoken = " ".join(m.get("content") or "" for m in rec["messages"] if m["role"] == "assistant")
+        self.assertNotIn("Thursday", spoken)
+        # "20" passes on its own: the script's style rule says "under 20 words", so it counts as heard. The weekday
+        # and month are what give the invented date away.
+        self.assertEqual(rec["meta"]["crm_corrections"], [["thursday", "april"]])
+
+    def test_a_model_that_keeps_inventing_facts_is_handed_to_a_person(self):
+        fake = FakeModel(lambda m: "Okay.", lambda msgs, reminded: say("You owe 5,000 rupees by Friday."))
+        rec, why = self.run_call(fake, "Enquiry follow-up", "not_interested", coach=False)
+        self.assertEqual(why, "the CRM handed the call to a person: the agent kept stating facts it was not given")
+        self.assertEqual(len(rec["meta"]["crm_corrections"]), 2)
+        self.assertNotIn("5,000", " ".join(m.get("content") or "" for m in rec["messages"]))
+
+    def test_an_invented_hand_over_reason_is_refused(self):
+        call = callkit.new_call(script("Enquiry follow-up"), random.Random(3))
+        res = __import__("json").loads(call.run("request_human_handoff", {"reason_code": "DISPUTE", "summary": "x"}))
+        self.assertEqual((res["ok"], res["error_code"]), (False, "INVALID_ARGUMENT"))
+        self.assertIn("COMPLAINT_OR_DISPUTE", res["error_message"])
+        self.assertIsNone(call.outcome)
+        self.assertTrue(__import__("json").loads(call.run("request_human_handoff", {"reason_code": "CALLER_REQUEST", "summary": "x"}))["ok"])
+
     def test_a_caller_who_only_gives_a_stage_direction_is_asked_again(self):
         replies = iter(["*hangs up*", "No, I'm not interested anymore."])
         caller = lambda msgs: next(replies, "Okay.")

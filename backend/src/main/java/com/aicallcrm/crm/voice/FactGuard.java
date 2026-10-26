@@ -1,0 +1,72 @@
+package com.aicallcrm.crm.voice;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Stops a model from saying a fact nobody gave it. A small model's worst habit on a phone call is inventing an amount,
+ * a date or a deadline ("your visit is on Thursday, 20th April"): every number, currency, weekday, month and length
+ * of time in a reply must already have been heard in the call, in the script, from the caller or from a tool.
+ * The same rule as the training kit's checker ({@code training/callkit.py}, {@code ungrounded}).
+ */
+final class FactGuard {
+
+    private FactGuard() {
+    }
+
+    private static final Pattern NUMBER = Pattern.compile("\\d+");
+    private static final Pattern CURRENCY = Pattern.compile("\\$|\\busd\\b|\\bdollars?\\b|\\brs\\.?\\s*\\d|₹|\\blakhs?\\b|\\bcrores?\\b");
+    private static final List<String> DAYS_AND_MONTHS = List.of("monday", "tuesday", "wednesday", "thursday", "friday",
+            "saturday", "sunday", "january", "february", "march", "april", "may", "june", "july", "august", "september",
+            "october", "november", "december");
+    /** "may" is also an ordinary word ("may I have your name"): only a date counts. */
+    private static final Pattern MAY_DATE = Pattern.compile("\\b(\\d+\\s+may|may\\s+\\d+)\\b");
+    private static final Pattern DURATION = Pattern.compile("\\b(\\d+|one|two|three|four|five|six|seven|eight|nine|ten|"
+            + "eleven|twelve|fifteen|twenty|thirty|few|couple of)\\s+(minute|hour|day|week|month|year)s?\\b");
+
+    /** The facts in {@code said} that {@code heard} never contained; empty when the reply is grounded. */
+    static List<String> unheard(String said, String heard) {
+        String s = said == null ? "" : said.toLowerCase(Locale.ROOT);
+        String h = heard == null ? "" : heard.toLowerCase(Locale.ROOT);
+        Set<String> out = new LinkedHashSet<>();
+        Set<String> numbersHeard = new HashSet<>();
+        for (Matcher m = NUMBER.matcher(h); m.find(); ) {
+            numbersHeard.add(m.group());
+        }
+        for (Matcher m = NUMBER.matcher(s); m.find(); ) {
+            if (!numbersHeard.contains(m.group())) {
+                out.add(m.group());
+            }
+        }
+        Matcher c = CURRENCY.matcher(s);
+        if (c.find() && !CURRENCY.matcher(h).find()) {
+            out.add(c.group());
+        }
+        for (String word : DAYS_AND_MONTHS) {
+            Pattern w = Pattern.compile("\\b" + word + "\\b");
+            if (w.matcher(s).find() && !w.matcher(h).find() && (!"may".equals(word) || MAY_DATE.matcher(s).find())) {
+                out.add(word);
+            }
+        }
+        for (Matcher m = DURATION.matcher(s); m.find(); ) {
+            if (!h.contains(m.group())) {
+                out.add(m.group());
+            }
+        }
+        return new ArrayList<>(out);
+    }
+
+    /** The private note the model gets once, with the reply it must not repeat left out of the call. */
+    static String reminder(List<String> facts) {
+        return "\n\nPRIVATE NOTE (never mention it): your last reply stated " + String.join(", ", facts)
+                + ", which no tool returned and the caller did not say. Never guess a date, time, amount or number."
+                + " Use only what the tools or the caller gave. If you do not have it, say you cannot check right now"
+                + " and offer a call-back.";
+    }
+}

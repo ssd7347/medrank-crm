@@ -345,7 +345,11 @@ public class VoiceTools {
         try {
             reason = HandoffReason.valueOf(String.valueOf(text(args, "reason_code")).toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            reason = HandoffReason.OUT_OF_SCOPE;
+            // An invented reason ("DISPUTE", "WRONG_PERSON") would file the call under the wrong heading: the model
+            // is told the valid ones and asks again. Nothing has been handed over yet.
+            return ToolResult.error(ToolResult.INVALID_ARGUMENT, "reason_code must be one of: "
+                    + String.join(", ", Arrays.stream(HandoffReason.values()).map(Enum::name).toList())
+                    + ". A wrong person is not a hand-over: use log_call_outcome with WRONG_PERSON.");
         }
         String summary = text(args, "summary");
         Handoff h = handoffs.handoff(call, reason, summary == null ? "No summary was given." : summary);

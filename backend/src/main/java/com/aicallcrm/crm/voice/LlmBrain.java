@@ -185,12 +185,25 @@ public class LlmBrain {
             s.history.add(Message.user(said.trim()));
             List<ToolSpec> specs = specs();
             try {
+                // Set once a reply stated a fact nobody gave it (FactGuard): the model is asked once more with a note.
+                String factNote = "";
                 for (int round = 0; round < MAX_ROUNDS; round++) {
-                    Reply r = s.client.chat(s.system, s.history, specs);
+                    Reply r = s.client.chat(s.system + factNote, s.history, specs);
                     if (r.toolCalls().isEmpty()) {
                         String text = brief(spoken(r.text()));
                         if (text.isEmpty()) {
                             text = "Sorry, could you say that again?";
+                        }
+                        List<String> made = FactGuard.unheard(text, heard(s));
+                        if (!made.isEmpty()) {
+                            // The caller never hears it: the reply is dropped. A second invention goes to a person.
+                            log.info("Call {}: the {} brain stated facts nobody gave it: {}", callId, s.kind, made);
+                            if (factNote.isEmpty()) {
+                                factNote = FactGuard.reminder(made);
+                                continue;
+                            }
+                            handOver(callId, s, "The AI agent kept stating facts it was not given (" + String.join(", ", made) + ").", out);
+                            return out;
                         }
                         s.history.add(Message.assistant(text, List.of(), r.raw()));
                         out.add(Line.agent(text));
@@ -211,8 +224,10 @@ public class LlmBrain {
                         return out;
                     }
                     s.history.add(Message.assistant(r.text(), r.toolCalls(), r.raw()));
-                    if (!spoken(r.text()).isEmpty()) {
-                        out.add(Line.agent(brief(spoken(r.text()))));
+                    String alongside = brief(spoken(r.text()));
+                    // Words said alongside a tool call are spoken only if they invent nothing; the tools still run.
+                    if (!alongside.isEmpty() && FactGuard.unheard(alongside, heard(s)).isEmpty()) {
+                        out.add(Line.agent(alongside));
                     }
                     for (ToolCall c : r.toolCalls()) {
                         ToolResult res = executor.execute(callId, c.name(), c.arguments());
@@ -270,6 +285,17 @@ public class LlmBrain {
             return text.trim();
         }
         return parts[0] + " " + parts[1] + " " + parts[parts.length - 1];
+    }
+
+    /** What the agent may state: the script and call context, the caller's words and the tools' answers. */
+    private static String heard(Session s) {
+        StringBuilder h = new StringBuilder(s.system);
+        for (Message m : s.history) {
+            if (!"assistant".equals(m.role()) && m.text() != null) {
+                h.append(' ').append(m.text());
+            }
+        }
+        return h.toString();
     }
 
     private void handOver(UUID callId, Session s, String why, List<Line> out) {

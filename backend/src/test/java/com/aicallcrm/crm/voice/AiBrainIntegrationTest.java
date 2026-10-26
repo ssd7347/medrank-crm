@@ -178,6 +178,48 @@ class AiBrainIntegrationTest {
     }
 
     @Test
+    void aMadeUpDateIsNeverSpoken() throws Exception {
+        String admin = admin();
+        long contact = contact(admin);
+        String callId = JsonPath.read(mvc.perform(auth(post("/api/voice/test-calls"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contactId\":" + contact + ",\"scriptName\":\"Enquiry follow-up\",\"brain\":\"LOCAL\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        mvc.perform(auth(post("/api/voice/test-calls/" + callId + "/say"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"Okay, when is my visit?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.over").value(false))
+                // The invented "Thursday, 20th April" is dropped; the caller hears only the second, honest answer.
+                .andExpect(jsonPath("$.added[?(@.role == 'agent')].text").value(Matchers.contains(
+                        "I'm sorry, I can't check that right now. Shall I ask our team to call you?")));
+    }
+
+    @Test
+    void factsNobodyGaveAreCaught() {
+        String heard = "Short sentences (under 20 words). Your EMI amount is 5,000 rupees, due Friday 3 October 2026.";
+        assertThat(FactGuard.unheard("Your visit is on Thursday, 20th April.", heard)).containsExactly("thursday", "april");
+        assertThat(FactGuard.unheard("Your EMI of 5,000 rupees is due on Friday 3 October 2026.", heard)).isEmpty();
+        // The same list as the training kit's checker gives (sim.unheard): a number and a length of time.
+        assertThat(FactGuard.unheard("You owe 7,500 rupees within 2 days.", heard)).containsExactly("7", "500", "2", "2 days");
+        // "may" as an ordinary word is not a month.
+        assertThat(FactGuard.unheard("May I have your full name?", heard)).isEmpty();
+        assertThat(FactGuard.unheard("It is due on 12 May.", heard)).containsExactly("12", "may");
+    }
+
+    @Test
+    void anInventedHandOverReasonIsAskedAgain() throws Exception {
+        String admin = admin();
+        long contact = contact(admin);
+        String callId = JsonPath.read(mvc.perform(auth(post("/api/voice/test-calls"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contactId\":" + contact + ",\"scriptName\":\"Enquiry follow-up\",\"brain\":\"LOCAL\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        mvc.perform(auth(post("/api/voice/test-calls/" + callId + "/say"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"Please connect me to a person.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.added[?(@.tool == 'request_human_handoff')].status").value(Matchers.contains("INVALID_ARGUMENT", "OK")))
+                .andExpect(jsonPath("$.over").value(true));
+    }
+
+    @Test
     void whenTheModelFailsAPersonTakesOver() throws Exception {
         String admin = admin();
         long contact = contact(admin);
@@ -268,6 +310,20 @@ class AiBrainIntegrationTest {
         }
         String lastCaller = messages.stream().filter(m -> "user".equals(m.get("role"))).reduce((a, b) -> b)
                 .map(m -> String.valueOf(m.get("content"))).orElse("");
+        if (lastCaller.contains("when is my visit")) {
+            // Invents a date, unless the CRM's private note (FactGuard) told it not to guess.
+            answer(ex, String.valueOf(messages.get(0).get("content")).contains("PRIVATE NOTE")
+                    ? "I'm sorry, I can't check that right now. Shall I ask our team to call you?"
+                    : "Your visit is on Thursday, 20th April.");
+            return;
+        }
+        if (lastCaller.contains("connect me")) {
+            // Invents a hand-over reason first; uses a valid one once the CRM refuses it.
+            String last = String.valueOf(lastMsg.get("content"));
+            answer(ex, !"tool".equals(lastMsg.get("role")) ? handoff("DISPUTE")
+                    : last.contains("INVALID_ARGUMENT") ? handoff("CALLER_REQUEST") : "Of course. Please stay on the line.");
+            return;
+        }
         if (lastCaller.contains("call me later")) {
             // Books the call-back, then forgets log_call_outcome and says goodbye.
             String content = "tool".equals(lastMsg.get("role")) ? "Of course. Our team will call you back. Thank you, goodbye."
@@ -284,6 +340,16 @@ class AiBrainIntegrationTest {
         // As Ollama returns it when no tools are passed: the model's own <tool_call> text.
         reply(ex, 200, JSON.writeValueAsString(Map.of("choices", List.of(Map.of("message", Map.of("role", "assistant",
                 "content", "<tool_call>\n{\"name\": \"search_faq\", \"arguments\": {\"query\": \"opening hours\"}}\n</tool_call>"))))));
+    }
+
+    private static String handoff(String reason) {
+        return "<tool_call>\n{\"name\": \"request_human_handoff\", \"arguments\": {\"reason_code\": \"" + reason
+                + "\", \"summary\": \"Asked for a person.\"}}\n</tool_call>";
+    }
+
+    private static void answer(HttpExchange ex, String content) throws IOException {
+        reply(ex, 200, JSON.writeValueAsString(Map.of("choices", List.of(Map.of("message", Map.of("role", "assistant",
+                "content", content))))));
     }
 
     private static void reply(HttpExchange ex, int status, String json) throws IOException {

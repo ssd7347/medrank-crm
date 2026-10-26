@@ -12,7 +12,7 @@ import random
 import re
 import urllib.error
 
-from callkit import CONNECTED, MAX_ROUNDS, TOOLS, FakeCrm, new_call, ollama_chat, record, spoken
+from callkit import CONNECTED, MAX_ROUNDS, TOOLS, FakeCrm, new_call, ollama_chat, record, spoken, ungrounded
 from scenarios import Scenario
 
 MAX_CALLER_TURNS = 12
@@ -67,6 +67,21 @@ def caller_prompt(call: FakeCrm, scenario: Scenario) -> str:
     return CALLER.format(name=name, company=call.company, who=who, facts=facts, brief=scenario.brief, wrong=wrong)
 
 
+def unheard(said: str, history: list[dict], system: str) -> list[str]:
+    """FactGuard.unheard(): the facts in a reply that the script, the caller and the tools never gave."""
+    heard = " ".join([system] + [m.get("content") or "" for m in history if m["role"] != "assistant"]).lower()
+    facts = [p[p.rindex("(") + 1:-1] for p in ungrounded(said.lower(), heard)]
+    return list(dict.fromkeys(facts))
+
+
+def fact_note(facts: list[str]) -> str:
+    """FactGuard.reminder(), word for word."""
+    return ("\n\nPRIVATE NOTE (never mention it): your last reply stated " + ", ".join(facts)
+            + ", which no tool returned and the caller did not say. Never guess a date, time, amount or number."
+            + " Use only what the tools or the caller gave. If you do not have it, say you cannot check right now"
+            + " and offer a call-back.")
+
+
 def clean_caller(text: str) -> str:
     t = re.sub(r"^\s*(\w+\s*)?(caller|customer|me|you)\s*:\s*", "", text.strip(), flags=re.I)
     t = re.sub(r"\(.*?\)|\*.*?\*", "", t).strip().strip('"').strip()
@@ -103,9 +118,10 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
         history.append({"role": "user", "content": said})
         # ---- the agent answers, using tools as often as it needs (as LlmBrain.respond does)
         reminder = ""
+        facts_note = ""          # as LlmBrain.respond: set once a reply invented a fact, for this caller turn
         for _ in range(MAX_ROUNDS):
             try:
-                r = ollama_chat(agent_model, [{"role": "system", "content": hidden + reminder}] + history, TOOLS,
+                r = ollama_chat(agent_model, [{"role": "system", "content": hidden + reminder + facts_note}] + history, TOOLS,
                                 temperature=agent_temperature, url=url, max_tokens=300)
             except urllib.error.HTTPError as e:
                 # Ollama could not read the model's reply (usually a broken tool call): the model's mistake, so it
@@ -116,6 +132,15 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                 text = spoken(r["content"])
                 if not text:
                     return None, "the agent gave an empty reply"
+                made = unheard(text, history, system)
+                if made:
+                    # The CRM's FactGuard: the caller never hears it; one more try with a note, then a person.
+                    call.corrections.append(made)
+                    if not facts_note:
+                        facts_note = fact_note(made)
+                        continue
+                    return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id,
+                                  scenario.expect), "the CRM handed the call to a person: the agent kept stating facts it was not given"
                 if not call.closing and coach and not reminder and CLOSING_WORDS.search(text):
                     # Writing training calls: drop this reply and ask again with a private reminder, so only the
                     # corrected turn is kept. (Never while testing: there the mistake must count.)
@@ -135,7 +160,10 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
             for c in r["tool_calls"]:
                 n += 1
                 calls.append({"id": f"call_{n}", "type": "function", "function": c["function"]})
-            history.append({"role": "assistant", "content": spoken(r["content"]), "tool_calls": calls})
+            alongside = spoken(r["content"])
+            # As LlmBrain: words said alongside a tool call are spoken (and kept) only if they invent nothing.
+            history.append({"role": "assistant", "content": alongside if not unheard(alongside, history, system) else "",
+                            "tool_calls": calls})
             for c in calls:
                 out = call.run(c["function"]["name"], c["function"]["arguments"] if isinstance(c["function"]["arguments"], dict) else {})
                 history.append({"role": "tool", "tool_call_id": c["id"], "name": c["function"]["name"], "content": out})
