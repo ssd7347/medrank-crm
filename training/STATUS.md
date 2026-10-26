@@ -14,6 +14,31 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 26 October 2026, 10:40 pm: BIGGER MODELS, UNTRAINED — 8B 14/30 (47%), 14B 5/11
+
+Colab disconnected once (~9:46 pm); the user stopped cell 5 and downloaded `test-results.zip` (copies in
+`data/eval-qwen3_8b.*`, `data/eval-qwen3_14b.*`). Same 30 calls, scored with the CRM guards (FactGuard is new, so
+earlier scores did not have it):
+
+| Model | Training | With CRM safety net | Model alone |
+|---|---|---|---|
+| qwen3:4b-instruct | none | 6/30 (20%) | 6/30 |
+| **qwen3:8b** (no thinking) | **none** | **14/30 (47%)** | 10/30 |
+| qwen3:14b (no thinking) | none | 5/11 finished (45%) | — |
+| ourvoice r1 / r3 (4B) | rounds 1 / 3 | 18/30 (60%) | 17/30 |
+
+- **FactGuard works and is not over-strict:** every stop in these runs was a real invention ("₹15,000", "April",
+  "2023", "March", "15 October"); 3 of 8b's calls ended with a person taking over because it invented twice.
+- **8b's failures are the ones training fixed for the 4B:** no `log_call_outcome` (6), emojis (6 — "Take care! 😊"),
+  goodbye before recording, invented amounts, `search_faq` skipped. Untrained 8b is already 2.3× the untrained 4B.
+- 14b: no better than 8b on its first 11 calls and slower (1.5 s vs 1.0 s per turn) → 8b is the candidate.
+**Next (decide with the user):** train qwen3:8b with the round 3 data on Colab (same kit; base model change in
+finetune.py/the notebook; a T4 should fit 8B with 4-bit LoRA — check memory and time first), then the same 30-call
+test. Also: make the Colab notebooks save results to Google Drive after every call (a disconnect lost the end of
+the 14b run).
+
+---
+
 # 26 October 2026, 9:30 pm: GPU SPEED MEASURED (Colab T4) — FAST ENOUGH FOR THE PHONE
 
 `speed_test.py` on a free T4, each model alone, 100% GPU (`ollama ps`), one 'Overdue follow-up' call replayed:
