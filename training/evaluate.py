@@ -29,6 +29,8 @@ def main() -> None:
     ap.add_argument("--url", default="http://localhost:11434")
     ap.add_argument("--show", action="store_true", help="print the failed conversations")
     ap.add_argument("--resume-log", help="log of an earlier run that was stopped: its finished calls are not run again")
+    ap.add_argument("--out-dir", default=str(DATA),
+                    help="where the per-call results go; on Colab a Google Drive folder, so a disconnect loses nothing")
     ap.add_argument("--no-think", action="store_true",
                     help="switch off hidden reasoning, for hybrid models such as qwen3:8b / qwen3:14b (too slow on a phone)")
     a = ap.parse_args()
@@ -45,7 +47,7 @@ def main() -> None:
     tests = (held + rest)[:a.calls]
 
     # Results are saved after every call, so a stopped test (laptop shut down) carries on where it left off.
-    out = DATA / f"eval-{a.model.replace(':', '_').replace('/', '_')}.jsonl"
+    out = Path(a.out_dir) / f"eval-{a.model.replace(':', '_').replace('/', '_')}.jsonl"
     done = {r["meta"]["test"]: r for r in read_jsonl(out) if "test" in r.get("meta", {})}
     if a.resume_log:
         # Calls finished by a run that did not save per call: their PASS/FAIL lines in its log count too.
@@ -69,6 +71,8 @@ def main() -> None:
         rec = rec or {"meta": {"script": script.name, "scenario": scenario.id}}
         # A made-up fact the CRM's FactGuard stopped never reached the caller, but it is still the model's mistake.
         alone += [f"the CRM stopped a made-up fact ({', '.join(f)})" for f in rec["meta"].get("crm_corrections", [])]
+        if rec["meta"].get("thinking_turns"):
+            alone.append(f"wrote hidden reasoning in {rec['meta']['thinking_turns']} replies (slow on a phone)")
         rec["meta"].update(test=i, problems=problems, problems_alone=alone)
         write_jsonl(out, [rec], "a")
         done[i] = rec

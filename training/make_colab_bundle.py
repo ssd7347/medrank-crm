@@ -239,6 +239,147 @@ for line in subprocess.run(["ollama", "ps"], capture_output=True, text=True).std
             "nbformat": 4, "nbformat_minor": 0}
 
 
+# Qwen3-8B trained on the round 3 data (Apache 2.0). Untrained it scored 14/30 against the 4B's 6/30 (26 Oct).
+BASE8 = "unsloth/Qwen3-8B"
+NAME8 = "ourvoice8b"
+KEEP8 = f"/content/drive/MyDrive/ourvoice-training-8b-r{ROUND}"
+RESULTS8 = f"{KEEP8}/results"
+NEED8_GB = 3.0              # checkpoints (~1 GB each, two kept) and the adapter; the 5 GB model file only if room
+
+
+def notebook_8b() -> dict:
+    here = f"%cd {KIT}"
+    find_gguf = (f'import glob\nlocal = sorted(glob.glob("{KIT}/out8b*/**/*.gguf", recursive=True))\n'
+                 f'saved = sorted(glob.glob("{KEEP8}/*.gguf"))\ngguf = (local or saved or [None])[0]\n'
+                 f'print("Model file:", gguf)')
+    cells = [
+        md(f"""
+# Train the 8B model and test it, all on Colab
+
+Round {ROUND} data on **Qwen3-8B** (Apache 2.0), then the same 30 test calls on the GPU. About **3 hours** in all:
+training ~2 h, building the model file ~30–45 min, test ~25 min. It can be spread over several sessions:
+**everything slow is saved to Google Drive** (`{KEEP8}`): training progress every 10 steps, the trained adapter,
+every finished test call, and the model file when Drive has room.
+
+1. **Runtime → Change runtime type → T4 GPU**, then **Save**.
+2. Upload **colab-kit.zip** in the Files panel on the left (folder icon).
+3. Run the cells **in order, one at a time**. Keep this tab open; click in it now and then.
+
+**After a disconnect:** reconnect, upload colab-kit.zip again and run the cells from the top. Training and the test
+carry on where they stopped; cell 5 skips finished training and only rebuilds the model file if it was not saved.
+"""),
+        md("## 1. Check the GPU and unpack the kit"),
+        code(f"""
+!nvidia-smi --query-gpu=name,memory.total --format=csv
+!unzip -o -q /content/colab-kit.zip -d /content/kit && echo "Kit unpacked"
+{here}
+!python -m unittest test_callkit test_sim 2>&1 | tail -3
+"""),
+        md("## 2. Connect Google Drive\nColab asks you to allow access."),
+        code(f"""
+import shutil
+from google.colab import drive
+drive.mount("/content/drive")
+free_gb = shutil.disk_usage("/content/drive/MyDrive").free / 1e9
+print(f"Google Drive free space: {{free_gb:.1f}} GB")
+if free_gb < {NEED8_GB}:
+    raise SystemExit("Not enough Google Drive space (need {NEED8_GB} GB). In Drive, delete the checkpoints folders inside "
+                     "MyDrive/ourvoice-training, ourvoice-training-r2 and ourvoice-training-r3 (keep ourvoice-lora) and "
+                     "any .gguf file there, empty the Trash, then run this cell again.")
+!mkdir -p {RESULTS8} && echo "Saving to {KEEP8}"
+"""),
+        md("## 3. Install the training tool (3–5 minutes)"),
+        code("!pip install -q unsloth 2>&1 | tail -1"),
+        md("## 4. Make the training data and check it in the 8B model's own format (about 2 minutes)\nThe last line must say **0 with problems**."),
+        code(f"""
+{here}
+!python make_templates.py --per {PER} | head -1
+!python build_dataset.py | head -1
+!python check_chat_format.py --base {BASE8} > check8.log 2>&1; tail -3 check8.log
+"""),
+        md(f"""
+## 5. Train (about 2 hours), then build the model file (30–45 minutes)
+
+Progress is saved to Google Drive every 10 steps. The first lines must show the 8B model loading and a step count
+of about 64. If it stops with **out of memory**, send a screenshot.
+"""),
+        code(f"""
+{here}
+import glob, os, shutil
+!nvidia-smi --query-gpu=memory.used,memory.total --format=csv
+checked = os.path.exists("check8.log") and " 0 with problems" in open("check8.log").read()
+if glob.glob("{KEEP8}/*.gguf"):
+    print("The model file is already in Google Drive: nothing to train or build. Go on to cell 6.")
+elif not checked:
+    print("Not trained: run cell 4 first; it must say '0 with problems'")
+else:
+    get_ipython().system("python finetune.py --base {BASE8} --batch 1 --accum 16 --train data/train.jsonl "
+                         "--val data/val.jsonl --epochs {EPOCHS} --keep {KEEP8} --out out8b")
+    built = sorted(glob.glob("{KIT}/out8b*/**/*.gguf", recursive=True))
+    free_gb = shutil.disk_usage("/content/drive/MyDrive").free / 1e9
+    if built and free_gb > 6:
+        shutil.copy(built[0], "{KEEP8}/{NAME8}.Q4_K_M.gguf")
+        print("Model file also saved to Google Drive")
+    elif built:
+        print(f"Model file NOT copied to Drive ({{free_gb:.1f}} GB free, 6 needed): after a disconnect this cell rebuilds it.")
+"""),
+        md("## 6. Load the trained model into Ollama (about 5 minutes)\nMust end with **Answers directly**."),
+        code(f"""
+{here}
+import os, shutil, subprocess, time, urllib.request, json
+!apt-get -qq install -y zstd pciutils > /dev/null
+!curl -fsSL https://ollama.com/install.sh | sh > /dev/null 2>&1 && echo "Ollama installed"
+env = dict(os.environ, OLLAMA_CONTEXT_LENGTH="8192", OLLAMA_MAX_LOADED_MODELS="2")
+subprocess.Popen(["ollama", "serve"], env=env, stdout=open("/content/ollama.log", "w"), stderr=subprocess.STDOUT)
+for _ in range(60):
+    try:
+        urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
+        print("Ollama is running")
+        break
+    except Exception:
+        time.sleep(1)
+else:
+    raise SystemExit("Ollama did not start: see /content/ollama.log")
+!ollama pull {CALLER} 2>&1 | tail -1
+!ollama pull qwen3:4b-instruct 2>&1 | tail -1
+{find_gguf}
+if not gguf:
+    raise SystemExit("No model file: run cell 5 first")
+# The plain chat template of qwen3:4b-instruct (no thinking), exactly as the 8B was trained.
+get_ipython().system(f'python make_modelfile.py "{{gguf}}" --base qwen3:4b-instruct --name {NAME8} --create 2>&1 | tail -2')
+body = {{"model": "{NAME8}", "messages": [{{"role": "user", "content": "Say hello in five words."}}], "max_tokens": 60, "stream": False}}
+req = urllib.request.Request("http://localhost:11434/v1/chat/completions", json.dumps(body).encode(), {{"Content-Type": "application/json"}})
+text = json.load(urllib.request.urlopen(req, timeout=300))["choices"][0]["message"].get("content") or ""
+print(repr(text[:150]))
+print("Thinks first: the CRM removes it, but it costs time. Send a screenshot." if "<think>" in text else "Answers directly")
+"""),
+        md("## 7. Speed on the GPU (1 minute)"),
+        code(f"""
+{here}
+!python -u speed_test.py --model {NAME8}
+!ollama ps
+"""),
+        md(f"""
+## 8. The same 30 test calls (about 25 minutes)
+
+Every finished call is saved in Google Drive (`{RESULTS8}`): after a disconnect, rerun cells 1, 2, 6 and this one
+and it carries on. Send a screenshot of the score at the end.
+"""),
+        code(f"""
+{here}
+!python -u evaluate.py --model {NAME8} --out-dir {RESULTS8} >> {RESULTS8}/eval-{NAME8}.log 2>&1; tail -22 {RESULTS8}/eval-{NAME8}.log
+"""),
+        md("## 9. Download the results\nRight-click **test-results-8b.zip** in the Files panel → **Download** (small), and tell Claude."),
+        code(f"""
+!cd {RESULTS8} && zip -q /content/test-results-8b.zip eval-* && ls -l /content/test-results-8b.zip
+"""),
+    ]
+    return {"cells": cells, "metadata": {"accelerator": "GPU", "colab": {"provenance": []},
+                                         "kernelspec": {"display_name": "Python 3", "name": "python3"},
+                                         "language_info": {"name": "python"}},
+            "nbformat": 4, "nbformat_minor": 0}
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
     zpath = OUT / "colab-kit.zip"
@@ -246,7 +387,8 @@ def main() -> None:
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         for src, name in files:
             z.write(src, name)
-    for name, nb in (("train-on-colab.ipynb", notebook()), ("test-bigger-models.ipynb", test_notebook())):
+    for name, nb in (("train-on-colab.ipynb", notebook()), ("test-bigger-models.ipynb", test_notebook()),
+                     ("train-8b-on-colab.ipynb", notebook_8b())):
         (OUT / name).write_text(json.dumps(nb, indent=1, ensure_ascii=False), encoding="utf-8")
         print(f"Wrote {OUT / name}")
     print(f"Wrote {zpath} ({len(files)} files, {zpath.stat().st_size // 1024} KB)")

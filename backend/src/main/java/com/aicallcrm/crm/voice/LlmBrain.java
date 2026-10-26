@@ -311,7 +311,9 @@ public class LlmBrain {
         if (text == null) {
             return "";
         }
-        String t = text.replaceAll("(?m)^\\s*([-*•]|\\d+[.)])\\s+", "").replaceAll("[*_#`>|]", "")
+        // A "thinking" model's hidden reasoning (<think>...</think>, or cut off unfinished) is never read aloud.
+        String t = text.replaceAll("(?s)<think>.*?(</think>|$)", "")
+                .replaceAll("(?m)^\\s*([-*•]|\\d+[.)])\\s+", "").replaceAll("[*_#`>|]", "")
                 .replaceAll("\\s*\\n+\\s*", " ").replaceAll("\\s{2,}", " ").trim();
         return t.length() > 600 ? t.substring(0, 600) : t;
     }

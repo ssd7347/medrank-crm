@@ -129,6 +129,8 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                 # counts against this call. On a real call the CRM hands over to a person in this case.
                 return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id,
                               scenario.expect), f"the model's reply could not be read (Ollama error {e.code})"
+            if "<think>" in (r["content"] or ""):
+                call.thinking += 1
             if not r["tool_calls"]:
                 text = spoken(r["content"])
                 if not text:

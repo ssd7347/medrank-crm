@@ -308,6 +308,7 @@ class FakeCrm:
     over: bool = False
     tool_log: list[tuple[str, dict, dict]] = field(default_factory=list)   # (name, args, parsed result)
     corrections: list[list[str]] = field(default_factory=list)   # facts the CRM's FactGuard stopped (see sim.py)
+    thinking: int = 0              # replies with hidden reasoning (removed before speaking, but they cost time)
 
     # ---- context and prompt
 
@@ -502,7 +503,9 @@ def spoken(text: str | None) -> str:
     """LlmBrain.spoken(): what the model wrote, made fit to be spoken."""
     if not text:
         return ""
-    t = re.sub(r"(?m)^\s*([-*•]|\d+[.)])\s+", "", text)
+    # A "thinking" model's hidden reasoning (<think>...</think>, or cut off unfinished) is never read aloud.
+    t = re.sub(r"(?s)<think>.*?(</think>|$)", "", text)
+    t = re.sub(r"(?m)^\s*([-*•]|\d+[.)])\s+", "", t)
     t = re.sub(r"[*_#`>|]", "", t)
     t = re.sub(r"\s*\n+\s*", " ", t)
     return re.sub(r"\s{2,}", " ", t).strip()[:600]
@@ -727,7 +730,8 @@ def record(call: FakeCrm, messages: list[dict], source: str, scenario: str, expe
     return {"messages": messages, "tools": TOOLS,
             "meta": {"source": source, "script": call.script.name, "industry": call.script.industry, "scenario": scenario,
                      "expect": expect, "private_values": sorted(private), "never_values": sorted(never),
-                     **({"crm_corrections": call.corrections} if call.corrections else {})}}
+                     **({"crm_corrections": call.corrections} if call.corrections else {}),
+                     **({"thinking_turns": call.thinking} if call.thinking else {})}}
 
 
 # --------------------------------------------------------------------------------------------- local model

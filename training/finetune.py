@@ -69,6 +69,8 @@ def main() -> None:
     ap.add_argument("--epochs", type=float, default=1, help="passes over the data (1 fits a free Colab session)")
     ap.add_argument("--max-len", type=int, default=4096)
     ap.add_argument("--rank", type=int, default=16, help="LoRA rank: higher learns more but needs more memory")
+    ap.add_argument("--batch", type=int, default=2, help="calls per step on the GPU (1 for an 8B model on a T4)")
+    ap.add_argument("--accum", type=int, default=8, help="steps added up before each update (batch x accum = 16)")
     ap.add_argument("--out", default="out", help="where the merged model and the .gguf file are written")
     ap.add_argument("--keep", default=None,
                     help="folder that survives a disconnect (Google Drive): progress is saved there every --save-steps "
@@ -92,7 +94,7 @@ def main() -> None:
     bf16 = torch.cuda.is_bf16_supported()
     cfg = SFTConfig(**only_supported(
         SFTConfig, output_dir=checkpoints, dataset_text_field="text", max_seq_length=a.max_len,
-        max_length=a.max_len, packing=False, per_device_train_batch_size=2, gradient_accumulation_steps=8,
+        max_length=a.max_len, packing=False, per_device_train_batch_size=a.batch, gradient_accumulation_steps=a.accum,
         # One call at a time when checking: 8 at once (the default) runs a T4 out of memory (14 Oct).
         per_device_eval_batch_size=1,
         num_train_epochs=a.epochs, learning_rate=2e-4, lr_scheduler_type="cosine", warmup_ratio=0.03,

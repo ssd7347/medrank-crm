@@ -14,6 +14,26 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 26 October 2026, 10:45 pm: 8B TRAINING NOTEBOOK READY (`train-8b-on-colab.ipynb`)
+
+In `Desktop\Colab training` (22:46, with a new colab-kit.zip). Qwen3-8B (`unsloth/Qwen3-8B`, Apache 2.0, hybrid
+thinking) on the round 3 data: format check with the 8B tokenizer (gate) → finetune `--batch 1 --accum 16` (same 64
+steps; memory-safe on a T4; ~2 h) → model file (~30–45 min, copied to Drive if > 6 GB free) → Ollama model
+`ourvoice8b` with the **plain qwen3:4b-instruct template (no thinking)**, checked to "answer directly" → speed test →
+the same 30 calls, **every call saved to Drive** (`MyDrive/ourvoice-training-8b-r3/results`, rerun carries on) →
+`test-results-8b.zip`. Cell 5 skips training/building when the model file is already in Drive.
+Training text is the same as for the 4B (the empty think block is removed; the gate rejects thinking tags in the
+learnt part). Safety: the CRM's `spoken()` (and the kit's) now removes `<think>…</think>` (also unfinished) before
+speaking; the simulator counts such replies and `evaluate.py` lists them against "the model alone".
+New options: `finetune.py --batch/--accum`, `evaluate.py --out-dir`. Tests: 64 backend, 32 kit; templates 1,074 OK;
+laptop dry run of cells 6–8 with the round 3 file (create with the plain template → "Answers directly"; 1 call into
+a separate results folder; rerun printed "Carrying on"). Not testable on the laptop: 8B training memory/time on a
+T4, the GGUF build of an 8B within Colab's RAM, Drive space (needs 3 GB; 6 more for the model file copy).
+`test-bigger-models.ipynb` was not changed to save to Drive (it has done its job).
+**Next:** user runs `train-8b-on-colab.ipynb`; then read `test-results-8b.zip` against round 1's 18/30.
+
+---
+
 # 26 October 2026, 10:40 pm: BIGGER MODELS, UNTRAINED — 8B 14/30 (47%), 14B 5/11
 
 Colab disconnected once (~9:46 pm); the user stopped cell 5 and downloaded `test-results.zip` (copies in

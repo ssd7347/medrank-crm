@@ -277,6 +277,10 @@ class AiBrainIntegrationTest {
     void spokenTextLosesMarkdown() {
         assertThat(LlmBrain.spoken("**Sure!**\n- Monday to Friday\n- 9 to 6")).isEqualTo("Sure! Monday to Friday 9 to 6");
         assertThat(LlmBrain.spoken(null)).isEmpty();
+        // Hidden reasoning is never read aloud, finished or cut off.
+        assertThat(LlmBrain.spoken("<think>\nThe caller is busy.\n</think>\n\nNo problem. When should we call?"))
+                .isEqualTo("No problem. When should we call?");
+        assertThat(LlmBrain.spoken("Sure. <think>maybe I should")).isEqualTo("Sure.");
     }
 
     // ------------------------------------------------------------------ the stand-in model server

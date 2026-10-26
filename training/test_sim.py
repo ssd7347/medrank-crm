@@ -130,6 +130,16 @@ class SimTest(unittest.TestCase):
         self.assertEqual(len(rec["meta"]["crm_corrections"]), 2)
         self.assertNotIn("5,000", " ".join(m.get("content") or "" for m in rec["messages"]))
 
+    def test_hidden_reasoning_is_never_spoken_but_is_counted(self):
+        def agent(msgs, reminded):
+            if msgs[-1]["role"] == "tool":
+                return say("<think>\nThe caller said no.\n</think>\n\nNo problem. Thank you, goodbye.")
+            return tool("log_call_outcome", outcome_code="NOT_INTERESTED")
+        rec, why = self.run_call(FakeModel(lambda m: "No, I'm not interested anymore.", agent), "Enquiry follow-up", "not_interested", coach=False)
+        self.assertEqual(why, "")
+        self.assertEqual(rec["messages"][-1]["content"], "No problem. Thank you, goodbye.")
+        self.assertEqual(rec["meta"]["thinking_turns"], 1)
+
     def test_an_invented_hand_over_reason_is_refused(self):
         call = callkit.new_call(script("Enquiry follow-up"), random.Random(3))
         res = __import__("json").loads(call.run("request_human_handoff", {"reason_code": "DISPUTE", "summary": "x"}))
