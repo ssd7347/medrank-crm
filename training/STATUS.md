@@ -14,6 +14,28 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 27 October 2026, 10:10 pm: FAIR TEST, STEP 2 — EVALUATE.PY RERUNS, STRICT + FAIR SCORES, 60 CALLS
+
+`evaluate.py`: every call (passed or failed) is checked with `fairness.caller_played`; an off-script call is rerun
+with a new caller (seed + k × 100,000), up to `--reruns` (default 2); **strict** = first attempt of every call,
+unchanged; **FAIR** = the first attempt whose caller played its part; calls that stay off-script are "unusable".
+Default `--calls 60` (the first 30 are the earlier test); the summary also splits the 25 calls on the 2 held-out
+scripts from the 35 on scripts seen in training. Calls saved by older runs are checked and topped up with reruns
+(the strict result kept), so the 8B's saved 30 calls are reused. Results stay append-only (Drive-safe).
+Checks: regression on a copy of the 8B results with `--reruns 0` → **strict 17/30, alone 16/30 (identical to
+Colab)**, FAIR 15/24 (62%) with 6 unusable before any rerun; a second run changes nothing; `test_fairness.py`
+RerunTest with a fake simulator (rerun until the caller plays its part; all-off-script → unusable, not failed; an
+on-script failed call is never rerun); 37 kit tests OK, also from a clean unzip of the new kit;
+`status_watch.py` still reads the score and per-call lines.
+Notebooks: `train-8b-on-colab.ipynb` cell 8 now runs the 60 calls with reruns (~1 h; continues from the 30 saved
+in the college Drive); `test-bigger-models.ipynb` pinned to `--calls 30` as its text says. New kit in
+`Desktop\Colab training` (27 Oct 22:07).
+**Next:** run the 60-call fair test for the 4B round 3 model on the laptop (fresh run — its saved calls predate
+FactGuard: move `data/eval-ourvoice-r3.jsonl` aside first) and for the 8B on Colab (cells 1, 2, 6, 7, 8, 9 of
+`train-8b-on-colab.ipynb`; cell 5 skips training because the model file is in Drive). Then compare.
+
+---
+
 # 27 October 2026, 10:05 pm: FAIR TEST, STEP 1 — "DID THE CALLER PLAY ITS PART?" CHECK
 
 User decision: make the test fair (rerun calls whose simulated caller went off-script, keep the strict score too,

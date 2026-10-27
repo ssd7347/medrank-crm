@@ -6,6 +6,13 @@
 Uses the scripts held back from training (scenarios.HELD_OUT_SCRIPTS) plus a fresh random sample of the others,
 with no trainer notes: the model sees exactly what it sees on a real call. Transcripts are saved to
 data/eval-<model>.jsonl after every call, so failures can be read and a stopped run simply continues when rerun.
+
+Two scores (27 October 2026):
+* strict - the first attempt of every call, exactly as every earlier score was counted;
+* fair   - the simulated caller sometimes goes off-script (an "injection" caller that never tries anything), and
+  such a call cannot be passed. EVERY call is checked (fairness.caller_played), passed or failed, so the agent gets
+  no free second chances; an off-script call is rerun with a new caller, up to --reruns times, and the fair score
+  counts the first attempt whose caller played its part. Calls that stay off-script are reported as unusable.
 """
 
 import argparse
@@ -16,15 +23,54 @@ import sys
 from pathlib import Path
 
 from callkit import DATA, all_scripts, check, installed_models, read_jsonl, write_jsonl
+from fairness import caller_played
 from scenarios import HELD_OUT_SCRIPTS, for_script
 from sim import simulate, transcript
+
+# A rerun gets its own caller: the call's usual seed plus this, times the rerun number.
+RERUN_SEED = 100_000
+
+
+def run_once(script, scenario, seed: int, a, caller: str) -> dict:
+    """One simulated call, scored strictly (with and without the CRM's safety net) and checked for an off-script caller."""
+    rec, stopped = simulate(script, scenario, random.Random(seed), a.model, caller, coach=False,
+                            agent_temperature=0.3, url=a.url, agent_think=False if a.no_think else None)
+    # Scored as the live CRM handles the call (its safety net included); "alone" is the model with no help,
+    # the strict rule every score before 23 October 2026 used.
+    problems = ([stopped] if stopped else []) + (check(rec, crm_net=True) if rec else [])
+    alone = ([stopped] if stopped else []) + (check(rec) if rec else [])
+    if rec:
+        played, why = caller_played(rec)
+    else:
+        # No transcript: "the caller said nothing" is the caller's doing; anything else (an empty agent reply) is not.
+        played, why = (False, stopped) if stopped.startswith("the caller") else (True, "")
+    rec = rec or {"meta": {"script": script.name, "scenario": scenario.id}}
+    # A made-up fact the CRM's FactGuard stopped never reached the caller, but it is still the model's mistake.
+    alone += [f"the CRM stopped a made-up fact ({', '.join(f)})" for f in rec["meta"].get("crm_corrections", [])]
+    if rec["meta"].get("thinking_turns"):
+        alone.append(f"wrote hidden reasoning in {rec['meta']['thinking_turns']} replies (slow on a phone)")
+    rec["meta"].update(problems=problems, problems_alone=alone, caller_played=played, caller_why=why)
+    return rec
+
+
+def fair(rec: dict) -> str:
+    """'pass' / 'fail' from the first attempt whose caller played its part; 'unusable' if none did; 'unknown' if a
+    call was saved without its transcript (an old --resume-log line)."""
+    for att in [rec] + rec.get("reruns", []):
+        played = att["meta"].get("caller_played")
+        if played is None:
+            return "unknown"
+        if played:
+            return "pass" if not att["meta"]["problems"] else "fail"
+    return "unusable"
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True, help="the model to test as the agent")
     ap.add_argument("--caller", default="qwen2.5:7b", help="model that plays the caller (default qwen2.5:7b)")
-    ap.add_argument("--calls", type=int, default=30)
+    ap.add_argument("--calls", type=int, default=60, help="test calls (default 60; the first 30 are the earlier test)")
+    ap.add_argument("--reruns", type=int, default=2, help="new callers tried when a caller goes off-script (default 2)")
     ap.add_argument("--seed", type=int, default=2026, help="same seed = same test calls, for a fair comparison")
     ap.add_argument("--url", default="http://localhost:11434")
     ap.add_argument("--show", action="store_true", help="print the failed conversations")
@@ -35,7 +81,8 @@ def main() -> None:
                     help="switch off hidden reasoning, for hybrid models such as qwen3:8b / qwen3:14b (too slow on a phone)")
     a = ap.parse_args()
     # The log is usually redirected to a file, which Windows writes in cp1252: a model's "₹" would stop the test.
-    sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
 
     models = installed_models(a.url)
     caller = a.caller if a.caller in models else a.model
@@ -47,6 +94,7 @@ def main() -> None:
     tests = (held + rest)[:a.calls]
 
     # Results are saved after every call, so a stopped test (laptop shut down) carries on where it left off.
+    # A call whose record changes (a rerun added) is appended again: the last line for a call is the one that counts.
     out = Path(a.out_dir) / f"eval-{a.model.replace(':', '_').replace('/', '_')}.jsonl"
     done = {r["meta"]["test"]: r for r in read_jsonl(out) if "test" in r.get("meta", {})}
     if a.resume_log:
@@ -59,39 +107,60 @@ def main() -> None:
     if done:
         print(f"Carrying on: {len(done)} of {len(tests)} calls already done.")
     for i, (script, scenario) in enumerate(tests, 1):
-        if i in done:
+        rec, changed = done.get(i), False
+        if rec is None:
+            # Each test call has its own random seed, so the same calls come out whether or not the run was stopped.
+            rec = run_once(script, scenario, a.seed * 1000 + i, a, caller)
+            rec["meta"]["test"] = i
+            changed = True
+        elif "caller_played" not in rec["meta"]:
+            # Saved before the caller check existed: check its caller now (the strict result is kept as it was).
+            played, why = caller_played(rec) if "messages" in rec else (None, "no transcript saved")
+            rec["meta"].update(caller_played=played, caller_why=why)
+            changed = True
+        reruns = rec.setdefault("reruns", [])
+        while fair(rec) == "unusable" and len(reruns) < a.reruns:
+            reruns.append(run_once(script, scenario, a.seed * 1000 + i + (len(reruns) + 1) * RERUN_SEED, a, caller))
+            changed = True
+        if not changed:
             continue
-        # Each test call has its own random seed, so the same calls come out whether or not the run was stopped.
-        rec, stopped = simulate(script, scenario, random.Random(a.seed * 1000 + i), a.model, caller, coach=False,
-                                agent_temperature=0.3, url=a.url, agent_think=False if a.no_think else None)
-        # Scored as the live CRM handles the call (its safety net included); "alone" is the model with no help,
-        # the strict rule every score before 23 October 2026 used.
-        problems = ([stopped] if stopped else []) + (check(rec, crm_net=True) if rec else [])
-        alone = ([stopped] if stopped else []) + (check(rec) if rec else [])
-        rec = rec or {"meta": {"script": script.name, "scenario": scenario.id}}
-        # A made-up fact the CRM's FactGuard stopped never reached the caller, but it is still the model's mistake.
-        alone += [f"the CRM stopped a made-up fact ({', '.join(f)})" for f in rec["meta"].get("crm_corrections", [])]
-        if rec["meta"].get("thinking_turns"):
-            alone.append(f"wrote hidden reasoning in {rec['meta']['thinking_turns']} replies (slow on a phone)")
-        rec["meta"].update(test=i, problems=problems, problems_alone=alone)
         write_jsonl(out, [rec], "a")
         done[i] = rec
-        ok = not problems
-        print(f"[{i}/{len(tests)}] {'PASS' if ok else 'FAIL'} {script.name} / {scenario.id}" + ("" if ok else f": {'; '.join(problems[:3])}"))
+        ok, f = not rec["meta"]["problems"], fair(rec)
+        note = "" if not reruns else (f"  [caller off-script ({rec['meta']['caller_why']}); "
+                                      f"{len(reruns)} rerun{'s' if len(reruns) > 1 else ''}; fair: {f.upper()}]")
+        print(f"[{i}/{len(tests)}] {'PASS' if ok else 'FAIL'} {script.name} / {scenario.id}"
+              + ("" if ok else f": {'; '.join(rec['meta']['problems'][:3])}") + note)
         if a.show and not ok and "messages" in rec:
             print(transcript(rec), "\n")
 
-    by_scenario = collections.defaultdict(lambda: [0, 0])
-    for r in done.values():
-        by_scenario[r["meta"]["scenario"]][0] += not r["meta"]["problems"]
-        by_scenario[r["meta"]["scenario"]][1] += 1
-    passed = sum(ok for ok, _ in by_scenario.values())
+    rows = [done[i] for i in range(1, len(tests) + 1) if i in done]
+    n = len(rows)
+    passed = sum(not r["meta"]["problems"] for r in rows)
     # Calls saved before the CRM safety net have no "problems_alone": their only score was the strict one.
-    alone = sum(not r["meta"].get("problems_alone", r["meta"]["problems"]) for r in done.values())
-    print(f"\n{a.model}: {passed}/{len(done)} calls handled correctly ({passed / max(len(done), 1):.0%})")
-    print(f"  (the model alone, without the CRM's safety net: {alone}/{len(done)})")
-    for sid, (ok, n) in sorted(by_scenario.items()):
-        print(f"  {sid:<18} {ok}/{n}")
+    alone = sum(not r["meta"].get("problems_alone", r["meta"]["problems"]) for r in rows)
+    fairs = collections.Counter(fair(r) for r in rows)
+    usable = fairs["pass"] + fairs["fail"]
+    # The first line keeps its old wording: status_watch.py and earlier logs read it.
+    print(f"\n{a.model}: {passed}/{n} calls handled correctly ({passed / max(n, 1):.0%})")
+    print(f"  (the model alone, without the CRM's safety net: {alone}/{n})")
+    print(f"  FAIR: {fairs['pass']}/{usable} calls where the caller played its part ({fairs['pass'] / max(usable, 1):.0%}); "
+          f"{fairs['unusable']} unusable after {a.reruns} reruns; {sum(bool(r.get('reruns')) for r in rows)} calls rerun"
+          + (f"; {fairs['unknown']} without transcript" if fairs["unknown"] else ""))
+    for label, group in (("scripts never seen in training", [r for r in rows if r["meta"].get("script") in HELD_OUT_SCRIPTS]),
+                         ("scripts seen in training", [r for r in rows if r["meta"].get("script") not in HELD_OUT_SCRIPTS])):
+        if group:
+            g = collections.Counter(fair(r) for r in group)
+            print(f"  {label:<31} strict {sum(not r['meta']['problems'] for r in group)}/{len(group)}, "
+                  f"fair {g['pass']}/{g['pass'] + g['fail']}")
+    print(f"  {'scenario':<18} strict  fair")
+    by = collections.defaultdict(list)
+    for r in rows:
+        by[r["meta"]["scenario"]].append(r)
+    for sid, group in sorted(by.items()):
+        g = collections.Counter(fair(r) for r in group)
+        print(f"  {sid:<18} {sum(not r['meta']['problems'] for r in group)}/{len(group)}     "
+              f"{g['pass']}/{g['pass'] + g['fail']}" + (f" ({g['unusable']} unusable)" if g["unusable"] else ""))
 
 
 if __name__ == "__main__":

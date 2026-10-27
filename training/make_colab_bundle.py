@@ -142,7 +142,7 @@ def test_notebook() -> dict:
     pulls = "\n".join(f"!ollama pull {m} 2>&1 | tail -1" for m in [CALLER] + [m for m, _ in CANDIDATES])
     speed = "\n".join(f"stop_all()\n!python -u speed_test.py --model {m}{' --no-think' if nt else ''}\n!ollama ps"
                       for m, nt in CANDIDATES)
-    evals = "\n".join(f"!python -u evaluate.py --model {m} --no-think > data/eval-{m.replace(':', '_')}.log 2>&1; "
+    evals = "\n".join(f"!python -u evaluate.py --model {m} --no-think --calls 30 > data/eval-{m.replace(':', '_')}.log 2>&1; "
                       f"tail -20 data/eval-{m.replace(':', '_')}.log" for m in no_think)
     cells = [
         md(f"""
@@ -256,8 +256,8 @@ def notebook_8b() -> dict:
         md(f"""
 # Train the 8B model and test it, all on Colab
 
-Round {ROUND} data on **Qwen3-8B** (Apache 2.0), then the same 30 test calls on the GPU. About **3 hours** in all:
-training ~2 h, building the model file ~30–45 min, test ~25 min. It can be spread over several sessions:
+Round {ROUND} data on **Qwen3-8B** (Apache 2.0), then the 60 test calls on the GPU. About **4 hours** in all:
+training ~2 h, building the model file ~30–45 min, test ~1 h. It can be spread over several sessions:
 **everything slow is saved to Google Drive** (`{KEEP8}`): training progress every 10 steps, the trained adapter,
 every finished test call, and the model file when Drive has room.
 
@@ -360,10 +360,12 @@ print("Thinks first: the CRM removes it, but it costs time. Send a screenshot." 
 !ollama ps
 """),
         md(f"""
-## 8. The same 30 test calls (about 25 minutes)
+## 8. The 60 test calls, with reruns (about 1 hour)
 
-Every finished call is saved in Google Drive (`{RESULTS8}`): after a disconnect, rerun cells 1, 2, 6 and this one
-and it carries on. Send a screenshot of the score at the end.
+60 calls (the first 30 are the earlier test). A call whose simulated caller went off-script is rerun with a new
+caller, up to 2 times; the end shows the strict score and the FAIR score. Every finished call is saved in Google
+Drive (`{RESULTS8}`): calls already there are not run again, and after a disconnect, rerun cells 1, 2, 6 and this
+one and it carries on. Send a screenshot of the score at the end.
 """),
         code(f"""
 {here}

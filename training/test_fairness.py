@@ -43,5 +43,71 @@ class CallerPlayedTest(unittest.TestCase):
         self.assertFalse(caller_played(call("verify_retry", "My loan account number is LN 562804."))[0])
 
 
+class RerunTest(unittest.TestCase):
+    """evaluate.py with a fake simulator: which attempt counts, and that a stopped run carries on."""
+
+    def fake_call(self, said):
+        """A finished will_act call that passes every check; ``said`` decides whether the caller played its part."""
+        msgs = [{"role": "system", "content": "x"}, {"role": "user", "content": CONNECTED},
+                {"role": "assistant", "content": "Hello, this is Asha."}, {"role": "user", "content": said},
+                {"role": "assistant", "content": "", "tool_calls": [{"id": "c1", "type": "function", "function": {
+                    "name": "log_call_outcome", "arguments": {"outcome_code": "WILL_ACT"}}}]},
+                {"role": "tool", "tool_call_id": "c1", "name": "log_call_outcome", "content": '{"ok":true,"data":{"recorded":true}}'},
+                {"role": "assistant", "content": "Thank you, goodbye."}]
+        return {"messages": msgs, "meta": {"script": "Overdue follow-up", "scenario": "will_act",
+                                           "expect": {"calls": {"log_call_outcome": {"outcome_code": "WILL_ACT"}}}}}
+
+    def run_eval(self, out_dir, callers, calls=1):
+        import contextlib
+        import io
+        import sys
+        import evaluate
+        seen = []
+
+        def fake_simulate(script, scenario, rng, *args, **kw):
+            seen.append(scenario.id)
+            return self.fake_call(callers[len(seen) - 1]), ""
+        real = (evaluate.simulate, evaluate.installed_models, sys.argv)
+        evaluate.simulate, evaluate.installed_models = fake_simulate, lambda url: ["qwen2.5:7b"]
+        sys.argv = ["evaluate.py", "--model", "fake", "--calls", str(calls), "--out-dir", out_dir]
+        try:
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                evaluate.main()
+        finally:
+            evaluate.simulate, evaluate.installed_models, sys.argv = real
+        return len(seen), printed.getvalue()
+
+    def test_an_off_script_call_is_rerun_and_the_first_fair_attempt_counts(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            ran, out = self.run_eval(d, ["I'm busy right now.", "Okay, I will pay it by Friday."])
+            self.assertEqual(ran, 2)                         # the first caller never mentioned paying: one rerun
+            self.assertIn("1/1 calls handled correctly", out)  # strict: the first attempt, unchanged
+            self.assertIn("FAIR: 1/1", out)
+            ran, out = self.run_eval(d, [])                  # run again: everything is saved, nothing runs
+            self.assertEqual(ran, 0)
+            self.assertIn("FAIR: 1/1", out)
+
+    def test_a_call_whose_callers_all_go_off_script_is_unusable_not_failed(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            ran, out = self.run_eval(d, ["I'm busy.", "Who is this?", "Not now."])
+            self.assertEqual(ran, 3)                         # the call and two reruns
+            self.assertIn("FAIR: 0/0", out)
+            self.assertIn("1 unusable after 2 reruns", out)
+
+    def test_an_on_script_call_is_not_rerun_even_if_it_failed(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            real = self.fake_call
+            self.fake_call = lambda said: {**real(said), "messages": real(said)["messages"][:4] + [
+                {"role": "assistant", "content": "Okay. Goodbye."}]}   # no outcome recorded: a fail
+            ran, out = self.run_eval(d, ["I will pay on Friday."])
+            self.assertEqual(ran, 1)
+            self.assertIn("0/1 calls handled correctly", out)
+            self.assertIn("FAIR: 0/1", out)
+
+
 if __name__ == "__main__":
     unittest.main()
