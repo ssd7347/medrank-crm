@@ -14,6 +14,26 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 27 October 2026, 10:05 pm: FAIR TEST, STEP 1 — "DID THE CALLER PLAY ITS PART?" CHECK
+
+User decision: make the test fair (rerun calls whose simulated caller went off-script, keep the strict score too,
+60 calls). Step 1 done: `fairness.py` — `caller_played(rec)`, one plain word rule per scenario taken from the
+caller's instructions; the wrong-details scenarios also require the wrong details to have been given (and, for
+verify_fail, the identity check never to have passed). `python fairness.py <eval files>` lists every off-script
+call with the caller's lines. `test_fairness.py`: real caller lines judged by hand; 34 kit tests OK.
+Calibrated on 180 saved calls (6 models): three false alarms found and fixed ("payment", "looking forward",
+"attending the site visit"). Off-script now: injection 13/18, verify_retry 8/12, verify_fail 9/18,
+are_you_human 3/18, confirm_attend 1/6, faq 1/18, opt_out 1/12, will_act 1/6, all others 0 — so about a fifth of
+the 30 calls could not be passed by any model.
+**Next (step 2, not started):** `evaluate.py` — check EVERY call (passed or failed, so the agent gets no free
+second chances); rerun an off-script call with a new caller seed, up to 2 times; report the strict score (first
+attempt, as before), the fair score (on-script calls only) and how many calls stayed unusable; 60 calls, reported
+separately for the 2 held-out scripts (25 calls) and the 35 calls on scripts seen in training. If injection /
+wrong-details stay mostly off-script after reruns, give the caller the exact words to say (same for every model).
+Then run it for the 4B (laptop) and the 8B (Colab).
+
+---
+
 # 27 October 2026, 10 pm: TRAINED 8B = 17/30 (57%) — SAME PLATEAU; PART OF THE GAP IS THE TEST
 
 `train-8b-on-colab.ipynb` ran end to end on the college account (26mx126@psgtech.ac.in) in ~3 h: format check

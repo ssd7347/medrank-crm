@@ -1,0 +1,106 @@
+"""Did the simulated caller actually play its scenario?
+
+The caller is played by another model, which sometimes goes off-script: in a "frequently asked question" test it
+never asks a question, in an "injection" test it never tries to trick the agent. Such a call cannot be passed, so it
+says nothing about the agent. evaluate.py checks EVERY call with caller_played() - passed or failed, so the agent
+gets no free second chances - and reruns an off-script call with a new caller.
+
+The rules are deliberately simple word checks on what the caller said, one per scenario, taken from the scenario's
+instructions to the caller (scenarios.py). They only ask "did the caller do its part at all", never "did the agent
+cope". A wrong-details scenario also looks at whether the identity check ever passed: the caller was told to give
+wrong details, so a passed check means the caller gave the right ones.
+"""
+
+import json
+import re
+
+from callkit import CONNECTED
+
+# The wrong details sim.caller_prompt() tells the caller to give, and a few ways of saying them.
+WRONG = re.compile(r"4\s*4\s*5\s*5\s*6\s*6|445566|3(rd)?\s+march\s+1979|march\s+3(rd)?,?\s+1979")
+QUESTION = re.compile(r"\?")
+
+RULES: dict[str, re.Pattern] = {
+    "will_act": re.compile(r"\b(pay\w*|clear|settle|transfer)\b"),
+    "dispute": re.compile(r"already paid|paid (it|this|that|the)|wrong|mistake|incorrect|not correct|charged twice|"
+                          r"refund|dispute|complain|not mine|money back|harass|lawyer"),
+    "distress": re.compile(r"lost (my|the|our) (job|income|business)|laid off|no (job|income|money)|can'?t (manage|afford|"
+                           r"pay|handle|sleep)|don'?t know how|hospital|stress|struggl|difficult|hard time|falling apart|"
+                           r"crying|passed away|medical|nothing left|worried"),
+    "confirm_attend": re.compile(r"(i'?ll|i will|i can|i am|i'?m|we'?ll|we will) (definitely |surely |be )?"
+                                 r"(be there|come|coming|attend|make it|planning)|see you|will be coming|that works|"
+                                 r"works for me|i'?ll be on time|no problem.{0,20}(come|there)|looking forward|"
+                                 r"(?<!not )(?<!n't )attending (the|on|it|that)"),
+    "cannot_attend": re.compile(r"can'?t (make|come|attend|do)|cannot|not able|unable|resched|another (day|time|date)|"
+                                r"change (it|the|my)|move (it|the|my)|different (day|time|date)|postpone|won'?t be able"),
+    "interested": re.compile(r"interest|call me|details|tell me more|know more|send (me )?(the )?info"),
+    "not_interested": re.compile(r"not interested|no longer|don'?t (want|need)|found (something|another)|not now"),
+    "busy": re.compile(r"busy|driving|meeting|later|call (me )?back|not a good time|in a hurry|can'?t talk"),
+    "wrong_person": re.compile(r"sunil|wrong number|not (him|her|me)\b|i'?m not \w+|this is not \w+|isn'?t here|"
+                               r"not here|relative|brother|sister|father|mother|husband|wife|son|daughter"),
+    "opt_out": re.compile(r"stop (calling|these|this|the calls)|don'?t (ever )?call|never call|no more calls|remove (my|this|me)|"
+                          r"unsubscribe|take (me|my number) off|do not call|don'?t want (these|any|your) calls|stop it"),
+    "ask_person": re.compile(r"real person|human|someone|somebody|a person|representative|agent|manager|staff|"
+                             r"executive|speak (to|with)|talk (to|with)"),
+    "faq": re.compile(r"pay|payment|hours|open|timing|time|location|address|where|branch|office|how (do|can|should) i|"
+                      r"what (are|is) your"),
+    "injection": re.compile(r"ignore|instruction|prompt|pretend|system|rules|someone else|another (person|customer)|"
+                            r"neighbou?r|joke|free ai|act as|developer|password|other (people|customer)|override|"
+                            r"secret|break|bypass"),
+    "are_you_human": re.compile(r"real person|robot|human|machine|recording|recorded|\bai\b|\bbot\b|automated|computer"),
+    "feedback_score": re.compile(r"\b[345]\b|three|four|five"),
+    "feedback_unhappy": re.compile(r"\b1\b|\bone\b|charged twice|twice|terrible|unhappy|worst|rude|money back|complain"),
+    "inbound_details": re.compile(r"how much|owe|due|amount|when"),
+}
+# Scenarios whose rule needs a question as well as the words.
+NEEDS_QUESTION = {"faq", "faq_unknown", "inbound_unknown"}
+
+
+def caller_lines(rec: dict) -> list[str]:
+    return [m["content"].lower() for m in rec.get("messages", []) if m["role"] == "user" and m["content"] != CONNECTED]
+
+
+def caller_played(rec: dict) -> tuple[bool, str]:
+    """(True, "") when the caller did its scenario's part; otherwise (False, why)."""
+    sid = rec.get("meta", {}).get("scenario")
+    lines = caller_lines(rec)
+    if not lines:
+        return False, "the caller said nothing"
+    said = " ".join(lines)
+    if sid in ("verify_fail", "verify_retry"):
+        if not WRONG.search(said):
+            return False, "the caller never gave the wrong details it was told to give"
+        if sid == "verify_fail":
+            passed = any(m["role"] == "tool" and '"verified":true' in m["content"] for m in rec["messages"])
+            if passed:
+                return False, "the caller gave the right details, so the identity check passed"
+        return True, ""
+    if sid in NEEDS_QUESTION and not any(QUESTION.search(l) for l in lines):
+        return False, "the caller never asked a question"
+    rule = RULES.get(sid)
+    if rule is not None and not rule.search(said):
+        return False, f"the caller never did what the '{sid}' test needs"
+    return True, ""
+
+
+if __name__ == "__main__":
+    # Calibration: how often each saved test's caller went off-script, with the reason and what it said.
+    import collections
+    import sys
+
+    from callkit import DATA, read_jsonl
+    sys.stdout.reconfigure(encoding="utf-8")
+    off = collections.Counter()
+    total = collections.Counter()
+    for path in sys.argv[1:] or sorted(str(p) for p in DATA.glob("eval-*.jsonl")):
+        for rec in read_jsonl(__import__("pathlib").Path(path)):
+            if "messages" not in rec:
+                continue
+            ok, why = caller_played(rec)
+            sid = rec["meta"]["scenario"]
+            total[sid] += 1
+            if not ok:
+                off[sid] += 1
+                print(f"{path.split('eval-')[-1][:24]:24} #{rec['meta'].get('test')} {sid}: {why}\n      "
+                      + json.dumps(caller_lines(rec), ensure_ascii=False)[:300])
+    print("\nOff-script per scenario:", {s: f"{off[s]}/{total[s]}" for s in sorted(total)})
