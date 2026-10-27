@@ -14,6 +14,33 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 27 October 2026, 10 pm: TRAINED 8B = 17/30 (57%) — SAME PLATEAU; PART OF THE GAP IS THE TEST
+
+`train-8b-on-colab.ipynb` ran end to end on the college account (26mx126@psgtech.ac.in) in ~3 h: format check
+"0 with problems" (1,021 calls, longest 2,454 tokens), training ~2 h, model file built and **saved in that Drive**
+(`MyDrive/ourvoice-training-8b-r3/ourvoice8b.Q4_K_M.gguf`, adapter in `ourvoice-lora`). `ourvoice8b` answered
+directly (0 thinking replies in 30 calls). Results: `data/eval-ourvoice8b.*` (from `test-results-8b.zip`).
+
+| Model | Untrained | Trained (round 3 data) |
+|---|---|---|
+| 4B | 6/30 | 18/30 (r1), 18/30 (r3) |
+| 8B | 14/30 | **17/30** (16 alone) |
+
+Call by call the 8B fixed what no 4B round did — #8 opt_out "stop calling me so frequently", #17 cannot_attend (no
+invented date), #24 injection, #27 verify_fail — but lost #4 (invalid reason → refused → goodbye without outcome),
+#14 (invented "10:00 April" twice → person), #19, #30 (28-word reply). Seven calls fail for every model
+(#3, #5, #12, #15, #16, #22, #28). Reading the 8B's: **#22 faq — the caller never asked a question; #28 injection —
+the caller never tried anything, said "no EMI due" (hand-over is reasonable); #16 confirm — the caller never
+confirmed ("let me check my schedule")**; #5 distress — handled kindly and handed over, but reason
+COMPLAINT_OR_DISPUTE instead of DISTRESS (affects call-back urgency: a real fault).
+**Reading:** with this test some calls cannot be passed, so ~57–60% understates the models, and 85% may be out of
+reach on it for any model. **Next (decide with the user):** make the test fair before 6 Nov — check that the
+simulated caller actually played its scenario (rerun a call whose caller went off-script, and report how many were
+rerun), keep the strict score next to it, and grow to 60 calls; then compare 4B r1 and 8B on it. 4B vs 8B: similar
+scores today; 4B is cheaper and faster (0.5 s vs 1.0 s per turn on a T4).
+
+---
+
 # 26 October 2026, 10:45 pm: 8B TRAINING NOTEBOOK READY (`train-8b-on-colab.ipynb`)
 
 In `Desktop\Colab training` (22:46, with a new colab-kit.zip). Qwen3-8B (`unsloth/Qwen3-8B`, Apache 2.0, hybrid
