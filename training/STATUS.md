@@ -1,6 +1,6 @@
 <!-- LIVE PROGRESS START -->
-## Live re-score progress (updated 24 Oct 2026, 12:08 AM by status_watch.py)
-- `eval-r3.log`: **finished — 18/30**
+## Live re-score progress (updated 27 Oct 2026, 10:12 PM by status_watch.py)
+- `eval-r3-fair.log`: 1 of 60 calls done in this log, 1 passed (a resumed run only lists the calls it ran). Latest: [1] PASS Overdue follow-up / will_act
 <!-- LIVE PROGRESS END -->
 
 # DELIVERY PLAN (agreed 23 Oct 2026): client hand-over ~23 Nov 2026, real phone calls
@@ -13,6 +13,18 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 2 (– 6 Nov) | 60-call test; connect platform; first real call to the user's phone | run round 3 on Colab |
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
+
+# 27 October 2026, 10:12 pm: 4B ROUND 3 FAIR TEST RUNNING OVERNIGHT ON THE LAPTOP
+
+Old results kept as `data/eval-ourvoice-r3-before-fair.jsonl` (and `data/eval-r3.log`). Running as its own hidden
+Windows process (survives the internet cut-off): `python -u evaluate.py --model ourvoice-r3 > data/eval-r3-fair.log`
+(60 calls, 2 reruns, results in `data/eval-ourvoice-r3.jsonl`); `status_watch.py data/eval-r3-fair.log` updates the
+section above. Call 1 passed at 10:12 pm (~3 min per call → expected end ~2 am). If the laptop stopped, run the
+same two commands again from `training/`: finished calls are kept.
+**Then:** the 8B fair test on Colab (college account): cells 1, 2, 6, 7, 8, 9 of `train-8b-on-colab.ipynb`
+(new kit of 27 Oct 22:07); compare strict and FAIR scores, held-out vs seen scripts.
+
+---
 
 # 27 October 2026, 10:10 pm: FAIR TEST, STEP 2 — EVALUATE.PY RERUNS, STRICT + FAIR SCORES, 60 CALLS
 
