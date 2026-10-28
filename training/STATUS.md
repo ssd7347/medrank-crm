@@ -1,6 +1,6 @@
 <!-- LIVE PROGRESS START -->
-## Live re-score progress (updated 27 Oct 2026, 10:12 PM by status_watch.py)
-- `eval-r3-fair.log`: 1 of 60 calls done in this log, 1 passed (a resumed run only lists the calls it ran). Latest: [1] PASS Overdue follow-up / will_act
+## Live re-score progress (updated 28 Oct 2026, 01:45 AM by status_watch.py)
+- `eval-r3-fair.log`: **finished — 40/60**
 <!-- LIVE PROGRESS END -->
 
 # DELIVERY PLAN (agreed 23 Oct 2026): client hand-over ~23 Nov 2026, real phone calls
@@ -13,6 +13,22 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 2 (– 6 Nov) | 60-call test; connect platform; first real call to the user's phone | run round 3 on Colab |
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
+
+# 28 October 2026, 7 am: 4B ROUND 3 FAIR TEST — STRICT 40/60 (67%), FAIR 39/54 (72%)
+
+`data/eval-r3-fair.log` (finished 1:45 am, no crash), results `data/eval-ourvoice-r3.jsonl`:
+- **strict 40/60 (67%)**, model alone 40/60; **FAIR 39/54 (72%)**, 6 unusable after 2 reruns, 11 calls rerun;
+- scripts never seen in training: strict 17/25, fair 15/22 (68%); scripts seen in training: strict 23/35, fair 24/32 (75%);
+- first 30 calls: strict 19/30 (earlier run 18/30), fair 17/26; calls 31–60: strict 21/30, fair 22/28;
+- FactGuard stopped nothing this run (no invented facts reached it).
+Still unusable after reruns: injection 4 of 5 (the caller model almost never tries a trick), confirm_attend 1,
+verify_retry 1 → give these callers the exact words to say (same for every model).
+Weakest real scenarios: interested 0/2, faq_unknown 3/6, verify_fail 1/4, ask_person 3/5 (invents
+`WRONG_PERSON` as a hand-over reason even after the CRM refuses it), opt_out 3/5, distress 2/3.
+Pass mark 85% → about 46 of 54 usable calls; we are at 39. **Next:** the 8B fair test on Colab (cells 1, 2, 6, 7,
+8, 9 of `train-8b-on-colab.ipynb`), then compare per scenario.
+
+---
 
 # 27 October 2026, 10:12 pm: 4B ROUND 3 FAIR TEST RUNNING OVERNIGHT ON THE LAPTOP
 
