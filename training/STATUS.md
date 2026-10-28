@@ -14,6 +14,26 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 28 October 2026, 8 pm: BACKING THE 8B — CRM RULE: DISTRESSED / DISPUTING CALLERS ALWAYS GET THE URGENT HAND-OVER
+
+User: back the 8B; I chose the fix (user: "make the best choice"). Read #4, #5, #42, #43, #48: distressed callers
+got an ordinary call-back (#43, #48 — not urgent, normal queue); #4 used "DISPUTE", the CRM refused it and the model
+gave up; #5/#42 handed over under another reason. **CRM rule, commit da6fdaf** (`CallerSignals`):
+- if the caller's words in the call show distress or a dispute and the agent books a call-back or hands over, the
+  CRM runs the urgent DISTRESS / COMPLAINT_OR_DISPUTE hand-over (VERIFICATION_FAILED left alone; distress never
+  downgraded). Word lists calibrated on ~400 saved calls: distress 12/14, dispute 11/13 (every miss: the caller never
+  said it), **0 false alarms** elsewhere;
+- hand-over reason aliases (DISPUTE/COMPLAINT → COMPLAINT_OR_DISPUTE, HUMAN/PERSON → CALLER_REQUEST, ...); unknown
+  reasons (WRONG_PERSON) still refused.
+The kit reads the same lists/aliases from `spec/agent-spec.json` (written by TrainingSpecTest); `sim.py` runs the
+upgraded tool, keeps the model's own call, marks `"ran"` and meta `crm_upgrades`; only the score WITH the CRM's
+safety net counts it. `evaluate.py` CRM_VERSION 2 redoes only saved calls the new CRM would change: **4B none,
+8B #4, #5, #43, #48**. Tests: 66 backend, 40 kit (also from a clean unzip); strict 8B rescore unchanged (36/60).
+**Next:** Colab with the new kit (28 Oct 20:01): cells 1, 2, 5 (skips), 6, 8, 9 of `train-8b-on-colab.ipynb` —
+only those 4 calls run (~5 min); results to Drive `ourvoice-training-8b-r3/results`; download the two eval files.
+
+---
+
 # 28 October 2026, 7:50 pm: 8B FAIR TEST — STRICT 36/60, FAIR 39/60 (65%); 4B AND 8B LEVEL OVERALL
 
 Colab (college account) finished cell 8 at 7:08 pm, then disconnected while idle; results taken straight from
