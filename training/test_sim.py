@@ -156,11 +156,28 @@ class SimTest(unittest.TestCase):
 
     def test_an_invented_hand_over_reason_is_refused(self):
         call = callkit.new_call(script("Enquiry follow-up"), random.Random(3))
-        res = __import__("json").loads(call.run("request_human_handoff", {"reason_code": "DISPUTE", "summary": "x"}))
+        # WRONG_PERSON is never a hand-over reason; "DISPUTE" is understood (CallerSignals.REASON_ALIASES).
+        res = __import__("json").loads(call.run("request_human_handoff", {"reason_code": "WRONG_PERSON", "summary": "x"}))
         self.assertEqual((res["ok"], res["error_code"]), (False, "INVALID_ARGUMENT"))
         self.assertIn("COMPLAINT_OR_DISPUTE", res["error_message"])
         self.assertIsNone(call.outcome)
-        self.assertTrue(__import__("json").loads(call.run("request_human_handoff", {"reason_code": "CALLER_REQUEST", "summary": "x"}))["ok"])
+        self.assertTrue(__import__("json").loads(call.run("request_human_handoff", {"reason_code": "DISPUTE", "summary": "x"}))["ok"])
+        self.assertEqual(callkit.handoff_reason("dispute"), "COMPLAINT_OR_DISPUTE")
+
+    def test_a_distressed_callers_call_back_becomes_the_urgent_hand_over(self):
+        def agent(msgs, reminded):
+            if msgs[-1]["role"] == "tool":
+                return say("I'm so sorry. Someone from our team will call you. Take care, goodbye.")
+            return tool("schedule_callback", preferred_time_text="later", reason="Wants a call later.")
+        rec, why = self.run_call(FakeModel(lambda m: "I lost my job last month, I don't know how I'll manage.", agent),
+                                 "Payment reminder", "distress", coach=False)
+        self.assertEqual(why, "")
+        res = [m for m in rec["messages"] if m["role"] == "tool"][-1]
+        self.assertEqual((res["name"], res["ran"]), ("schedule_callback", "request_human_handoff"))
+        self.assertEqual(rec["meta"]["crm_upgrades"], [{"from": "schedule_callback", "reason_code": "DISTRESS"}])
+        # With the CRM's safety net it is the DISTRESS hand-over the scenario wants; the model alone booked a call-back.
+        self.assertNotIn("expected request_human_handoff with {'reason_code': 'DISTRESS'}", check(rec, crm_net=True))
+        self.assertTrue(any("request_human_handoff" in p for p in check(rec)))
 
     def test_a_caller_who_only_gives_a_stage_direction_is_asked_again(self):
         replies = iter(["*hangs up*", "No, I'm not interested anymore."])

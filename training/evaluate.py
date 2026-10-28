@@ -22,13 +22,33 @@ import re
 import sys
 from pathlib import Path
 
-from callkit import DATA, all_scripts, check, installed_models, read_jsonl, write_jsonl
+from callkit import DATA, SPEC, all_scripts, check, handoff_reason, installed_models, read_jsonl, upgrade, write_jsonl
 from fairness import caller_played
 from scenarios import HELD_OUT_SCRIPTS, for_script
 from sim import caller_version, simulate, transcript
 
 # A rerun gets its own caller: the call's usual seed plus this, times the rerun number.
 RERUN_SEED = 100_000
+# Raised when the CRM's handling changes in a way that can change a saved call (2: CallerSignals, 28 Oct 2026 -
+# urgent hand-overs for distress / disputes, and hand-over reason aliases). Only calls it would change are redone.
+CRM_VERSION = 2
+
+
+def crm_would_change(att: dict) -> bool:
+    """Would today's CRM have run a different tool in this saved call? Replays its call-backs / hand-overs."""
+    words = ""
+    for m in att.get("messages", []):
+        if m["role"] == "user":
+            words += " " + m["content"]
+        for c in m.get("tool_calls") or []:
+            name, args = c["function"]["name"], c["function"]["arguments"] if isinstance(c["function"]["arguments"], dict) else {}
+            if upgrade(name, args, words)[1] is not args:
+                return True
+            raw = args.get("reason_code")
+            if name == "request_human_handoff" and raw is not None and str(raw) not in SPEC["handoff_reasons"] \
+                    and handoff_reason(raw) is not None:
+                return True       # an alias that used to be refused
+    return False
 
 
 def run_once(script, scenario, seed: int, a, caller: str) -> dict:
@@ -50,7 +70,7 @@ def run_once(script, scenario, seed: int, a, caller: str) -> dict:
     if rec["meta"].get("thinking_turns"):
         alone.append(f"wrote hidden reasoning in {rec['meta']['thinking_turns']} replies (slow on a phone)")
     rec["meta"].update(problems=problems, problems_alone=alone, caller_played=played, caller_why=why,
-                       caller_version=caller_version(scenario.id))
+                       caller_version=caller_version(scenario.id), crm_version=CRM_VERSION)
     return rec
 
 
@@ -112,6 +132,10 @@ def main() -> None:
         if rec is not None and rec["meta"].get("caller_version", 1) != caller_version(scenario.id):
             # Saved with older caller instructions for this scenario (sim.CALLER_VERSIONS): run it again, so every
             # model meets the same callers. The new record is appended and counts from now on.
+            rec = None
+        elif rec is not None and rec["meta"].get("crm_version", 1) < CRM_VERSION \
+                and any(crm_would_change(a) for a in [rec] + rec.get("reruns", [])):
+            # Saved under an older CRM that would have handled this call differently: run it again.
             rec = None
         if rec is None:
             # Each test call has its own random seed, so the same calls come out whether or not the run was stopped.

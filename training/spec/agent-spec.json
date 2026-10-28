@@ -1,5 +1,16 @@
 {
   "closing_tools" : [ "log_call_outcome", "opt_out", "request_human_handoff" ],
+  "dispute_words" : "already paid|already cleared|amount[^.?!]{0,30}(wrong|incorrect|not due)|paid (it|this|that) (already|last)|(amount|charge|bill) (is|was) (wrong|incorrect|not correct)|charged twice|double charged|refund|money back|not my (loan|account|charge)|never (took|agreed)|wrong amount|incorrect amount|overcharged|lawyer|consumer court|i want to complain|file a complaint",
+  "distress_words" : "lost (my|our) (job|income|business)|laid off|no (job|income)|(can'?t|cannot) afford|hospital|passed away|(very|so|really) stressed|depress|crying|falling apart|(can'?t|cannot) cope|medical (bills|emergency)|struggling (to pay|financially|with money)|no money|don'?t have (the |any )?money|don'?t know how i('ll| will| am going to) (manage|pay|cope)",
+  "handoff_reason_aliases" : {
+    "COMPLAINT" : "COMPLAINT_OR_DISPUTE",
+    "DISPUTE" : "COMPLAINT_OR_DISPUTE",
+    "DISTRESSED" : "DISTRESS",
+    "HUMAN" : "CALLER_REQUEST",
+    "HUMAN_REQUEST" : "CALLER_REQUEST",
+    "PERSON" : "CALLER_REQUEST",
+    "VERIFICATION_FAILURE" : "VERIFICATION_FAILED"
+  },
   "handoff_reasons" : [ "COMPLAINT_OR_DISPUTE", "DISTRESS", "CALLER_REQUEST", "TOOL_FAILURE", "VERIFICATION_FAILED", "OUT_OF_SCOPE" ],
   "max_tool_rounds" : 6,
   "outcomes" : [ "ACKNOWLEDGED", "WILL_ACT", "INTERESTED", "CALLBACK_REQUESTED", "HANDED_OFF", "NOT_INTERESTED", "OPTED_OUT", "WRONG_PERSON", "NO_INTERACTION", "VERIFICATION_FAILED" ],

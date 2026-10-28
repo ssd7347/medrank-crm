@@ -341,12 +341,10 @@ public class VoiceTools {
     }
 
     private ToolResult handoff(VoiceCall call, Map<String, Object> args) {
-        HandoffReason reason;
-        try {
-            reason = HandoffReason.valueOf(String.valueOf(text(args, "reason_code")).toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            // An invented reason ("DISPUTE", "WRONG_PERSON") would file the call under the wrong heading: the model
-            // is told the valid ones and asks again. Nothing has been handed over yet.
+        // Common invented reasons ("DISPUTE", "HUMAN") are understood (CallerSignals.REASON_ALIASES); anything else
+        // would file the call under the wrong heading, so the model is told the valid ones and asks again.
+        HandoffReason reason = CallerSignals.reason(text(args, "reason_code"));
+        if (reason == null) {
             return ToolResult.error(ToolResult.INVALID_ARGUMENT, "reason_code must be one of: "
                     + String.join(", ", Arrays.stream(HandoffReason.values()).map(Enum::name).toList())
                     + ". A wrong person is not a hand-over: use log_call_outcome with WRONG_PERSON.");

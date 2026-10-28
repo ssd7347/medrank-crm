@@ -309,6 +309,7 @@ class FakeCrm:
     tool_log: list[tuple[str, dict, dict]] = field(default_factory=list)   # (name, args, parsed result)
     corrections: list[list[str]] = field(default_factory=list)   # facts the CRM's FactGuard stopped (see sim.py)
     thinking: int = 0              # replies with hidden reasoning (removed before speaking, but they cost time)
+    upgrades: list[dict] = field(default_factory=list)   # call-backs / hand-overs the CRM made urgent (upgrade())
 
     # ---- context and prompt
 
@@ -444,8 +445,8 @@ class FakeCrm:
                            "A member of our team will call you back by " + slot + ".")
 
     def t_request_human_handoff(self, args):
-        reason = str(args.get("reason_code") or "").upper()
-        if reason not in SPEC["handoff_reasons"]:
+        reason = handoff_reason(args.get("reason_code"))
+        if reason is None:
             # VoiceTools.handoff: an invented reason is refused and the model asks again; nothing is handed over.
             return result_json(False, code="INVALID_ARGUMENT", msg="reason_code must be one of: " + ", ".join(SPEC["handoff_reasons"])
                                + ". A wrong person is not a hand-over: use log_call_outcome with WRONG_PERSON.")
@@ -557,6 +558,49 @@ def ungrounded(said: str, heard: str) -> list[str]:
     return out
 
 
+# CallerSignals (the CRM), read from the spec so the kit can never drift from it: hand-over reason aliases, and the
+# caller words that make a call-back or hand-over an urgent DISTRESS / COMPLAINT_OR_DISPUTE hand-over.
+REASON_ALIASES: dict[str, str] = SPEC["handoff_reason_aliases"]
+DISTRESS_WORDS = re.compile(SPEC["distress_words"])
+DISPUTE_WORDS = re.compile(SPEC["dispute_words"])
+
+
+def handoff_reason(raw) -> str | None:
+    """CallerSignals.reason(): the valid hand-over reason a model meant, or None."""
+    if raw is None:
+        return None
+    r = re.sub(r"[\s-]+", "_", str(raw).strip().upper())
+    r = REASON_ALIASES.get(r, r)
+    return r if r in SPEC["handoff_reasons"] else None
+
+
+def heard_signal(caller_words: str) -> str | None:
+    """CallerSignals.heard(): DISTRESS, COMPLAINT_OR_DISPUTE or None from everything the caller said."""
+    s = (caller_words or "").lower()
+    if DISTRESS_WORDS.search(s):
+        return "DISTRESS"
+    return "COMPLAINT_OR_DISPUTE" if DISPUTE_WORDS.search(s) else None
+
+
+def upgrade(name: str, args: dict, caller_words: str) -> tuple[str, dict]:
+    """CallerSignals.upgrade(): the tool the CRM actually runs. Returns (name, args) unchanged - the same args
+    object - when nothing changes."""
+    handoff = name == "request_human_handoff"
+    if not handoff and name != "schedule_callback":
+        return name, args
+    signal = heard_signal(caller_words)
+    if signal is None:
+        return name, args
+    asked = handoff_reason(args.get("reason_code")) if handoff else None
+    if asked == signal or asked == "VERIFICATION_FAILED" or (asked == "DISTRESS" and signal == "COMPLAINT_OR_DISPUTE"):
+        return name, args
+    note = args.get("summary") if handoff else args.get("reason")
+    return "request_human_handoff", {
+        "reason_code": signal,
+        "summary": ("The caller sounded distressed" if signal == "DISTRESS" else "The caller disputes a charge")
+                   + " (marked urgent by the CRM)." + ("" if note is None else f" Agent's note: {note}")}
+
+
 def settles_the_call(name: str, res: dict) -> str | None:
     """LlmBrain.settlesTheCall(): the outcome a booked call-back or the identity lock-out already recorded, or None.
 
@@ -605,10 +649,13 @@ def check(rec: dict, crm_net: bool = False) -> list[str]:
             res = json.loads(m["content"])
             if m.get("name") == "verify_identity" and res.get("data", {}).get("verified"):
                 verified = True
-            if res.get("ok") and m.get("name") in CLOSING_TOOLS and closing_at is None:
+            # With the CRM's safety net the tool that actually ran counts ("ran": a call-back the CRM made an urgent
+            # hand-over); judged alone, the model's own call counts.
+            ran = (m.get("ran") or m.get("name")) if crm_net else m.get("name")
+            if res.get("ok") and ran in CLOSING_TOOLS and closing_at is None:
                 closing_at = i
             if crm_net and settled is None:
-                settled = settles_the_call(m.get("name"), res)
+                settled = settles_the_call(ran, res)
             continue
         if pending:
             problems.append(f"message {i}: tool calls left unanswered")
@@ -660,7 +707,7 @@ def check(rec: dict, crm_net: bool = False) -> list[str]:
         problems.append("does not end with the agent's goodbye")
     if closing_at is None and settled is None:
         problems.append("ends without log_call_outcome, opt_out or request_human_handoff")
-    problems += check_expectation(rec, settled)
+    problems += check_expectation(rec, settled, crm_net)
     return problems
 
 
@@ -692,14 +739,18 @@ def calls_in(rec: dict) -> list[tuple[str, dict]]:
             for c in m.get("tool_calls") or []]
 
 
-def check_expectation(rec: dict, settled: str | None = None) -> list[str]:
+def check_expectation(rec: dict, settled: str | None = None, crm_net: bool = False) -> list[str]:
     """What the scenario says must happen, such as WILL_ACT being logged or a person taking over.
 
-    ``settled``: an outcome the CRM recorded itself (see settles_the_call); it counts as that log_call_outcome."""
+    ``settled``: an outcome the CRM recorded itself (see settles_the_call); it counts as that log_call_outcome.
+    With ``crm_net`` the urgent hand-overs the CRM made (meta "crm_upgrades", see upgrade()) count too."""
     expect = rec.get("meta", {}).get("expect") or {}
     calls = calls_in(rec)
     if settled:
         calls = calls + [("log_call_outcome", {"outcome_code": settled})]
+    if crm_net:
+        calls = calls + [("request_human_handoff", {"reason_code": u["reason_code"]})
+                         for u in rec.get("meta", {}).get("crm_upgrades", [])]
     out = []
     for name, want in expect.get("calls", {}).items():
         hits = [a for n, a in calls if n == name]
@@ -731,7 +782,8 @@ def record(call: FakeCrm, messages: list[dict], source: str, scenario: str, expe
             "meta": {"source": source, "script": call.script.name, "industry": call.script.industry, "scenario": scenario,
                      "expect": expect, "private_values": sorted(private), "never_values": sorted(never),
                      **({"crm_corrections": call.corrections} if call.corrections else {}),
-                     **({"thinking_turns": call.thinking} if call.thinking else {})}}
+                     **({"thinking_turns": call.thinking} if call.thinking else {}),
+                     **({"crm_upgrades": call.upgrades} if call.upgrades else {})}}
 
 
 # --------------------------------------------------------------------------------------------- local model

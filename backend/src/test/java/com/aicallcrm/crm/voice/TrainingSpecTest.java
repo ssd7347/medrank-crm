@@ -49,6 +49,10 @@ class TrainingSpecTest {
         spec.put("tools", wire);
         spec.put("outcomes", List.of(Voice.Outcome.values()).stream().map(Enum::name).toList());
         spec.put("handoff_reasons", List.of(Voice.HandoffReason.values()).stream().map(Enum::name).toList());
+        // CallerSignals: the kit judges and simulates calls with the very same words and aliases.
+        spec.put("handoff_reason_aliases", CallerSignals.REASON_ALIASES);
+        spec.put("distress_words", CallerSignals.DISTRESS);
+        spec.put("dispute_words", CallerSignals.DISPUTE);
 
         String expected = JSON.writeValueAsString(spec) + "\n";
         if (Boolean.getBoolean("training.spec.write")) {

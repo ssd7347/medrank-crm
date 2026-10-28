@@ -194,6 +194,52 @@ class AiBrainIntegrationTest {
     }
 
     @Test
+    void aDistressedCallerAlwaysGetsTheUrgentHandOver() throws Exception {
+        String admin = admin();
+        long contact = contact(admin);
+        String callId = JsonPath.read(mvc.perform(auth(post("/api/voice/test-calls"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contactId\":" + contact + ",\"scriptName\":\"Enquiry follow-up\",\"brain\":\"LOCAL\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        // The stand-in model books an ordinary call-back; the caller just said they lost their job.
+        mvc.perform(auth(post("/api/voice/test-calls/" + callId + "/say"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"I lost my job last month, please book me a call later\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.added[*].tool").value(Matchers.hasItem("request_human_handoff")))
+                .andExpect(jsonPath("$.added[*].tool").value(Matchers.not(Matchers.hasItem("schedule_callback"))))
+                .andExpect(jsonPath("$.over").value(true));
+    }
+
+    @Test
+    void callerSignalsDecideTheHandOver() {
+        LlmClient.ToolCall callback = new LlmClient.ToolCall("c1", "schedule_callback", Map.of("reason", "Wants a call later."));
+        LlmClient.ToolCall handoff = new LlmClient.ToolCall("c2", "request_human_handoff", Map.of("reason_code", "COMPLAINT_OR_DISPUTE"));
+        LlmClient.ToolCall verifyFailed = new LlmClient.ToolCall("c3", "request_human_handoff", Map.of("reason_code", "VERIFICATION_FAILED"));
+        LlmClient.ToolCall lookup = new LlmClient.ToolCall("c4", "get_contact_details", Map.of());
+        String distress = " Yes. I lost my job last month and I don't know how I'll manage.";
+        String dispute = " That amount is wrong, I already paid it.";
+        // Distress: a call-back or another hand-over becomes the DISTRESS hand-over, same id.
+        assertThat(CallerSignals.upgrade(callback, distress)).satisfies(c -> {
+            assertThat(c.name()).isEqualTo("request_human_handoff");
+            assertThat(c.id()).isEqualTo("c1");
+            assertThat(c.arguments()).containsEntry("reason_code", "DISTRESS");
+            assertThat(String.valueOf(c.arguments().get("summary"))).contains("Wants a call later.");
+        });
+        assertThat(CallerSignals.upgrade(handoff, distress).arguments()).containsEntry("reason_code", "DISTRESS");
+        // Dispute: a call-back becomes COMPLAINT_OR_DISPUTE; a hand-over already for it is left as it is.
+        assertThat(CallerSignals.upgrade(callback, dispute).arguments()).containsEntry("reason_code", "COMPLAINT_OR_DISPUTE");
+        assertThat(CallerSignals.upgrade(handoff, dispute)).isSameAs(handoff);
+        // Never changed: an unverified caller's hand-over, other tools, or a call with no such words.
+        assertThat(CallerSignals.upgrade(verifyFailed, distress)).isSameAs(verifyFailed);
+        assertThat(CallerSignals.upgrade(lookup, distress)).isSameAs(lookup);
+        assertThat(CallerSignals.upgrade(callback, " I'm in a meeting, call me at 5.")).isSameAs(callback);
+        // Invented reasons models use are understood; a wrong person is not a hand-over.
+        assertThat(CallerSignals.reason("DISPUTE")).isEqualTo(Voice.HandoffReason.COMPLAINT_OR_DISPUTE);
+        assertThat(CallerSignals.reason("human")).isEqualTo(Voice.HandoffReason.CALLER_REQUEST);
+        assertThat(CallerSignals.reason("caller request")).isEqualTo(Voice.HandoffReason.CALLER_REQUEST);
+        assertThat(CallerSignals.reason("WRONG_PERSON")).isNull();
+    }
+
+    @Test
     void factsNobodyGaveAreCaught() {
         String heard = "Short sentences (under 20 words). Your EMI amount is 5,000 rupees, due Friday 3 October 2026.";
         assertThat(FactGuard.unheard("Your visit is on Thursday, 20th April.", heard)).containsExactly("thursday", "april");
@@ -314,6 +360,13 @@ class AiBrainIntegrationTest {
         }
         String lastCaller = messages.stream().filter(m -> "user".equals(m.get("role"))).reduce((a, b) -> b)
                 .map(m -> String.valueOf(m.get("content"))).orElse("");
+        if (lastCaller.contains("lost my job")) {
+            // Books an ordinary call-back for a distressed caller; the CRM should make it the urgent hand-over.
+            answer(ex, "tool".equals(lastMsg.get("role")) ? "I'm so sorry. Someone from our team will call you. Take care, goodbye."
+                    : "<tool_call>\n{\"name\": \"schedule_callback\", \"arguments\": {\"preferred_time_text\": \"later\", "
+                    + "\"reason\": \"Wants a call later.\"}}\n</tool_call>");
+            return;
+        }
         if (lastCaller.contains("when is my visit")) {
             // Invents a date, unless the CRM's private note (FactGuard) told it not to guess.
             answer(ex, String.valueOf(messages.get(0).get("content")).contains("PRIVATE NOTE")
@@ -324,7 +377,8 @@ class AiBrainIntegrationTest {
         if (lastCaller.contains("connect me")) {
             // Invents a hand-over reason first; uses a valid one once the CRM refuses it.
             String last = String.valueOf(lastMsg.get("content"));
-            answer(ex, !"tool".equals(lastMsg.get("role")) ? handoff("DISPUTE")
+            // "WRONG_PERSON" is never a hand-over reason ("DISPUTE" would now be understood: CallerSignals).
+            answer(ex, !"tool".equals(lastMsg.get("role")) ? handoff("WRONG_PERSON")
                     : last.contains("INVALID_ARGUMENT") ? handoff("CALLER_REQUEST") : "Of course. Please stay on the line.");
             return;
         }

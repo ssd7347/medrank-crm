@@ -12,7 +12,7 @@ import random
 import re
 import urllib.error
 
-from callkit import CONNECTED, MAX_ROUNDS, TOOLS, FakeCrm, new_call, ollama_chat, record, spoken, ungrounded
+from callkit import CONNECTED, MAX_ROUNDS, TOOLS, FakeCrm, new_call, ollama_chat, record, spoken, ungrounded, upgrade
 from scenarios import TRICKS, Scenario, label_text
 
 MAX_CALLER_TURNS = 12
@@ -187,9 +187,18 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
             # As LlmBrain: words said alongside a tool call are spoken (and kept) only if they invent nothing.
             history.append({"role": "assistant", "content": alongside if not unheard(alongside, history, system) else "",
                             "tool_calls": calls})
+            # As LlmBrain: a call-back or hand-over for a distressed or disputing caller becomes the urgent hand-over.
+            # The transcript keeps the model's own call; "ran" says what the CRM ran instead.
+            words = " ".join(m["content"] for m in history if m["role"] == "user")
             for c in calls:
-                out = call.run(c["function"]["name"], c["function"]["arguments"] if isinstance(c["function"]["arguments"], dict) else {})
-                history.append({"role": "tool", "tool_call_id": c["id"], "name": c["function"]["name"], "content": out})
+                name, args = c["function"]["name"], c["function"]["arguments"] if isinstance(c["function"]["arguments"], dict) else {}
+                run_name, run_args = upgrade(name, args, words)
+                out = call.run(run_name, run_args)
+                msg = {"role": "tool", "tool_call_id": c["id"], "name": name, "content": out}
+                if run_args is not args:
+                    msg["ran"] = run_name
+                    call.upgrades.append({"from": name, "reason_code": run_args["reason_code"]})
+                history.append(msg)
         else:
             return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id, scenario.expect), \
                 "the agent kept using tools without answering"

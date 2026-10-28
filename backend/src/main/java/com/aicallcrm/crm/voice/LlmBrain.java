@@ -229,7 +229,13 @@ public class LlmBrain {
                     if (!alongside.isEmpty() && FactGuard.unheard(alongside, heard(s)).isEmpty()) {
                         out.add(Line.agent(alongside));
                     }
-                    for (ToolCall c : r.toolCalls()) {
+                    String callerWords = callerWords(s);
+                    for (ToolCall asked : r.toolCalls()) {
+                        // A call-back or hand-over for a distressed or disputing caller becomes the urgent hand-over.
+                        ToolCall c = CallerSignals.upgrade(asked, callerWords);
+                        if (c != asked) {
+                            log.info("Call {}: {} made an urgent {} hand-over", callId, asked.name(), c.arguments().get("reason_code"));
+                        }
                         ToolResult res = executor.execute(callId, c.name(), c.arguments());
                         out.add(Line.tool(c.name(), res.status(), res.ok() ? null : res.errorMessage()));
                         s.history.add(Message.toolResult(c.id(), json(res)));
@@ -285,6 +291,17 @@ public class LlmBrain {
             return text.trim();
         }
         return parts[0] + " " + parts[1] + " " + parts[parts.length - 1];
+    }
+
+    /** Everything the caller has said in this call. */
+    private static String callerWords(Session s) {
+        StringBuilder w = new StringBuilder();
+        for (Message m : s.history) {
+            if ("user".equals(m.role()) && m.text() != null) {
+                w.append(' ').append(m.text());
+            }
+        }
+        return w.toString();
     }
 
     /** What the agent may state: the script and call context, the caller's words and the tools' answers. */
