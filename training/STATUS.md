@@ -14,6 +14,26 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 28 October 2026, 8:30 pm: 8B'S 4 CALLS REDONE WITH THE NEW CRM RULE — DISTRESSED CALLERS NOW REACH A PERSON URGENTLY
+
+Colab (college account; the session showed "Reconnect" but was alive) redid exactly #4, #5, #43, #48 (crm_version 2);
+results `data/eval-ourvoice8b.*` (previous kept as `data/eval-ourvoice8b-before-crm2.*`). Score unchanged: strict
+36/60, **FAIR 39/60 (65%)** — but the transcripts show the rule working:
+- #48 and #43: the model booked an ordinary call-back; the CRM ran the **urgent DISTRESS hand-over** (#48 call-back
+  by 11:15, #43 transferred now). #5: the model chose DISTRESS itself.
+- They still score as failures only because the model did one more thing after the hand-over (logged an outcome;
+  in #43 a second DISTRESS hand-over): "more than one goodbye after the closing tool". Harmless for the caller,
+  but #48's later `log_call_outcome CALLBACK_REQUESTED` overwrites HANDED_OFF in the CRM (only OPTED_OUT and
+  VERIFICATION_FAILED are protected in `VoiceTools.logOutcome`) and #43's second hand-over may make a second task.
+- #4 dispute: a real fault the rule cannot reach — the model looped (asked for details again after verifying,
+  five times) and never offered a hand-over.
+**Possible next fixes (decide):** keep a hand-over's outcome (HANDED_OFF) from being overwritten and ignore a second
+hand-over in the same call (CRM); hand over when a caller repeats a dispute / distress and the agent has not
+(CRM); count a log after a hand-over as harmless in the fair score; round 4 data for the 8B (dispute loop,
+interested 0/2, faq_unknown 3/6).
+
+---
+
 # 28 October 2026, 8 pm: BACKING THE 8B — CRM RULE: DISTRESSED / DISPUTING CALLERS ALWAYS GET THE URGENT HAND-OVER
 
 User: back the 8B; I chose the fix (user: "make the best choice"). Read #4, #5, #42, #43, #48: distressed callers
