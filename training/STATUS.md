@@ -14,6 +14,35 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 28 October 2026, 7:50 pm: 8B FAIR TEST — STRICT 36/60, FAIR 39/60 (65%); 4B AND 8B LEVEL OVERALL
+
+Colab (college account) finished cell 8 at 7:08 pm, then disconnected while idle; results taken straight from
+Drive (`MyDrive/ourvoice-training-8b-r3/results`) → `data/eval-ourvoice8b.{jsonl,log}` (the earlier 30-call file
+kept as `data/eval-ourvoice8b-30calls.*`). Same 60 calls, same exact-words callers, 0 unusable, 5 calls rerun.
+
+| | 4B round 3 | 8B round 3 |
+|---|---|---|
+| strict | 38/60 | 36/60 |
+| **FAIR** | **39/59 (66%)** | **39/60 (65%)** |
+| fair, scripts never seen in training | 16/24 (67%) | **20/25 (80%)** |
+| fair, scripts seen in training | 23/35 | 19/35 |
+| fails only from the "no early lookup" rule | 3 | 3 |
+| private-detail leaks | **0** | **0** |
+| speed per turn on a T4 | 0.5 s | 1.0 s |
+
+Per scenario (fair), 4B → 8B: ask_person 3/5 → **5/5**, opt_out 3/5 → **5/5**, verify_fail 0/4 → **4/4**,
+injection 0/5 → 1/5, faq 5/6 → 4/6; but dispute 2/2 → **0/2**, distress 2/3 → **0/3**, wrong_person 4/4 → 2/4,
+are_you_human 5/5 → 3/5. Both: interested 0/2, faq_unknown 3/6, busy 5/5, verify_retry 3/3.
+8B's dispute/distress failures: invented reason `DISPUTE`, distress handed over as the wrong reason or not at all
+(#4, #5, #42, #43, #48) — upset callers not reaching a person is the most serious gap for a collections client.
+**Reading:** level overall; the 8B handles new scripts much better (80% vs 67%, which matters for a client's own
+scripts) and refuses impostors cleanly, the 4B handles upset callers better. Neither is near 85% yet; with the
+lookup rule relaxed both would be ~70%. Decisions for the user: the lookup rule; which model to back; next
+improvement round (targeted data for each model's weak scenarios, or a CRM rule that hands distressed / disputing
+callers to a person).
+
+---
+
 # 28 October 2026, 7:20 pm: 4B WITH THE NEW CALLERS — STRICT 38/60, FAIR 39/59 (66%), 1 UNUSABLE
 
 Exact-words callers (commit 572e874; CALLER_VERSIONS 2 for injection / verify_fail / verify_retry): the 12 affected
