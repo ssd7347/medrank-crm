@@ -197,6 +197,45 @@ class VoiceAgentIntegrationTest {
     }
 
     @Test
+    void aHandOverIsNeitherRepeatedNorOverwritten() throws Exception {
+        approve("Incoming calls");
+        String phone = phone();
+        long contact = contact(admin, "Kavya Menon", phone, "\"customer_ref\":\"CR-66120\"");
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        String byContact = "$[?(@.contactId == " + contact + ")]";
+        tool(call, "request_human_handoff", "{\"reason_code\":\"CALLER_REQUEST\",\"summary\":\"Wants a person.\"}")
+                .andExpect(jsonPath("$.data.handoff_mode").value("CALLBACK_TASK"));
+        // The model asking again, the same or a less urgent reason: no second task.
+        tool(call, "request_human_handoff", "{\"reason_code\":\"CALLER_REQUEST\",\"summary\":\"Asked again.\"}")
+                .andExpect(jsonPath("$.ok").value(true))
+                .andExpect(jsonPath("$.data.handoff_mode").value("ALREADY_ARRANGED"));
+        tool(call, "request_human_handoff", "{\"reason_code\":\"OUT_OF_SCOPE\"}")
+                .andExpect(jsonPath("$.data.handoff_mode").value("ALREADY_ARRANGED"));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin)).andExpect(jsonPath(byContact, Matchers.hasSize(1)));
+        // A later ending does not hide that a person has to act.
+        tool(call, "log_call_outcome", "{\"outcome_code\":\"CALLBACK_REQUESTED\",\"note\":\"Will be called.\"}")
+                .andExpect(jsonPath("$.ok").value(true));
+        mvc.perform(auth(get("/api/voice/calls/" + call), admin))
+                .andExpect(jsonPath("$.call.outcome").value("HANDED_OFF"));
+        // A more urgent reason is a new, urgent task; asking for it twice still makes one.
+        tool(call, "request_human_handoff", "{\"reason_code\":\"COMPLAINT_OR_DISPUTE\",\"summary\":\"Charged twice.\"}")
+                .andExpect(jsonPath("$.data.handoff_mode").value("CALLBACK_TASK"));
+        tool(call, "request_human_handoff", "{\"reason_code\":\"COMPLAINT_OR_DISPUTE\"}")
+                .andExpect(jsonPath("$.data.handoff_mode").value("ALREADY_ARRANGED"));
+        tool(call, "request_human_handoff", "{\"reason_code\":\"DISTRESS\",\"summary\":\"Very upset.\"}")
+                .andExpect(jsonPath("$.data.handoff_mode").value("CALLBACK_TASK"));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin))
+                .andExpect(jsonPath(byContact, Matchers.hasSize(3)))
+                .andExpect(jsonPath(byContact + ".reason").value(
+                        Matchers.containsInAnyOrder("CALLER_REQUEST", "COMPLAINT_OR_DISPUTE", "DISTRESS")));
+        hook("/webhooks/call-ended", "{\"call_id\":\"" + call + "\",\"status\":\"completed\"}");
+        mvc.perform(auth(get("/api/voice/calls/" + call), admin))
+                .andExpect(jsonPath("$.call.outcome").value("HANDED_OFF"))
+                .andExpect(jsonPath("$.call.handoffReason").value("DISTRESS"));
+    }
+
+    @Test
     void unknownCallerBecomesAContactOnCallback() throws Exception {
         approve("Incoming calls");
         String phone = phone();

@@ -303,6 +303,7 @@ class FakeCrm:
     verified: bool = False
     failures: int = 0
     outcome: str | None = None
+    handed_over: str | None = None  # the reason of this call's hand-over so far (VoiceCall.handoffReason)
     closing: bool = False
     settled: bool = False          # a call-back or the identity lock-out already recorded the outcome (settles_the_call)
     over: bool = False
@@ -392,9 +393,8 @@ class FakeCrm:
         self.failures += 1
         left = 3 - self.failures
         if left <= 0:
-            self.outcome = "VERIFICATION_FAILED"
-            msg = "A member of our team will call you back by " + self._callback_slot(120) + "."
-            return result_json(True, {"verified": False, "attempts_left": 0, "handoff_mode": "CALLBACK_TASK"}, "I could not verify the details. " + msg)
+            mode, msg = self._hand_over("VERIFICATION_FAILED", transfer=False)
+            return result_json(True, {"verified": False, "attempts_left": 0, "handoff_mode": mode}, "I could not verify the details. " + msg)
         return result_json(True, {"verified": False, "attempts_left": left}, "That did not match our records. Could you check and tell me again?")
 
     def visible(self) -> list[tuple[FieldDef, str]]:
@@ -450,22 +450,30 @@ class FakeCrm:
             # VoiceTools.handoff: an invented reason is refused and the model asks again; nothing is handed over.
             return result_json(False, code="INVALID_ARGUMENT", msg="reason_code must be one of: " + ", ".join(SPEC["handoff_reasons"])
                                + ". A wrong person is not a hand-over: use log_call_outcome with WRONG_PERSON.")
+        mode, msg = self._hand_over(reason)
+        return result_json(True, {"handoff_mode": mode, "message": msg}, msg)
+
+    def _hand_over(self, reason: str, transfer: bool = True) -> tuple[str, str]:
+        """HandoffService.handoff(): records the outcome; a second hand-over in the call that is not more urgent
+        than the first makes no new task. transfer=False: the identity lock-out, always a call-back in this kit."""
         if reason == "VERIFICATION_FAILED":
             self.outcome = "VERIFICATION_FAILED"
         elif self.outcome not in ("OPTED_OUT", "VERIFICATION_FAILED"):
             self.outcome = "HANDED_OFF"
-        if self.desk_open:
-            msg, mode = "I am connecting you to a member of our team now. Please stay on the line.", "TRANSFER_NOW"
-        else:
-            minutes = 15 if reason == "DISTRESS" else 30 if reason == "COMPLAINT_OR_DISPUTE" else 120
-            msg, mode = "A member of our team will call you back by " + self._callback_slot(minutes) + ".", "CALLBACK_TASK"
-        return result_json(True, {"handoff_mode": mode, "message": msg}, msg)
+        if self.handed_over is not None and urgency(reason) <= urgency(self.handed_over):
+            return "ALREADY_ARRANGED", "Our team already has your request from this call, so they will be in touch as arranged."
+        self.handed_over = reason
+        if self.desk_open and transfer:
+            return "TRANSFER_NOW", "I am connecting you to a member of our team now. Please stay on the line."
+        minutes = 15 if reason == "DISTRESS" else 30 if reason == "COMPLAINT_OR_DISPUTE" else 120
+        return "CALLBACK_TASK", "A member of our team will call you back by " + self._callback_slot(minutes) + "."
 
     def t_log_call_outcome(self, args):
         code = str(args.get("outcome_code") or "").upper()
         if code not in SPEC["outcomes"]:
             return result_json(False, code="INVALID_ARGUMENT", msg="Unknown outcome code.")
-        if self.outcome not in ("OPTED_OUT", "VERIFICATION_FAILED"):
+        # As VoiceTools.logOutcome: an opt-out, a lock-out or a hand-over is never overwritten.
+        if self.outcome not in ("OPTED_OUT", "VERIFICATION_FAILED", "HANDED_OFF"):
             self.outcome = code
         return result_json(True, {"recorded": True})
 
@@ -572,6 +580,11 @@ def handoff_reason(raw) -> str | None:
     r = re.sub(r"[\s-]+", "_", str(raw).strip().upper())
     r = REASON_ALIASES.get(r, r)
     return r if r in SPEC["handoff_reasons"] else None
+
+
+def urgency(reason: str) -> int:
+    """HandoffService.urgency(): distress, then complaints and disputes, then everything else."""
+    return 2 if reason == "DISTRESS" else 1 if reason == "COMPLAINT_OR_DISPUTE" else 0
 
 
 def heard_signal(caller_words: str) -> str | None:

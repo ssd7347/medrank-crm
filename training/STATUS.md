@@ -14,6 +14,26 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 28 October 2026, 8:45 pm: CRM KEEPS A HAND-OVER — NOT OVERWRITTEN, NOT REPEATED (user: "Yes, fix them")
+
+The two bookkeeping faults seen in #48 and #43 are fixed in the CRM and mirrored in the kit:
+- `VoiceTools.logOutcome`: a later `log_call_outcome` no longer replaces **HANDED_OFF** (as already for OPTED_OUT
+  and VERIFICATION_FAILED); the note is still saved. The team always sees that a person has to act.
+- `HandoffService.handoff`: a second hand-over in the same call makes **no second task** unless it is more urgent
+  (DISTRESS > COMPLAINT_OR_DISPUTE > everything else; `HandoffService.urgency`). The model gets
+  `handoff_mode` **ALREADY_ARRANGED** and "Our team already has your request from this call, so they will be in
+  touch as arranged." This also covers the identity lock-out and the CRM's own TOOL_FAILURE hand-over.
+- Kit: `FakeCrm._hand_over` / `t_log_call_outcome` / `urgency()` do the same. The kit's lock-out stays a call-back
+  even when the fake desk is open, as before, so earlier results stay comparable.
+- Tests: backend **67/67** (new `VoiceAgentIntegrationTest.aHandOverIsNeitherRepeatedNorOverwritten`; checked that
+  it fails without the fix), kit **43/43** (3 new). Colab kit rebuilt and copied to `Desktop\Colab training`.
+- Saved test calls are **not** rerun: the scores come from the model's own tool calls, which come before the CRM's
+  reply, so #43 / #48 still fail on "more than one goodbye after the closing tool" — that is the open scoring
+  question below, not a CRM fault.
+**Still to decide:** hand over when a caller repeats a dispute / distress and the agent has not (CRM); count a log
+after a hand-over as harmless in the fair score; count a refused / public-only early `get_contact_details` as safe;
+round 4 data for the 8B (dispute loop, interested 0/2, faq_unknown 3/6); phone platform.
+
 # 28 October 2026, 8:30 pm: 8B'S 4 CALLS REDONE WITH THE NEW CRM RULE — DISTRESSED CALLERS NOW REACH A PERSON URGENTLY
 
 Colab (college account; the session showed "Reconnect" but was alive) redid exactly #4, #5, #43, #48 (crm_version 2);

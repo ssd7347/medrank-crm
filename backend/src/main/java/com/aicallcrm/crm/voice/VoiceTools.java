@@ -364,8 +364,10 @@ public class VoiceTools {
         } catch (IllegalArgumentException e) {
             return ToolResult.error(ToolResult.INVALID_ARGUMENT, "Unknown outcome code.");
         }
-        // An opt-out or a failed identity check is never overwritten by a politer-sounding ending.
-        if (call.getOutcome() != Outcome.OPTED_OUT && call.getOutcome() != Outcome.VERIFICATION_FAILED) {
+        // An opt-out, a failed identity check or a hand-over to a person is never overwritten by a politer-sounding
+        // ending: the team must still see that a person has to act.
+        if (call.getOutcome() != Outcome.OPTED_OUT && call.getOutcome() != Outcome.VERIFICATION_FAILED
+                && call.getOutcome() != Outcome.HANDED_OFF) {
             call.setOutcome(outcome);
         }
         call.setOutcomeNote(cut(text(args, "note"), 1000));

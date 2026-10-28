@@ -27,6 +27,8 @@ public class HandoffService {
 
     public static final String TRANSFER_NOW = "TRANSFER_NOW";
     public static final String CALLBACK_TASK = "CALLBACK_TASK";
+    /** A person was already asked for earlier in this call; no second task is made. */
+    public static final String ALREADY_ARRANGED = "ALREADY_ARRANGED";
 
     /** {@code callbackId} is null for a live transfer and for test calls, which save nothing. */
     public record Handoff(String mode, String message, Long callbackId, Instant dueAt) {
@@ -50,12 +52,18 @@ public class HandoffService {
     @Transactional
     public Handoff handoff(VoiceCall call, HandoffReason reason, String summary) {
         Instant now = Instant.now();
-        call.setHandoffReason(reason);
         if (reason == HandoffReason.VERIFICATION_FAILED) {
             call.setOutcome(Outcome.VERIFICATION_FAILED);
         } else if (call.getOutcome() != Outcome.OPTED_OUT && call.getOutcome() != Outcome.VERIFICATION_FAILED) {
             call.setOutcome(Outcome.HANDED_OFF);
         }
+        HandoffReason earlier = call.getHandoffReason();
+        if (earlier != null && urgency(reason) <= urgency(earlier)) {
+            // A second hand-over in the same call (the model asking twice): the team already has the first one.
+            return new Handoff(ALREADY_ARRANGED, "Our team already has your request from this call, so they will be in "
+                    + "touch as arranged.", null, null);
+        }
+        call.setHandoffReason(reason);
         if (call.isTestCall()) {
             Instant due = dueAt(reason, now);
             return new Handoff(CALLBACK_TASK, callbackMessage(due), null, due);
@@ -123,6 +131,11 @@ public class HandoffService {
 
     private static String label(VoiceCall call, Contact contact) {
         return contact != null ? contact.getFullName() : "caller " + mask(call.getPhone());
+    }
+
+    /** Distress, then complaints and disputes, then everything else: a later hand-over only counts if it is higher. */
+    static int urgency(HandoffReason reason) {
+        return reason == HandoffReason.DISTRESS ? 2 : reason.high() ? 1 : 0;
     }
 
     // ------------------------------------------------------------------ due times

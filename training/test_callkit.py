@@ -49,6 +49,39 @@ class FakeCrmTest(unittest.TestCase):
                                                       "answers": {"customer_id": call.person.values["customer_id"]}}))
         self.assertFalse(res["data"]["verified"])
 
+    def test_a_hand_over_is_neither_repeated_nor_overwritten(self):
+        # As VoiceAgentIntegrationTest.aHandOverIsNeitherRepeatedNorOverwritten.
+        call = new_call(script("Payment reminder"), random.Random(5))
+        call.desk_open = False
+        mode = lambda reason: json.loads(call.run("request_human_handoff", {"reason_code": reason}))["data"]["handoff_mode"]
+        self.assertEqual(mode("CALLER_REQUEST"), "CALLBACK_TASK")
+        self.assertEqual(mode("CALLER_REQUEST"), "ALREADY_ARRANGED")
+        self.assertEqual(mode("OUT_OF_SCOPE"), "ALREADY_ARRANGED")
+        self.assertTrue(json.loads(call.run("log_call_outcome", {"outcome_code": "CALLBACK_REQUESTED"}))["ok"])
+        self.assertEqual(call.outcome, "HANDED_OFF")
+        self.assertEqual(mode("COMPLAINT_OR_DISPUTE"), "CALLBACK_TASK")
+        self.assertEqual(mode("DISPUTE"), "ALREADY_ARRANGED")          # an alias of the same reason
+        self.assertEqual(mode("DISTRESS"), "CALLBACK_TASK")
+        self.assertEqual((call.outcome, call.handed_over), ("HANDED_OFF", "DISTRESS"))
+
+    def test_the_lock_out_after_a_hand_over_makes_no_second_task(self):
+        call = new_call(script("Payment reminder"), random.Random(4))
+        call.desk_open = True
+        self.assertEqual(json.loads(call.run("request_human_handoff", {"reason_code": "CALLER_REQUEST"}))["data"]["handoff_mode"],
+                         "TRANSFER_NOW")
+        for _ in range(3):
+            res = json.loads(call.run("verify_identity", {"full_name": call.person.full_name, "answers": {"customer_id": "0000"}}))
+        self.assertEqual(res["data"]["handoff_mode"], "ALREADY_ARRANGED")
+        self.assertEqual(call.outcome, "VERIFICATION_FAILED")
+
+    def test_the_lock_out_is_a_call_back_even_when_the_desk_is_open(self):
+        call = new_call(script("Payment reminder"), random.Random(4))
+        call.desk_open = True
+        for _ in range(3):
+            res = json.loads(call.run("verify_identity", {"full_name": call.person.full_name, "answers": {"customer_id": "0000"}}))
+        self.assertEqual(res["data"]["handoff_mode"], "CALLBACK_TASK")
+        self.assertEqual(call.handed_over, "VERIFICATION_FAILED")
+
     def test_answers_match_like_the_backend(self):
         ref = FieldDef("Loan account number", "TEXT", "NONE", True)
         self.assertTrue(answer_matches(ref, "LN-482913", "482913"))
