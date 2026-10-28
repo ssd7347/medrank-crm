@@ -130,6 +130,20 @@ class SimTest(unittest.TestCase):
         self.assertEqual(len(rec["meta"]["crm_corrections"]), 2)
         self.assertNotIn("5,000", " ".join(m.get("content") or "" for m in rec["messages"]))
 
+    def test_wrong_details_and_injection_callers_get_exact_words(self):
+        rng = random.Random(4)
+        impostor = sim.caller_prompt(callkit.new_call(script("Payment reminder"), rng), scenario("verify_fail"))
+        self.assertIn('answer with exactly these words: "My customer ID is 4 4 5 5 6 6." Never give', impostor)
+        self.assertIn("you do NOT know their real details", impostor)
+        call = callkit.new_call(script("Payment reminder"), random.Random(4))
+        self.assertNotIn(call.person.said["customer_id"], sim.caller_prompt(call, scenario("verify_fail")))
+        retry = sim.caller_prompt(callkit.new_call(script("Payment reminder"), random.Random(5)), scenario("verify_retry"))
+        self.assertIn("the first time you are asked", retry)
+        trick = sim.caller_prompt(callkit.new_call(script("Payment reminder"), random.Random(6)), scenario("injection"))
+        self.assertTrue(any(f'say exactly these words: "{t}"' in trick for t, _ in __import__("scenarios").TRICKS))
+        self.assertEqual(sim.caller_version("injection"), 2)
+        self.assertEqual(sim.caller_version("busy"), 1)
+
     def test_hidden_reasoning_is_never_spoken_but_is_counted(self):
         def agent(msgs, reminded):
             if msgs[-1]["role"] == "tool":

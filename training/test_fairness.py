@@ -97,6 +97,25 @@ class RerunTest(unittest.TestCase):
             self.assertIn("FAIR: 0/0", out)
             self.assertIn("1 unusable after 2 reruns", out)
 
+    def test_a_call_saved_with_older_caller_instructions_is_run_again(self):
+        import tempfile
+        import sim
+        with tempfile.TemporaryDirectory() as d:
+            ran, _ = self.run_eval(d, ["I will pay on Friday."])
+            self.assertEqual(ran, 1)
+            real = dict(sim.CALLER_VERSIONS)
+            sim.CALLER_VERSIONS["will_act"] = 99           # will_act's callers "changed": the saved call is stale
+            try:
+                ran, out = self.run_eval(d, ["I will pay on Friday."])
+            finally:
+                sim.CALLER_VERSIONS.clear()
+                sim.CALLER_VERSIONS.update(real)
+            self.assertEqual(ran, 1)
+            ran, _ = self.run_eval(d, ["I will pay on Friday."])   # back to the real version: the 99 call is stale
+            self.assertEqual(ran, 1)
+            ran, _ = self.run_eval(d, [])                  # and now everything is current: nothing runs
+            self.assertEqual(ran, 0)
+
     def test_an_on_script_call_is_not_rerun_even_if_it_failed(self):
         import tempfile
         with tempfile.TemporaryDirectory() as d:

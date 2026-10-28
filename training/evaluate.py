@@ -25,7 +25,7 @@ from pathlib import Path
 from callkit import DATA, all_scripts, check, installed_models, read_jsonl, write_jsonl
 from fairness import caller_played
 from scenarios import HELD_OUT_SCRIPTS, for_script
-from sim import simulate, transcript
+from sim import caller_version, simulate, transcript
 
 # A rerun gets its own caller: the call's usual seed plus this, times the rerun number.
 RERUN_SEED = 100_000
@@ -49,7 +49,8 @@ def run_once(script, scenario, seed: int, a, caller: str) -> dict:
     alone += [f"the CRM stopped a made-up fact ({', '.join(f)})" for f in rec["meta"].get("crm_corrections", [])]
     if rec["meta"].get("thinking_turns"):
         alone.append(f"wrote hidden reasoning in {rec['meta']['thinking_turns']} replies (slow on a phone)")
-    rec["meta"].update(problems=problems, problems_alone=alone, caller_played=played, caller_why=why)
+    rec["meta"].update(problems=problems, problems_alone=alone, caller_played=played, caller_why=why,
+                       caller_version=caller_version(scenario.id))
     return rec
 
 
@@ -108,6 +109,10 @@ def main() -> None:
         print(f"Carrying on: {len(done)} of {len(tests)} calls already done.")
     for i, (script, scenario) in enumerate(tests, 1):
         rec, changed = done.get(i), False
+        if rec is not None and rec["meta"].get("caller_version", 1) != caller_version(scenario.id):
+            # Saved with older caller instructions for this scenario (sim.CALLER_VERSIONS): run it again, so every
+            # model meets the same callers. The new record is appended and counts from now on.
+            rec = None
         if rec is None:
             # Each test call has its own random seed, so the same calls come out whether or not the run was stopped.
             rec = run_once(script, scenario, a.seed * 1000 + i, a, caller)
