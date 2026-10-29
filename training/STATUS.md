@@ -14,6 +14,22 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 29 October 2026, 10:50 pm: ROUND 4 CALLS COLLECTED — 326 KEPT (in `data/r4-calls/`, not in git)
+
+Colab (college account) ran `round4-calls-on-colab.ipynb` 8:20–10:44 pm: 326 kept, 243 rejected, 7–75 s per call.
+It stopped once on an Ollama "HTTP 500" (generate.py exits on any Ollama error — **to fix: skip that call and go
+on**); restarted from cell 3 and carried on. Unpacked from `Downloads\r4-calls.zip` to `data/r4-calls/`
+(`generated-r4.jsonl`, `rejected.jsonl`, `generate.log`); also in Drive `MyDrive/ourvoice-r4-calls`.
+Rechecked on the laptop: **all 326 pass today's strict check; 0 on the test scripts; 0 with trainer notes**.
+Per scenario: 20 each for are_you_human, ask_person, busy, confirm_attend, dispute, faq, faq_unknown, injection,
+interested, opt_out, verify_retry, will_act, wrong_person; distress 15, not_interested 15, verify_fail 12,
+cannot_attend 11, feedback_score 5, inbound_details 4, feedback_unhappy 3, inbound_unknown 1.
+**Next (30 Oct):** read the calls for bad habits the checker does not catch — 22 where the caller mentioned a
+person / human with no hand-over (17 are_you_human, probably fine; **5 injection**: a call-back booked where a
+person was asked for, as in the smoke test) — drop those that teach the wrong thing; copy the rest to
+`data/generated-r4.jsonl`; build round 4 (templates + these ×2); round 4 8B training notebook (new Drive folder);
+fix generate.py's stop on an Ollama error. Then train + 60-call test.
+
 # 29 October 2026, 8:15 pm: ROUND 4 STARTED — REAL-CALLER CALLS FROM OUR 8B; FAIR SCORE 8B 44/60 (73%)
 
 User chose (29 Oct): round 4 = calls written by our trained 8B against the test's simulated caller, plus targeted
