@@ -382,6 +382,107 @@ one and it carries on. Send a screenshot of the score at the end.
             "nbformat": 4, "nbformat_minor": 0}
 
 
+# Round 4 (29 Oct): the trained 8B writes training calls against the test's simulated caller (generate.py). The
+# scenarios at or below 70% fair in the 8B's 60-call test get three times the tries.
+GEN = "/content/drive/MyDrive/ourvoice-r4-calls"
+GEN_FILE = "generated-r4.jsonl"
+FOCUS = "dispute,interested,faq_unknown,faq,wrong_person,are_you_human,confirm_attend,distress"
+GEN_MINUTES = 150
+
+
+def notebook_gen() -> dict:
+    here = f"%cd {KIT}"
+    cells = [
+        md(f"""
+# Round 4: our 8B writes training calls with the real simulated caller
+
+No training tonight: the trained 8B from round 3 (its model file is in Google Drive, `{KEEP8}`) talks to the same
+simulated caller as the test, with private trainer notes. Only calls that pass every check are kept, and never on
+the two test scripts. About **2 h 45 min**: setup ~10 min, then the calls stop by themselves after
+{GEN_MINUTES} minutes. **Every kept call is saved to Google Drive** (`{GEN}`) the moment it finishes.
+
+Use the **college Google account** (the one whose Drive has `ourvoice-training-8b-r3`).
+
+1. **Runtime → Change runtime type → T4 GPU**, then **Save**.
+2. Upload **colab-kit.zip** in the Files panel on the left (folder icon).
+3. Run the cells **in order, one at a time**. Keep this tab open; click in it now and then.
+
+**After a disconnect:** reconnect, upload colab-kit.zip again and run cells 1–4: the calls already in Drive count,
+and it carries on. You can also stop cell 4 at any time (■): nothing kept is lost.
+"""),
+        md("## 1. Check the GPU and unpack the kit"),
+        code(f"""
+!nvidia-smi --query-gpu=name,memory.total --format=csv
+!unzip -o -q /content/colab-kit.zip -d /content/kit && echo "Kit unpacked"
+{here}
+!python -m unittest test_callkit test_sim test_generate test_fairness 2>&1 | tail -3
+"""),
+        md("## 2. Connect Google Drive\nColab asks you to allow access: choose the college account."),
+        code(f"""
+import glob, os
+from google.colab import drive
+drive.mount("/content/drive")
+saved = sorted(glob.glob("{KEEP8}/*.gguf"))
+if not saved:
+    raise SystemExit("The 8B model file is not in this Drive ({KEEP8}). Is this the college account? "
+                     "Runtime -> Disconnect and delete runtime, then run cell 2 again and choose that account.")
+os.makedirs("{GEN}", exist_ok=True)
+print("Model file:", saved[0])
+print("Saving calls to {GEN}")
+"""),
+        md("## 3. Load the 8B into Ollama (about 5 minutes)\nMust end with **Answers directly**."),
+        code(f"""
+{here}
+import glob, os, subprocess, time, urllib.request, json
+!apt-get -qq install -y zstd pciutils > /dev/null
+!curl -fsSL https://ollama.com/install.sh | sh > /dev/null 2>&1 && echo "Ollama installed"
+env = dict(os.environ, OLLAMA_CONTEXT_LENGTH="8192", OLLAMA_MAX_LOADED_MODELS="2")
+subprocess.Popen(["ollama", "serve"], env=env, stdout=open("/content/ollama.log", "w"), stderr=subprocess.STDOUT)
+for _ in range(60):
+    try:
+        urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
+        print("Ollama is running")
+        break
+    except Exception:
+        time.sleep(1)
+else:
+    raise SystemExit("Ollama did not start: see /content/ollama.log")
+!ollama pull {CALLER} 2>&1 | tail -1
+!ollama pull qwen3:4b-instruct 2>&1 | tail -1
+gguf = sorted(glob.glob("{KEEP8}/*.gguf"))[0]
+# The plain chat template of qwen3:4b-instruct (no thinking), exactly as the 8B was trained and tested.
+get_ipython().system(f'python make_modelfile.py "{{gguf}}" --base qwen3:4b-instruct --name {NAME8} --create 2>&1 | tail -2')
+body = {{"model": "{NAME8}", "messages": [{{"role": "user", "content": "Say hello in five words."}}], "max_tokens": 60, "stream": False}}
+req = urllib.request.Request("http://localhost:11434/v1/chat/completions", json.dumps(body).encode(), {{"Content-Type": "application/json"}})
+text = json.load(urllib.request.urlopen(req, timeout=300))["choices"][0]["message"].get("content") or ""
+print(repr(text[:150]))
+print("Thinks first: send a screenshot." if "<think>" in text else "Answers directly")
+"""),
+        md(f"""
+## 4. Write the calls ({GEN_MINUTES} minutes, stops by itself)
+
+One line per call: **kept** or **rejected** with the reason. About half kept is normal. Leave it running; send a
+screenshot at the end (or whenever you stop it).
+"""),
+        code(f"""
+{here}
+!python -u generate.py --teacher {NAME8} --caller {CALLER} --focus {FOCUS} --max-per-scenario 20 --count 400 --minutes {GEN_MINUTES} --out {GEN_FILE} --out-dir {GEN} 2>&1 | tee -a {GEN}/generate.log
+"""),
+        md("## 5. Pack the calls\nRight-click **r4-calls.zip** in the Files panel → **Download**, and tell Claude."),
+        code(f"""
+{here}
+import collections, json
+kept = [json.loads(l) for l in open("{GEN}/{GEN_FILE}", encoding="utf-8") if l.strip()]
+print(len(kept), "calls kept:", dict(collections.Counter(r["meta"]["scenario"] for r in kept).most_common()))
+!cd {GEN} && zip -q /content/r4-calls.zip {GEN_FILE} rejected.jsonl generate.log && ls -l /content/r4-calls.zip
+"""),
+    ]
+    return {"cells": cells, "metadata": {"accelerator": "GPU", "colab": {"provenance": []},
+                                         "kernelspec": {"display_name": "Python 3", "name": "python3"},
+                                         "language_info": {"name": "python"}},
+            "nbformat": 4, "nbformat_minor": 0}
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
     zpath = OUT / "colab-kit.zip"
@@ -390,7 +491,7 @@ def main() -> None:
         for src, name in files:
             z.write(src, name)
     for name, nb in (("train-on-colab.ipynb", notebook()), ("test-bigger-models.ipynb", test_notebook()),
-                     ("train-8b-on-colab.ipynb", notebook_8b())):
+                     ("train-8b-on-colab.ipynb", notebook_8b()), ("round4-calls-on-colab.ipynb", notebook_gen())):
         (OUT / name).write_text(json.dumps(nb, indent=1, ensure_ascii=False), encoding="utf-8")
         print(f"Wrote {OUT / name}")
     print(f"Wrote {zpath} ({len(files)} files, {zpath.stat().st_size // 1024} KB)")

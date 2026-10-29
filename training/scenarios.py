@@ -340,10 +340,20 @@ def enquiry_intro(c: Conv) -> None:
 
 
 def f_interested(c: Conv) -> None:
-    enquiry_intro(c)
-    c.caller(c.pick("Yes, I'm still interested.", "Yes, I want to know more.", "Yes, please tell me more."))
-    c.agent(c.pick("Wonderful. Shall I ask our team to call you with the details? When would suit you?",
-                   "Great. A member of our team can call you to explain everything. What time works for you?"))
+    if "Am I speaking with" in c.call.opening() and c.rng.random() < 0.5:
+        # Round 4: test callers ask for the call-back in their first words. That is still INTERESTED, not
+        # CALLBACK_REQUESTED (the 8B recorded CALLBACK_REQUESTED in both such test calls, 29 Oct).
+        c.caller(c.pick("Yes, this is {first}. Can someone call me back with the details?",
+                        "Yes, I'm still interested. Please ask someone to call me with all the information.",
+                        "Yes, speaking. Can you get someone to call me back with more details?",
+                        "Yes, {first} here. I want the details, can your team call me?"))
+        c.agent(c.pick("Of course, {first}. When would be a good time for our team to call you?",
+                       "Happy to arrange that. What time suits you?"))
+    else:
+        enquiry_intro(c)
+        c.caller(c.pick("Yes, I'm still interested.", "Yes, I want to know more.", "Yes, please tell me more."))
+        c.agent(c.pick("Wonderful. Shall I ask our team to call you with the details? When would suit you?",
+                       "Great. A member of our team can call you to explain everything. What time works for you?"))
     when = c.rng.choice(WHEN_CALL)
     c.caller(c.pick("{when} is good.", "Call me {when}.", when=when))
     res = c.tool("schedule_callback", {"preferred_time_text": when, "reason": "Still interested and wants the details."})
@@ -370,10 +380,27 @@ def f_busy(c: Conv) -> None:
 
 
 def f_wrong_person(c: Conv) -> None:
-    c.caller(c.pick("No, you have the wrong number.", "No, there's no {first} here.", "No, this is his brother. He is not here.",
-                    "Wrong number."))
-    c.close("WRONG_PERSON", "Answered by someone else; nothing was shared.",
-            c.pick("I'm sorry for the trouble. Thank you, goodbye.", "My apologies for disturbing you. Goodbye."))
+    kind = c.rng.random()
+    if kind < 0.3:
+        # Round 4: test callers ask what it is about. Nothing is said about it, and no call-back is booked.
+        c.caller(c.pick("No, this is Sunil. I think you have the wrong number. What is this about?",
+                        "I'm a relative of {first}. What is it about? I can pass it on.",
+                        "No, {first} is not here. Who is calling and why?"))
+        c.close("WRONG_PERSON", "Answered by someone else; nothing was shared.",
+                c.pick("I'm sorry, I can only talk about this with {first}. Sorry to disturb you, goodbye.",
+                       "Thank you, but I can only discuss it with {first} directly. Sorry for the trouble, goodbye."))
+    elif kind < 0.5:
+        # Round 4: asked to "call back for him": still a wrong person (the 8B booked a call-back to the same number).
+        c.caller(c.pick("No, this is Sunil, wrong number. Can you check again and try later for {first}?",
+                        "{first} is not here. Call later for {first}."))
+        c.close("WRONG_PERSON", "Answered by someone else; nothing was shared.",
+                c.pick("Thank you for letting me know. Sorry for the trouble, goodbye.",
+                       "Understood, thank you. My apologies for disturbing you, goodbye."))
+    else:
+        c.caller(c.pick("No, you have the wrong number.", "No, there's no {first} here.", "No, this is his brother. He is not here.",
+                        "Wrong number."))
+        c.close("WRONG_PERSON", "Answered by someone else; nothing was shared.",
+                c.pick("I'm sorry for the trouble. Thank you, goodbye.", "My apologies for disturbing you. Goodbye."))
 
 
 def f_opt_out(c: Conv) -> None:
@@ -440,6 +467,10 @@ def f_faq_unknown(c: Conv) -> None:
     if c.call.script.kind == "INBOUND":
         q = c.rng.choice(ODD)
         c.caller(q)
+    elif "Am I speaking with" in c.call.opening() and c.rng.random() < 0.5:
+        # Round 4: test callers ask in their first words; the answer is still looked up before saying it is unknown.
+        q = c.rng.choice(ODD)
+        c.caller(c.pick("Yes, this is {first}. ") + q)
     else:
         c.answer_opening()
         c.agent(c.pick("Thank you, {first}. I'm calling about {topic}. Do you have any questions for me?"))

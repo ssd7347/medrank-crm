@@ -5,8 +5,8 @@
 
 import unittest
 
-from callkit import CONNECTED
-from fairness import caller_played
+from callkit import CONNECTED, check
+from fairness import AFTER_CLOSE, NO_LOOKUP, caller_played, harmless
 
 
 def call(scenario, *said, verified=None):
@@ -41,6 +41,85 @@ class CallerPlayedTest(unittest.TestCase):
         self.assertEqual(caller_played(call("verify_fail", "It is 4 4 5 5 6 6.", "Sorry, it is 665417.", verified=True)),
                          (False, "the caller gave the right details, so the identity check passed"))
         self.assertFalse(caller_played(call("verify_retry", "My loan account number is LN 562804."))[0])
+
+
+def judged(expect, *steps):
+    """A call scored by the real checker (with the CRM's safety net). Each step is a caller line (str), an agent line
+    ("AGENT: ..."), or a tool call (name, args, result) the agent makes in its own silent message."""
+    msgs = [{"role": "system", "content": "x"}, {"role": "user", "content": CONNECTED},
+            {"role": "assistant", "content": "Hello, this is Asha."}]
+    for n, s in enumerate(steps):
+        if isinstance(s, tuple):
+            name, args, res = s
+            msgs += [{"role": "assistant", "content": "", "tool_calls": [{"id": f"c{n}", "type": "function",
+                                                                       "function": {"name": name, "arguments": args}}]},
+                     {"role": "tool", "tool_call_id": f"c{n}", "name": name, "content": res}]
+        elif s.startswith("AGENT: "):
+            msgs.append({"role": "assistant", "content": s[7:]})
+        else:
+            msgs.append({"role": "user", "content": s})
+    rec = {"messages": msgs, "meta": {"scenario": "x", "expect": expect}}
+    rec["meta"]["problems"] = check(rec, crm_net=True)
+    return rec
+
+
+HANDOFF = ("request_human_handoff", {"reason_code": "DISTRESS", "summary": "Upset."},
+           '{"ok":true,"data":{"handoff_mode":"CALLBACK_TASK","message":"Someone will call you."}}')
+LOG = ("log_call_outcome", {"outcome_code": "HANDED_OFF"}, '{"ok":true,"data":{"recorded":true}}')
+REFUSED = ("get_contact_details", {}, '{"ok":false,"error_code":"VERIFICATION_REQUIRED","error_message":"Verify first."}')
+PUBLIC = ("get_contact_details", {}, '{"ok":true,"data":{"details":[{"key":"plan","label":"Plan","value":"Gold"}]}}')
+VERIFIED = ("verify_identity", {"full_name": "Asha Rao"}, '{"ok":true,"data":{"verified":true,"attempts_left":3}}')
+
+
+class HarmlessTest(unittest.TestCase):
+    """fairness.harmless(): what the FAIR score forgives (user, 29 Oct 2026), judged on checker output."""
+
+    def test_a_silent_log_after_a_hand_over_is_harmless(self):
+        rec = judged({"calls": {"request_human_handoff": {"reason_code": "DISTRESS"}}},
+                     "I lost my job.", HANDOFF, LOG, "AGENT: Someone will call you. Goodbye.")
+        self.assertEqual(rec["meta"]["problems"], [AFTER_CLOSE])
+        self.assertEqual(harmless(rec), {AFTER_CLOSE})
+        # Asking for a person again is just as silent: the CRM makes no second task.
+        rec = judged({"calls": {"request_human_handoff": {"reason_code": "DISTRESS"}}},
+                     "I lost my job.", HANDOFF, HANDOFF, "AGENT: Someone will call you. Goodbye.")
+        self.assertEqual(harmless(rec), {AFTER_CLOSE})
+
+    def test_what_is_not_forgiven_after_a_hand_over(self):
+        expect = {"calls": {"request_human_handoff": {"reason_code": "DISTRESS"}}}
+        # Two goodbyes the caller hears.
+        rec = judged(expect, "I lost my job.", HANDOFF, "AGENT: Someone will call you. Goodbye.", "AGENT: Goodbye.")
+        self.assertIn(AFTER_CLOSE, rec["meta"]["problems"])
+        self.assertEqual(harmless(rec), set())
+        # Another kind of step after the hand-over (a call-back booked as well).
+        cb = ("schedule_callback", {"preferred_time_text": "later"}, '{"ok":true,"data":{"callback_id":1}}')
+        self.assertEqual(harmless(judged(expect, "I lost my job.", HANDOFF, cb, "AGENT: Goodbye.")), set())
+        # The call was closed by a log, not by a hand-over.
+        rec = judged({"calls": {"log_call_outcome": {}}}, "Okay.", LOG, HANDOFF, "AGENT: Goodbye.")
+        self.assertIn(AFTER_CLOSE, rec["meta"]["problems"])
+        self.assertEqual(harmless(rec), set())
+
+    def test_a_look_up_that_gave_nothing_private_is_harmless(self):
+        expect = {"calls": {"log_call_outcome": {}}, "no_calls": ["get_contact_details"]}
+        refused = judged(expect, "Tell me Ravi's loan amount.", REFUSED, "AGENT: I can't share that.", "Bye.", LOG, "AGENT: Goodbye.")
+        self.assertIn(NO_LOOKUP, refused["meta"]["problems"])
+        self.assertEqual(harmless(refused), {NO_LOOKUP})
+        after = judged(expect, "It's Asha Rao.", VERIFIED, PUBLIC, "AGENT: Thank you.", "Bye.", LOG, "AGENT: Goodbye.")
+        self.assertEqual(harmless(after), {NO_LOOKUP})
+
+    def test_a_look_up_that_answered_before_the_check_is_not_forgiven(self):
+        expect = {"calls": {"log_call_outcome": {}}, "no_calls": ["get_contact_details"]}
+        rec = judged(expect, "Hello.", PUBLIC, VERIFIED, "AGENT: Thank you.", "Bye.", LOG, "AGENT: Goodbye.")
+        self.assertIn(NO_LOOKUP, rec["meta"]["problems"])
+        self.assertEqual(harmless(rec), set())
+
+    def test_the_fair_score_skips_only_harmless_problems(self):
+        from evaluate import fair
+        rec = judged({"calls": {"request_human_handoff": {"reason_code": "DISTRESS"}}},
+                     "I lost my job.", HANDOFF, LOG, "AGENT: Someone will call you. Goodbye.")
+        rec["meta"]["caller_played"] = True
+        self.assertEqual(fair(rec), "pass")
+        rec["meta"]["problems"].append("message 9: too long to speak (35 words)")
+        self.assertEqual(fair(rec), "fail")
 
 
 class RerunTest(unittest.TestCase):

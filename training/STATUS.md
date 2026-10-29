@@ -14,6 +14,35 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 29 October 2026, 8:15 pm: ROUND 4 STARTED — REAL-CALLER CALLS FROM OUR 8B; FAIR SCORE 8B 44/60 (73%)
+
+User chose (29 Oct): round 4 = calls written by our trained 8B against the test's simulated caller, plus targeted
+templates; and the fair score forgives two harmless things.
+- **Fair score** (`fairness.harmless`, used by `evaluate.fair`; strict unchanged): (1) after a hand-over, the
+  model's further *silent* steps (log / asking for a person again) before its one goodbye — the CRM keeps
+  HANDED_OFF and makes no second task; (2) an unwanted `get_contact_details` when every look-up was refused or came
+  after a passed identity check. Rescored from the saved calls (`evaluate.py --report`, runs nothing):
+  **8B fair 39 → 44/60 (73%)** (#5, #24, #31, #48, #60), strict 36/60; **4B fair 39 → 41/59** (#5, and #3 — a
+  wrong-details impostor whose look-up the CRM refused: same rule, not an injection call; flagged to the user).
+- **Where the 8B still fails (16 calls):** FAQ not searched / no call-back for an unknown answer #11 #29 #35 #37;
+  wrong outcome code — wrong person booked a call-back #19 #39, interested caller recorded CALLBACK_REQUESTED
+  instead of INTERESTED #36 #58; too long #30 #43 #55; no ending recorded #28 #38 #51; dispute not handed over #4 #42.
+  Even with both scoring rules the ceiling from scoring alone was 73%: the rest needs better training data.
+- **Real-caller calls:** `generate.py` gains `--out-dir` (Drive, saved per call), `--focus` (3× tries for the
+  scenarios ≤ 70% fair: dispute, interested, faq_unknown, faq, wrong_person, are_you_human, confirm_attend,
+  distress), `--max-per-scenario`, `--no-think` (not used for ourvoice8b: plain template, tested without it).
+  Only calls passing the strict check are kept; never the 2 test scripts. New notebook
+  **`round4-calls-on-colab.ipynb`**: loads ourvoice8b from `MyDrive/ourvoice-training-8b-r3`, writes calls for
+  150 min to `MyDrive/ourvoice-r4-calls/generated-r4.jsonl`, packs `r4-calls.zip`.
+- **Templates (scenarios.py, "Round 4"):** interested callers asking for the call-back in their first words →
+  still INTERESTED; wrong person asking "what is it about?" or "call later for him" → WRONG_PERSON, nothing said,
+  no call-back; unknown FAQ question in the first words → search_faq first. 1,074 templates pass every check on
+  5 seeds.
+- Tests: kit **53/53** (new `test_generate.py`, 5 `HarmlessTest`s — a forgive-everything version fails 3 of them).
+**Next:** user runs `round4-calls-on-colab.ipynb` tonight → download `r4-calls.zip` → I read the kept calls
+(made-up facts, odd wording), put them in `data/generated-r4.jsonl`, build round 4 (templates + these calls ×2) and
+a round 4 8B training notebook (new Drive folder) → train + 60-call test tomorrow.
+
 # 28 October 2026, 8:45 pm: CRM KEEPS A HAND-OVER — NOT OVERWRITTEN, NOT REPEATED (user: "Yes, fix them")
 
 The two bookkeeping faults seen in #48 and #43 are fixed in the CRM and mirrored in the kit:

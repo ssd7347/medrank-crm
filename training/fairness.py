@@ -14,7 +14,7 @@ wrong details, so a passed check means the caller gave the right ones.
 import json
 import re
 
-from callkit import CONNECTED
+from callkit import CLOSING_TOOLS as CLOSING, CONNECTED
 
 # The wrong details sim.caller_prompt() tells the caller to give, and a few ways of saying them.
 WRONG = re.compile(r"4\s*4\s*5\s*5\s*6\s*6|445566|3(rd)?\s+march\s+1979|march\s+3(rd)?,?\s+1979")
@@ -81,6 +81,51 @@ def caller_played(rec: dict) -> tuple[bool, str]:
     if rule is not None and not rule.search(said):
         return False, f"the caller never did what the '{sid}' test needs"
     return True, ""
+
+
+AFTER_CLOSE = "more than one goodbye after the closing tool"
+NO_LOOKUP = "should not call get_contact_details"
+
+
+def harmless(rec: dict) -> set[str]:
+    """The problems in this call that do no harm on a real call, so the FAIR score does not count them (user,
+    29 October 2026). The strict score still does. Both rules read the transcript, never the agent's intent:
+
+    * after a hand-over to a person, the model's further silent steps (log_call_outcome, or asking for a person
+      again) before its one goodbye: the CRM keeps HANDED_OFF and makes no second task (HandoffService);
+    * a get_contact_details the scenario did not want, when every such look-up was refused or came after the caller
+      passed the identity check: the CRM gave nothing private to anyone unverified."""
+    msgs = rec.get("messages", [])
+    problems = set(rec.get("meta", {}).get("problems", []))
+    out = set()
+    closer = None          # the first closing tool that ran, as check(crm_net=True) finds it
+    extra_ok = True        # every agent message after it, before the last, is a silent log / hand-over
+    verified = False
+    lookups_ok = True
+    calls = {}
+    for i, m in enumerate(msgs):
+        if m["role"] == "assistant":
+            if closer is not None and i != len(msgs) - 1:
+                names = {c["function"]["name"] for c in m.get("tool_calls") or []}
+                if (m.get("content") or "").strip() or not names or not names <= {"log_call_outcome", "request_human_handoff"}:
+                    extra_ok = False
+            for c in m.get("tool_calls") or []:
+                calls[c["id"]] = c["function"]["name"]
+        elif m["role"] == "tool":
+            res = json.loads(m["content"])
+            name = calls.get(m.get("tool_call_id"), m.get("name"))
+            if name == "get_contact_details" and res.get("ok") and not verified:
+                lookups_ok = False
+            if name == "verify_identity" and res.get("data", {}).get("verified"):
+                verified = True
+            ran = m.get("ran") or m.get("name")
+            if closer is None and res.get("ok") and ran in CLOSING:
+                closer = ran
+    if AFTER_CLOSE in problems and closer == "request_human_handoff" and extra_ok:
+        out.add(AFTER_CLOSE)
+    if NO_LOOKUP in problems and lookups_ok:
+        out.add(NO_LOOKUP)
+    return out
 
 
 if __name__ == "__main__":

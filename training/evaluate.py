@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 from callkit import DATA, SPEC, all_scripts, check, handoff_reason, installed_models, read_jsonl, upgrade, write_jsonl
-from fairness import caller_played
+from fairness import caller_played, harmless
 from scenarios import HELD_OUT_SCRIPTS, for_script
 from sim import caller_version, simulate, transcript
 
@@ -82,7 +82,8 @@ def fair(rec: dict) -> str:
         if played is None:
             return "unknown"
         if played:
-            return "pass" if not att["meta"]["problems"] else "fail"
+            # Problems that do no harm on a real call (fairness.harmless) do not count here; the strict score keeps them.
+            return "pass" if set(att["meta"]["problems"]) <= harmless(att) else "fail"
     return "unusable"
 
 
@@ -100,13 +101,17 @@ def main() -> None:
                     help="where the per-call results go; on Colab a Google Drive folder, so a disconnect loses nothing")
     ap.add_argument("--no-think", action="store_true",
                     help="switch off hidden reasoning, for hybrid models such as qwen3:8b / qwen3:14b (too slow on a phone)")
+    ap.add_argument("--report", action="store_true",
+                    help="only print the scores of the saved calls: nothing is run or redone, Ollama is not needed")
     a = ap.parse_args()
     # The log is usually redirected to a file, which Windows writes in cp1252: a model's "₹" would stop the test.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    models = installed_models(a.url)
-    caller = a.caller if a.caller in models else a.model
+    caller = a.caller
+    if not a.report:
+        models = installed_models(a.url)
+        caller = a.caller if a.caller in models else a.model
     rng = random.Random(a.seed)
     scripts = all_scripts()
     held = [(s, sc) for s in scripts if s.name in HELD_OUT_SCRIPTS for sc in for_script(s)]
@@ -127,7 +132,7 @@ def main() -> None:
                                                   "problems": [] if m.group(2) == "PASS" else [m.group(5) or "failed"]}}
     if done:
         print(f"Carrying on: {len(done)} of {len(tests)} calls already done.")
-    for i, (script, scenario) in enumerate(tests, 1):
+    for i, (script, scenario) in enumerate([] if a.report else tests, 1):
         rec, changed = done.get(i), False
         if rec is not None and rec["meta"].get("caller_version", 1) != caller_version(scenario.id):
             # Saved with older caller instructions for this scenario (sim.CALLER_VERSIONS): run it again, so every
