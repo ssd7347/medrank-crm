@@ -36,6 +36,13 @@ Promotional calls: 140-series + consent + DND scrub (the CRM already has consent
 and a public HTTPS address for the CRM and the engine. Risk to test early: Whisper accuracy on 8 kHz Indian-English
 phone audio.
 Rough cost per 3-minute call on Plivo: ~₹1.14 in phone charges (plus the GPU server for our model and speech).
+**Client = a SaaS company (not BFSI itself), 30 Oct.** The CRM is one copy per end customer
+(`docs/new-customer-setup.md`), so: **each end customer opens its own phone account** (its own KYC, numbers and DLT
+principal-entity registration; credentials go in that copy's settings) — the client sells software and does not
+place calls for others (which could make it a registered telemarketer). The client's own account (its own KYC)
+covers demos and test calls to its team. End customers on the loans / insurance packs (banks, NBFCs, insurers)
+need 160-series numbers — Plivo documents 160-series provisioning. Pay as you go (Plivo) also suits many small
+accounts better than per-customer bundles (Exotel from ₹9,999).
 
 # 30 October 2026, 12:25 pm: CRM RULE — A FIRST NAME ALONE IS NOT AN IDENTITY TRY (user: "Yes, add the rule")
 
