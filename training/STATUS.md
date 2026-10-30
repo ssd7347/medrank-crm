@@ -14,6 +14,29 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 30 October 2026, 1 pm: PHONE PLATFORM COMPARISON (week 1 item) — RECOMMEND PLIVO, EXOTEL AS BACKUP
+
+Need: Indian numbers, inbound + outbound to Indian mobiles, **two-way live audio over a WebSocket** to our own
+voice engine (Whisper → our model → Piper), transfer to the desk number. Checked 30 Oct (official pages where
+possible; prices change — confirm at sign-up):
+| | Plivo | Exotel | Twilio | Tata Smartflo |
+|---|---|---|---|---|
+| Two-way audio stream | yes ("Audio Streaming", WebSocket) | yes (Voicebot applet / AgentStream) | — | yes (WSS stream, per Sarvam docs) |
+| India domestic calls | yes, India-registered business, India data-region account | yes | **no**: +91→+91 calls not supported since 1 Aug 2024 | yes |
+| Price (official) | **₹0.38/min in and out, 30 s pulse, streaming included**, number ₹200/month, recording free (90 days) | bundles (third-party: ₹9,999 / 5 months incl. 5,000 credits); ~₹0.8–1.0/min out (unverified); 60 s pulse | — | sales quote |
+| KYC | CoI or Udyam + business PAN or GST | CoI/deed/GST + business PAN + signatory ID; 1–3 business days | — | enterprise |
+**Recommendation: Plivo** (cheapest published rate with streaming included, pay as you go, start small);
+**Exotel** if the client wants an Indian vendor with local support / 160-series help. Twilio is out.
+**Must know from the client:** its legal entity and industry. The account, KYC and DLT "principal entity" must be
+the **client's** business (CoI/GST/PAN), not ours. If it is RBI/SEBI/IRDAI/PFRDA-regulated (bank, NBFC,
+insurer...), service calls such as EMI reminders need **160-series** numbers (vendor guides; check TRAI text).
+Promotional calls: 140-series + consent + DND scrub (the CRM already has consent and a DND hook).
+**Engineering still to do (~2–3 days):** the voice engine's `/call` WebSocket endpoint (phone audio is 8 kHz
+μ-law/PCM → resample for Whisper; Piper audio back to 8 kHz), the `PlivoClient` adapter (place call, transfer),
+and a public HTTPS address for the CRM and the engine. Risk to test early: Whisper accuracy on 8 kHz Indian-English
+phone audio.
+Rough cost per 3-minute call on Plivo: ~₹1.14 in phone charges (plus the GPU server for our model and speech).
+
 # 30 October 2026, 12:25 pm: CRM RULE — A FIRST NAME ALONE IS NOT AN IDENTITY TRY (user: "Yes, add the rule")
 
 `VoiceTools.verifyIdentity`: when the caller's name has fewer words than the registered name, nothing is checked
