@@ -14,6 +14,18 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 30 October 2026, 10 pm: ROUND 4 TRAINED, MODEL FILE NOT BUILT; PLIVO SIGN-UP WITH THE CLIENT
+
+**Round 4:** Colab's runtime disconnected about 9:45 pm while converting to GGUF, so training had finished and the
+adapter should be in `MyDrive/ourvoice-training-8b-r4/ourvoice-lora` (seen in the output; not yet checked in Drive).
+Next: rerun cells 1–5. Cell 5 should say "Carrying on from …/checkpoints/checkpoint-…" and only build the file, as in
+round 2. If Colab refuses a GPU (daily limit, as in round 2), wait until it allows one. Trust the Drive file only after
+"Model file also saved to Google Drive": a disconnect during that copy could leave a cut-off `.gguf`.
+**Plivo sign-up:** "not available in your region" on the laptop's network (Brave, Edge); the page opens on mobile data,
+so the block looks tied to that network. It then asks for a working email, probably a company address (not confirmed).
+The account must be in the client's name anyway, so the client signs up with their company email. Whether the block
+also affects the server's connection is unknown.
+
 # 30 October 2026: PHONE BRIDGE BUILT (PLIVO + OUR ENGINE) — NOT YET ON A REAL PHONE LINE
 
 **CRM:** `LiveCallService` and signed `/api/voice/hooks/live/{open,turn,end}`; `PlivoClient` (place, transfer, hang up;
