@@ -21,6 +21,30 @@ history.
 | Transcripts, tool trail, "flag as wrong", metrics, cost estimate, retention purge | `voice/VoiceQueryService`, `/voice`, `/voice/calls` |
 | Test console with a rule-based stand-in for the AI model | `voice/SimulatedBrain`, `TestCallService`, `/voice/test` |
 
+## Plivo as the phone line (with our own model and speech engine)
+
+Built in: `PlivoClient`, `PlivoHooksController`, `LiveCallService`, and `voice-engine/phone.py`. Tested with a fake
+Plivo API and on one machine with the real speech models; **not yet tried on a real phone line**.
+
+**Each customer's copy of the CRM has its own Plivo account**: their own KYC, numbers and DLT registration. Your
+own account is for demos and test calls to your team.
+
+1. In Plivo, choose the **India data region** at sign-up (it cannot be changed), finish KYC and rent a number.
+2. Host the CRM and `voice-engine/` on public HTTPS addresses, with the brain on a GPU server.
+3. CRM settings: `VOICE_PLATFORM=plivo`, `VOICE_HMAC_SECRET`, `PLIVO_AUTH_ID`, `PLIVO_AUTH_TOKEN`,
+   `PLIVO_FROM_NUMBER`, `PLIVO_PUBLIC_URL` (the CRM's address exactly as Plivo reaches it: signatures are checked
+   against it), `PLIVO_ENGINE_URL` (`wss://your-engine/call`), and `AI_BRAIN`.
+4. Engine settings: the same `VOICE_HMAC_SECRET`, and `CRM_URL`.
+5. For incoming calls, create a Plivo application and attach it to the number, with answer URL
+   `https://your-crm/api/voice/hooks/plivo/answer` and hangup URL `https://your-crm/api/voice/hooks/plivo/hangup`
+   (both POST). Outgoing calls set these URLs themselves.
+6. Make one test call to your own phone and read its transcript before anything else.
+
+Known limits: Plivo's recording is not switched on, so calls keep a transcript but no recording, although the
+starter scripts say the call may be recorded (adjust the opening line, or add recording, before going live). A
+transfer to the desk happens at once, so the caller does not hear "I am connecting you" first. The models load on
+the first call after the engine starts, so that caller waits several seconds.
+
 ## Connecting a provider: the three steps
 
 ### 1. Write one adapter

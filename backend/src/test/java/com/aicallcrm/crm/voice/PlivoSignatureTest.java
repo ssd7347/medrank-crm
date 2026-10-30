@@ -57,6 +57,14 @@ class PlivoSignatureTest {
     }
 
     @Test
+    void theStreamTokenMatchesTheSpeechEngine() {
+        // voice-engine/test_phone.py asserts the same value for phone.stream_token.
+        assertThat(PlivoHooksController.streamToken("test-only-voice-secret-0123456789-abcdefgh",
+                java.util.UUID.fromString("6f1c2b8e-0000-4000-8000-000000000001")))
+                .isEqualTo("c4af2d96e8c7c170948d98741c6e3201f8a57ae74c2642903899926cc2e7b5df");
+    }
+
+    @Test
     void validChecksEverySignatureInTheHeaderAndNothingElse() {
         String desk = "https://crm.example.in/api/voice/hooks/plivo/desk";
         String good = "BldF3REnTi+LpUDm6JJubNcUKqRvtCo+7dU1wGTAdN8=";

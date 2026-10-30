@@ -66,7 +66,14 @@ Piper voices can be trained on our own recordings: about 1–2 hours of a voice 
 in a quiet room, then a few hours of training on a GPU (cloud GPUs can be rented by the hour). The result is a
 `.onnx` file used exactly like the downloaded voices.
 
-## Real phone calls (later)
+## Real phone calls
 
-A phone line provider streams the call audio to an engine like this one over a WebSocket. The engine will gain a
-`/call` stream endpoint doing the same loop (Whisper → brain → Piper) on the phone audio.
+Plivo streams the call's audio both ways over a WebSocket to this engine's `/call` (`phone.py`): 8 kHz mu-law in,
+Whisper to text, the CRM's brain decides the reply (`POST /api/voice/hooks/live/{open,turn,end}`), Piper back to
+8 kHz mu-law. The caller can talk over the agent; after the goodbye has been played the CRM hangs up.
+
+The engine needs two more settings: `VOICE_HMAC_SECRET` (the CRM's, it checks each call's stream token and signs the
+CRM requests; blank refuses every call) and `CRM_URL`. It must be reachable from the internet as `wss://...`.
+Setting up the CRM and Plivo: `docs/voice-agent.md`, "Plivo as the phone line".
+
+Tests, with no phone line or models: `.venv\Scripts\python -m unittest test_phone`.

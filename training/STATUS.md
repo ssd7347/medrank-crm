@@ -14,6 +14,28 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 30 October 2026: PHONE BRIDGE BUILT (PLIVO + OUR ENGINE) — NOT YET ON A REAL PHONE LINE
+
+**CRM:** `LiveCallService` and signed `/api/voice/hooks/live/{open,turn,end}`; `PlivoClient` (place, transfer, hang up;
+never a hang-up without a call id, which would end every call on the account); `PlivoHooksController` (answer, hangup,
+desk) with Plivo's V3 signature (`PlivoSignature`, ported from plivo-python's source, checked against Plivo's documented
+base string and a separate Python transcription). **Engine:** `voice-engine/phone.py` and `/call`: mu-law, resampling,
+end of speech, barge-in, hang-up after the goodbye is played; per-call stream token. Setup: `docs/voice-agent.md`.
+Tests: backend **76/76** (fake Plivo API), engine **15/15**, kit **61/61**.
+**One-machine run with real Whisper + Piper and a real WebSocket** (fake Plivo client, fake signature-checking CRM):
+the caller's sentence reached the CRM correctly through 8 kHz ("...on Friday, the 25th of this month"); the agent's
+speech came back word for word; wrong token refused; hung up after the goodbye. Time from end of the caller's audio to
+the reply being ready: **0.88 s on the laptop CPU, with an instant fake brain**. Add 0.7 s end-of-speech wait and the
+brain's ~1 s, so **about 2.6 s** expected against the ~2 s target: to measure on a real call and tune.
+**Not proven:** a real phone line; real Indian-English callers on 8 kHz (the test voice was Piper's clear US voice, so
+this says nothing yet about accents or noisy lines — the biggest open risk); the real brain in the loop. The Plivo
+docs left some details open (whether Hangup after Stream runs, the `Duration` field on hangup), so the first real call
+may need small fixes.
+**Known limits (in the docs):** no call recording yet though the scripts say "may be recorded"; a desk transfer cuts
+"I am connecting you"; models load on the first call after start-up (several seconds of silence).
+**Next:** user trains round 4 (`train-8b-round4.ipynb`) and the client signs up with Plivo; then host the CRM and engine
+and make the first real call to the user's phone.
+
 # 30 October 2026, 1 pm: PHONE PLATFORM COMPARISON (week 1 item) — RECOMMEND PLIVO, EXOTEL AS BACKUP
 
 Need: Indian numbers, inbound + outbound to Indian mobiles, **two-way live audio over a WebSocket** to our own
