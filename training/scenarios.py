@@ -105,6 +105,12 @@ class Conv:
             bad = attempt < wrong
             name = self.p.full_name
             answers = {}
+            if attempt == 0 and not bad and self.rng.random() < 0.25:
+                # Round 4: callers often give only their first name. A single name can never pass the check (the 8B
+                # locked out a genuine customer that way, 30 Oct), so the agent asks for the full name first.
+                self.caller(self.pick("It's {first}.", "This is {first}.", "{first} here."))
+                self.agent(self.pick("Thank you. Could you tell me your full name, please, first and last name?",
+                                     "Thanks, {first}. And your full name, please, with your surname?"))
             if qs:
                 q = qs[0]
                 said = self.p.said[q.key]
@@ -123,7 +129,8 @@ class Conv:
                                           "My name is {name} and it's {said}.", name=name, said=said))
             else:
                 if bad:
-                    name = self.rng.choice(["Ramesh", "Sunil Varma"])
+                    # Two words, and in neither name list, so it can never be the customer's own name.
+                    name = self.rng.choice(["Mohan Bhat", "Sunil Varma"])
                 self.caller(self.pick("It's {name}.", "{name}.", name=name))
             res = self.tool("verify_identity", {"full_name": name, "answers": answers} if answers else {"full_name": name})
             data = res.get("data", {})

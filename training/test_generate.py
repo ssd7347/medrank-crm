@@ -9,6 +9,7 @@ import io
 import sys
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 
 import generate
@@ -18,15 +19,19 @@ from scenarios import HELD_OUT_SCRIPTS, for_script
 
 class GenerateTest(unittest.TestCase):
 
-    def run_gen(self, out_dir, *args, bad=()):
-        """Runs generate.main(); every simulated call passes the checker unless its scenario is in ``bad``."""
+    def run_gen(self, out_dir, *args, bad=(), fail=()):
+        """Runs generate.main(); every simulated call passes the checker unless its scenario is in ``bad``. The calls
+        numbered in ``fail`` (from 1) raise an Ollama error instead."""
         tried, kw_seen = [], []
 
         def fake_simulate(script, scenario, rng, teacher, caller, coach, **kw):
             tried.append((script.name, scenario.id))
             kw_seen.append((teacher, caller, coach, kw))
+            if len(tried) in fail:
+                raise urllib.error.HTTPError("http://localhost:11434", 500, "Internal Server Error", None, None)
             return {"messages": [], "meta": {"script": script.name, "scenario": scenario.id}}, ""
-        real = (generate.simulate, generate.check, generate.installed_models, sys.argv)
+        real = (generate.simulate, generate.check, generate.installed_models, sys.argv, generate.time.sleep)
+        generate.time.sleep = lambda s: None
         generate.simulate = fake_simulate
         generate.check = lambda rec: ["bad call"] if rec["meta"]["scenario"] in bad else []
         generate.installed_models = lambda url: ["ourvoice8b", "qwen2.5:7b"]
@@ -37,7 +42,7 @@ class GenerateTest(unittest.TestCase):
             with contextlib.redirect_stdout(printed):
                 generate.main()
         finally:
-            generate.simulate, generate.check, generate.installed_models, sys.argv = real
+            generate.simulate, generate.check, generate.installed_models, sys.argv, generate.time.sleep = real
         return tried, kw_seen, printed.getvalue()
 
     def test_calls_go_to_the_drive_folder_and_a_rerun_carries_on(self):
@@ -79,6 +84,19 @@ class GenerateTest(unittest.TestCase):
             kept = collections.Counter(r["meta"]["scenario"] for r in read_jsonl(Path(d) / "gen.jsonl"))
             self.assertEqual(set(kept.values()), {2})
             self.assertIn("Every scenario has 2 kept calls", out)
+
+    def test_an_ollama_error_costs_only_that_call(self):
+        # 29 Oct: one "HTTP 500" from Ollama stopped the whole Colab run.
+        with tempfile.TemporaryDirectory() as d:
+            tried, _, out = self.run_gen(d, "--count", "5", fail={2, 4})
+            self.assertEqual(len(read_jsonl(Path(d) / "gen.jsonl")), 5)
+            self.assertEqual(len(tried), 7)
+            self.assertEqual(out.count("skipped, Ollama error"), 2)
+
+    def test_five_ollama_errors_in_a_row_stop_the_run(self):
+        with tempfile.TemporaryDirectory() as d, self.assertRaises(SystemExit) as e:
+            self.run_gen(d, "--count", "5", fail={2, 3, 4, 5, 6})
+        self.assertIn("five times in a row", str(e.exception))
 
     def test_an_unknown_focus_scenario_stops_at_once(self):
         with tempfile.TemporaryDirectory() as d, self.assertRaises(SystemExit) as e:

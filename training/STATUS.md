@@ -14,6 +14,36 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 30 October 2026, noon: ROUND 4 TRAINING KIT READY — AND A REAL FAULT FOUND: GENUINE CUSTOMERS LOCKED OUT
+
+**Read-through of the 326 model-written calls** found habits the checker let through:
+- **Single-name identity checks.** The agent sends only the first name ("Priya") to `verify_identity`; registered
+  names have two words, so the check can never pass and a **genuine customer is locked out** after three tries.
+  In generation the 8B did this in 16 of its 20 wrong-then-right-details calls. **The 60-call test had the same
+  gap**: 8B #49 (verify_retry) was locked out this way and was scored a pass (4B: #2).
+- One reply said again and again (the same refusal six times, never answering "why renew?" — the loop behind
+  dispute fail #4); "Sure, I can ask a person" with no tool; nonsense identity answers ("discount", "manager",
+  the caller's question as the customer ID).
+- The finance pack's FAQ "Who do I contact for a dispute?" answered "I will arrange for a member of our team to
+  call you back" — read aloud, a promise with no tool behind it. **Changed** (client content,
+  `packs/finance.json`) to "Our team looks into disputes. If you like, I can ask them to call you back about it."
+**Checker** (`callkit.identity_habits`): always — a genuine customer (not verify_fail / wrong_person) locked out
+after a single-name check fails the call; training data only — any single-name check, the same reply three times
+in a row, promising a person without the tool. `evaluate.py --report` adds the new rule to saved calls.
+**Honest scores now: 8B strict 35/60, fair 43/60 (72%); 4B strict 37/60, fair 40/59.**
+**Templates:** 25% of identity checks start with only the first name → the agent asks for the full name first
+(83 of 1,074); the "wrong name" in no-field checks is now two words from neither name list ("Ramesh" could be a
+real customer). **Model-written calls:** 39 of 326 dropped by the new rules (none changed by the CRM's urgent
+rule) → **287 in `data/generated-r4.jsonl`** (not in git; packed into colab-kit.zip).
+**generate.py:** an Ollama error skips that call; five in a row stop the run.
+**Round 4 notebook `train-8b-round4.ipynb`** (Desktop\Colab training, 12:06): the round 3 8B notebook with a new
+Drive folder `MyDrive/ourvoice-training-8b-r4`, model `ourvoice8b-r4`, templates `--per 4` (716) + the 287 calls ×2
+→ **1,226 training calls, 77 steps (~2 h 30 min)** + model file ~40 min; then the 60-call test (~1 h, next
+session if needed — results saved to Drive per call). Dry run from a clean unzip: tests OK, 1,226 / 50 calls.
+Tests: kit **59/59** (4 new identity-habit tests, 2 Ollama-error tests), backend **67/67**.
+**To decide (user):** a CRM rule so a single-name `verify_identity` is not counted as a failed attempt (the
+caller is asked for the full name instead) — protects genuine customers whichever model is the brain.
+
 # 29 October 2026, 10:50 pm: ROUND 4 CALLS COLLECTED — 326 KEPT (in `data/r4-calls/`, not in git)
 
 Colab (college account) ran `round4-calls-on-colab.ipynb` 8:20–10:44 pm: 326 kept, 243 rejected, 7–75 s per call.

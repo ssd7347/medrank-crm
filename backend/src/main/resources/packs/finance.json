@@ -27,6 +27,6 @@
   "faqs": [
     {"question": "How can I pay my EMI?", "answer": "You can pay through [UPI ID / payment link / branch / app]. Please keep your loan account number ready.", "keywords": "pay, payment, upi, how, link"},
     {"question": "Can I get a payment receipt?", "answer": "Receipts are sent to your registered email and mobile within [time]. A member of our team can resend it if needed.", "keywords": "receipt, proof, statement"},
-    {"question": "Who do I contact for a dispute?", "answer": "I will arrange for a member of our team to call you back about it.", "keywords": "dispute, wrong, complaint, not mine"}
+    {"question": "Who do I contact for a dispute?", "answer": "Our team looks into disputes. If you like, I can ask them to call you back about it.", "keywords": "dispute, wrong, complaint, not mine"}
   ]
 }

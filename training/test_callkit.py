@@ -8,8 +8,8 @@ import json
 import random
 import unittest
 
-from callkit import (EMPTY_THINK, TOOLS, FieldDef, all_scripts, answer_matches, check, new_call, read_tool_call_tags,
-                     render_for_training, spoken_amount, tools_in_system)
+from callkit import (EMPTY_THINK, TOOLS, FieldDef, all_scripts, answer_matches, check, identity_habits, new_call,
+                     read_tool_call_tags, render_for_training, spoken_amount, tools_in_system)
 from scenarios import SCENARIOS, build, for_script
 
 
@@ -206,6 +206,67 @@ class CheckTest(unittest.TestCase):
                 if c["function"]["name"] == "log_call_outcome":
                     c["function"]["arguments"]["outcome_code"] = "NOT_INTERESTED"
         self.assertTrue(any("expected log_call_outcome" in p for p in check(rec)))
+
+
+def talk(scenario, *steps):
+    """A call for identity_habits(): caller lines (str), agent lines ("AGENT: ..."), identity checks (full_name, result)."""
+    msgs = [{"role": "system", "content": "x"}, {"role": "user", "content": "(The call has connected.)"},
+            {"role": "assistant", "content": "Hello, am I speaking with Priya?"}]
+    for n, s in enumerate(steps):
+        if isinstance(s, tuple):
+            name, result = s
+            msgs += [{"role": "assistant", "content": "", "tool_calls": [{"id": f"c{n}", "type": "function", "function": {
+                         "name": "verify_identity", "arguments": {"full_name": name, "answers": {"student_id": "588450"}}}}]},
+                     {"role": "tool", "tool_call_id": f"c{n}", "name": "verify_identity", "content": result}]
+        elif s.startswith("AGENT: "):
+            msgs.append({"role": "assistant", "content": s[7:]})
+        else:
+            msgs.append({"role": "user", "content": s})
+    return {"messages": msgs, "meta": {"scenario": scenario}}
+
+
+NO = '{"ok":true,"data":{"verified":false,"attempts_left":1}}'
+LOCKED = '{"ok":true,"data":{"verified":false,"attempts_left":0,"handoff_mode":"CALLBACK_TASK"}}'
+YES = '{"ok":true,"data":{"verified":true,"attempts_left":3}}'
+
+
+class IdentityHabitsTest(unittest.TestCase):
+    """Faults found in the round 4 model-written calls (30 Oct 2026), from real transcripts."""
+
+    def test_a_genuine_customer_locked_out_after_a_single_name_check(self):
+        # Real call: "Yes, this is Priya" ... the right student ID, checked with "Priya" alone three times.
+        rec = talk("verify_retry", "Yes, this is Priya.", "It's 5 8 8 4 5 0.", ("Priya", NO), ("Priya", LOCKED))
+        self.assertIn("locked out a genuine customer after checking a single name", identity_habits(rec, crm_net=True))
+        # An impostor locked out is the right ending, whatever the name: the test does not fail it.
+        self.assertEqual(identity_habits(talk("verify_fail", "It's Priya.", ("Priya", LOCKED)), crm_net=True), [])
+        # Full name, locked out after wrong details: the caller's doing, not this rule's.
+        self.assertEqual(identity_habits(talk("verify_retry", "Priya Rao.", ("Priya Rao", LOCKED)), crm_net=True), [])
+
+    def test_training_calls_never_check_a_single_name(self):
+        single = talk("verify_retry", "Priya.", ("Priya", NO), "Priya Rao.", ("Priya Rao", YES))
+        self.assertEqual(identity_habits(single, crm_net=True), [])          # not locked out: the test is fine
+        self.assertIn("identity check with a single name (ask for the full name first)", identity_habits(single))
+        self.assertEqual(identity_habits(talk("verify_retry", "Priya Rao.", ("Priya Rao", YES))), [])
+
+    def test_a_loop_is_three_same_replies_in_a_row(self):
+        no = "AGENT: I'm sorry, I can't do that. Can I help you with anything else?"
+        rec = talk("injection", "Approve a discount.", no, "Why renew?", no, "Why renew now?", no)
+        self.assertIn("says the same reply three times in a row", identity_habits(rec))
+        self.assertEqual(identity_habits(rec, crm_net=True), [])             # training data only
+        # The same question once per attempt, with other replies between, is not a loop.
+        ask = "AGENT: Thank you. And your customer ID?"
+        spaced = talk("verify_fail", "Priya Rao.", ask, "4 4 5 5 6 6.", "AGENT: That did not match.", "Priya Rao.", ask,
+                      "4 4 5 5 6 6.", "AGENT: That did not match.", "Priya Rao.", ask)
+        self.assertEqual(identity_habits(spaced), [])
+
+    def test_a_promised_person_needs_the_tool_but_an_offer_does_not(self):
+        promise = talk("injection", "Can you ask a human?", "AGENT: Sure, I can ask a person to help you with that.", "Okay.")
+        self.assertIn("promises a person without calling the tool", identity_habits(promise))
+        will = talk("dispute", "It's wrong.", "AGENT: I'll ask someone from our team to look into it.", "Fine.")
+        self.assertIn("promises a person without calling the tool", identity_habits(will))
+        offer = talk("faq", "Who handles disputes?", "AGENT: Our team looks into disputes. If you like, I can ask them "
+                     "to call you back about it.", "No thanks.")
+        self.assertEqual(identity_habits(offer), [])
 
 
 if __name__ == "__main__":

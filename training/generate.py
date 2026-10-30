@@ -68,7 +68,7 @@ def main() -> None:
     rng.shuffle(pairs)
     print(f"{done} good conversations so far; target {a.count}. Teacher {a.teacher}, caller {a.caller or a.teacher}.")
     # Rate and time left count only this run, so earlier runs' calls do not inflate them.
-    started, tried, kept_now = time.time(), 0, 0
+    started, tried, kept_now, errors = time.time(), 0, 0, 0
     for script, scenario in itertools.cycle(pairs):
         if done >= a.count:
             break
@@ -86,8 +86,16 @@ def main() -> None:
         try:
             rec, stopped = simulate(script, scenario, rng, a.teacher, a.caller or a.teacher, coach=True, url=a.url,
                                     agent_think=False if a.no_think else None)
+            errors = 0
         except OSError as e:
-            raise SystemExit(f"Could not reach Ollama at {a.url}: {e}")
+            # One failed reply (Ollama's "HTTP 500" stopped the 29 Oct run) costs only this call; five in a row means
+            # Ollama itself is down.
+            errors += 1
+            if errors >= 5:
+                raise SystemExit(f"Could not reach Ollama at {a.url} five times in a row: {e}")
+            print(f"[{done}/{a.count}] {script.name} / {scenario.id}: skipped, Ollama error ({e})")
+            time.sleep(5)
+            continue
         problems = ([stopped] if stopped else []) + (check(rec) if rec else [])
         took = time.time() - t0
         if rec and not problems:

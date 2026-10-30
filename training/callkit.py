@@ -13,6 +13,7 @@ Only the Python standard library is used, so nothing needs installing to make da
 
 from __future__ import annotations
 
+import collections
 import datetime as dt
 import json
 import random
@@ -721,7 +722,48 @@ def check(rec: dict, crm_net: bool = False) -> list[str]:
     if closing_at is None and settled is None:
         problems.append("ends without log_call_outcome, opt_out or request_human_handoff")
     problems += check_expectation(rec, settled, crm_net)
+    problems += identity_habits(rec, crm_net)
     return problems
+
+
+# Scenarios whose caller is not the customer: there an identity lock-out is the right ending.
+NOT_THE_CUSTOMER = {"verify_fail", "wrong_person"}
+# A promise of a person ("I'll ask someone", "Sure, I can ask a person to help you") with no hand-over or call-back
+# anywhere after it. An offer ("If you like, I can ask them to call you") is not a promise.
+_WHO = r"(ask|get|arrange for|have) (a person|someone|a member|our team|a human)"
+PROMISED_PERSON = re.compile(rf"\b(i|we)(?: will|'ll) {_WHO}|\b(sure|okay|ok|yes|of course),? (i|we) can {_WHO}", re.I)
+
+
+def identity_habits(rec: dict, crm_net: bool = False) -> list[str]:
+    """Faults found in the round 4 model-written calls (30 Oct 2026) that the rules above let through.
+
+    Always: a genuine customer locked out after the agent checked a single name - registered names have two words,
+    so the check could never pass (8B test call #49). Training data only (crm_net=False): the habits behind that and
+    other bad lessons - any single-name identity check (ask for the full name first), the same reply three times in
+    a row (a loop), and promising a person without the tool."""
+    msgs = rec["messages"]
+    out = []
+    single = any(c["function"]["name"] == "verify_identity" and isinstance(c["function"]["arguments"], dict)
+                 and len(str(c["function"]["arguments"].get("full_name") or "").split()) < 2
+                 for m in msgs for c in m.get("tool_calls") or [])
+    locked = any(m["role"] == "tool" and m.get("name") == "verify_identity" and '"attempts_left":0' in m["content"]
+                 and '"verified":false' in m["content"] for m in msgs)
+    if single and locked and rec.get("meta", {}).get("scenario") not in NOT_THE_CUSTOMER:
+        out.append("locked out a genuine customer after checking a single name")
+    if crm_net:
+        return out
+    if single:
+        out.append("identity check with a single name (ask for the full name first)")
+    replies = [" ".join(m["content"].lower().split()) for m in msgs[3:] if m["role"] == "assistant" and m.get("content")]
+    if any(replies[i] == replies[i + 1] == replies[i + 2] for i in range(len(replies) - 2)):
+        out.append("says the same reply three times in a row")
+    for i, m in enumerate(msgs):
+        if m["role"] == "assistant" and m.get("content") and not m.get("tool_calls") and PROMISED_PERSON.search(m["content"]):
+            later = {c["function"]["name"] for x in msgs[i:] for c in x.get("tool_calls") or []}
+            if not later & {"request_human_handoff", "schedule_callback"}:
+                out.append("promises a person without calling the tool")
+                break
+    return out
 
 
 def check_call(name: str, args) -> list[str]:

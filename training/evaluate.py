@@ -22,7 +22,8 @@ import re
 import sys
 from pathlib import Path
 
-from callkit import DATA, SPEC, all_scripts, check, handoff_reason, installed_models, read_jsonl, upgrade, write_jsonl
+from callkit import (DATA, SPEC, all_scripts, check, handoff_reason, identity_habits, installed_models, read_jsonl, upgrade,
+                     write_jsonl)
 from fairness import caller_played, harmless
 from scenarios import HELD_OUT_SCRIPTS, for_script
 from sim import caller_version, simulate, transcript
@@ -169,6 +170,15 @@ def main() -> None:
             print(transcript(rec), "\n")
 
     rows = [done[i] for i in range(1, len(tests) + 1) if i in done]
+    if a.report:
+        # Saved calls keep the problems found when they ran; add the one rule added since then (30 Oct 2026: a
+        # genuine customer locked out after a single-name check). Shown only, never written back.
+        for r in rows:
+            for att in [r] + r.get("reruns", []):
+                if "messages" in att:
+                    for key in ("problems", "problems_alone"):
+                        if key in att["meta"]:
+                            att["meta"][key] += [p for p in identity_habits(att, crm_net=True) if p not in att["meta"][key]]
     n = len(rows)
     passed = sum(not r["meta"]["problems"] for r in rows)
     # Calls saved before the CRM safety net have no "problems_alone": their only score was the strict one.
