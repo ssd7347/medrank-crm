@@ -239,6 +239,41 @@ class VoiceAgentIntegrationTest {
     }
 
     @Test
+    void ourSpeechEngineHoldsARealCallThroughTheLiveHooks() throws Exception {
+        approve("Incoming calls");
+        String phone = phone();
+        contact(admin, "Lakshmi Iyer", phone, "\"customer_ref\":\"CR-31415\"");
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\",\"provider_call_id\":\"plv-" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        String id = "{\"call_id\":\"" + call + "\"";
+
+        hook("/live/open", id + "}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.say").value(Matchers.containsString("AI assistant")))
+                .andExpect(jsonPath("$.over").value(false));
+        // The same brains and tools as the test console: asking for a person is a hand-over, and the call ends.
+        hook("/live/turn", id + ",\"said\":\"I want to speak to a real person please\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.say").value(Matchers.containsString("Goodbye")))
+                .andExpect(jsonPath("$.over").value(true));
+        mvc.perform(auth(get("/api/voice/calls/" + call), admin))
+                .andExpect(jsonPath("$.call.outcome").value("HANDED_OFF"))
+                .andExpect(jsonPath("$.transcript[?(@.role == 'caller')].text").value(Matchers.hasItem("I want to speak to a real person please")))
+                .andExpect(jsonPath("$.tools[*].tool").value(Matchers.hasItem("request_human_handoff")));
+        // No phone platform is connected in tests, so there is nothing to hang up.
+        hook("/live/end", id + "}").andExpect(status().isOk()).andExpect(jsonPath("$.hung_up").value(false));
+
+        // Unsigned, unknown, a test-console call, or a finished call: refused.
+        mvc.perform(post("/api/voice/hooks/live/open").contentType(MediaType.APPLICATION_JSON).content(id + "}"))
+                .andExpect(status().isUnauthorized());
+        hook("/live/open", "{\"call_id\":\"" + java.util.UUID.randomUUID() + "\"}").andExpect(status().isNotFound());
+        hook("/live/open", "{}").andExpect(status().isBadRequest());
+        String test = JsonPath.read(start(contact(admin, "Test Person", phone(), "\"customer_ref\":\"CR-1\""), "Incoming calls")
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        hook("/live/turn", "{\"call_id\":\"" + test + "\",\"said\":\"hello\"}").andExpect(status().isNotFound());
+        hook("/webhooks/call-ended", id + ",\"status\":\"completed\"}");
+        hook("/live/turn", id + ",\"said\":\"hello?\"}").andExpect(status().isConflict());
+    }
+
+    @Test
     void unknownCallerBecomesAContactOnCallback() throws Exception {
         approve("Incoming calls");
         String phone = phone();

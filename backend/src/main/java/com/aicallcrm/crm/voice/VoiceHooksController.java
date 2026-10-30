@@ -35,13 +35,15 @@ public class VoiceHooksController {
     private final ToolExecutor executor;
     private final VoiceCallService calls;
     private final ObjectMapper mapper;
+    private final LiveCallService live;
 
     public VoiceHooksController(VoiceSignatures signatures, ToolExecutor executor, VoiceCallService calls,
-                                ObjectMapper mapper) {
+                                ObjectMapper mapper, LiveCallService live) {
         this.signatures = signatures;
         this.executor = executor;
         this.calls = calls;
         this.mapper = mapper;
+        this.live = live;
     }
 
     /** {@code { "call_id": "...", "args": { } }}. The contact is never taken from the arguments. */
@@ -91,6 +93,35 @@ public class VoiceHooksController {
         out.put("opening_line", in.openingLine());
         out.put("system_prompt", in.systemPrompt());
         out.put("model", in.model());
+        return out;
+    }
+
+    // ------------------------------------------------------------------ our own speech engine on a real call
+
+    /**
+     * {@code open}: {@code {"call_id"}} when the call connects; {@code turn}: {@code {"call_id", "said"}} for each
+     * thing the caller says; {@code end}: {@code {"call_id"}} after the goodbye was heard, to hang up. Replies
+     * {@code {"say": "...", "over": false}} ({@code end}: {@code {"hung_up": true}}).
+     */
+    @PostMapping("/live/{step}")
+    public Map<String, Object> live(@PathVariable String step, @RequestBody(required = false) String raw,
+                                    @RequestHeader(value = VoiceSignatures.SIGNATURE_HEADER, required = false) String sig,
+                                    @RequestHeader(value = VoiceSignatures.TIMESTAMP_HEADER, required = false) String ts) {
+        Map<String, Object> body = verified(raw, sig, ts);
+        UUID callId = uuid(body.get("call_id"));
+        if (callId == null) {
+            throw ApiException.badRequest("call_id is needed");
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        switch (step) {
+            case "open", "turn" -> {
+                LiveCallService.Reply r = "open".equals(step) ? live.open(callId) : live.turn(callId, string(body.get("said")));
+                out.put("say", r.say());
+                out.put("over", r.over());
+            }
+            case "end" -> out.put("hung_up", live.end(callId));
+            default -> throw ApiException.notFound("Step");
+        }
         return out;
     }
 

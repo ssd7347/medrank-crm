@@ -40,4 +40,12 @@ public interface VoicePlatformClient {
 
     /** Warm-transfers a connected call to the staff desk. False: fall back to a callback task. */
     boolean transfer(String providerCallId, String deskNumberE164, String summary);
+
+    /**
+     * Ends a connected call (our own speech engine asks for this after the agent's goodbye has been heard). False
+     * when the platform cannot: platforms that hold the conversation themselves end their own calls.
+     */
+    default boolean hangup(String providerCallId) {
+        return false;
+    }
 }

@@ -265,6 +265,11 @@ public class VoiceCallService {
         }
         call.setStatus(CallStatus.CONNECTED);
         call.setStartedAt(Instant.now());
+        if (callId != null && providerCallId != null) {
+            // A platform can name the answered call differently from the request that placed it (Plivo: the
+            // request_uuid, then the CallUUID); transfers and hang-ups need the answered call's id.
+            call.setProviderCallId(providerCallId);
+        }
         return true;
     }
 
