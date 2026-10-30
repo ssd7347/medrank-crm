@@ -31,24 +31,28 @@ from sim import caller_version, simulate, transcript
 # A rerun gets its own caller: the call's usual seed plus this, times the rerun number.
 RERUN_SEED = 100_000
 # Raised when the CRM's handling changes in a way that can change a saved call (2: CallerSignals, 28 Oct 2026 -
-# urgent hand-overs for distress / disputes, and hand-over reason aliases). Only calls it would change are redone.
-CRM_VERSION = 2
+# urgent hand-overs for distress / disputes, and hand-over reason aliases; 3: 30 Oct - a first name alone is not an
+# identity try, the caller is asked for the full name). Only calls it would change are redone.
+CRM_VERSION = 3
 
 
-def crm_would_change(att: dict) -> bool:
-    """Would today's CRM have run a different tool in this saved call? Replays its call-backs / hand-overs."""
+def crm_would_change(att: dict, since: int = 1) -> bool:
+    """Would today's CRM have answered this saved call differently? Only the rules added after the CRM version
+    ``since`` it was run under count: a call already run with a rule must not be redone for it again."""
     words = ""
     for m in att.get("messages", []):
         if m["role"] == "user":
             words += " " + m["content"]
         for c in m.get("tool_calls") or []:
             name, args = c["function"]["name"], c["function"]["arguments"] if isinstance(c["function"]["arguments"], dict) else {}
-            if upgrade(name, args, words)[1] is not args:
+            if since < 2 and upgrade(name, args, words)[1] is not args:
                 return True
             raw = args.get("reason_code")
-            if name == "request_human_handoff" and raw is not None and str(raw) not in SPEC["handoff_reasons"] \
-                    and handoff_reason(raw) is not None:
+            if since < 2 and name == "request_human_handoff" and raw is not None \
+                    and str(raw) not in SPEC["handoff_reasons"] and handoff_reason(raw) is not None:
                 return True       # an alias that used to be refused
+            if since < 3 and name == "verify_identity" and len(str(args.get("full_name") or "").split()) < 2:
+                return True       # a single name, now answered "your full name, please" instead of a failed try
     return False
 
 
@@ -140,7 +144,7 @@ def main() -> None:
             # model meets the same callers. The new record is appended and counts from now on.
             rec = None
         elif rec is not None and rec["meta"].get("crm_version", 1) < CRM_VERSION \
-                and any(crm_would_change(a) for a in [rec] + rec.get("reruns", [])):
+                and any(crm_would_change(a, rec["meta"].get("crm_version", 1)) for a in [rec] + rec.get("reruns", [])):
             # Saved under an older CRM that would have handled this call differently: run it again.
             rec = None
         if rec is None:

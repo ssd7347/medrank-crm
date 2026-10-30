@@ -14,6 +14,20 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 30 October 2026, 12:25 pm: CRM RULE — A FIRST NAME ALONE IS NOT AN IDENTITY TRY (user: "Yes, add the rule")
+
+`VoiceTools.verifyIdentity`: when the caller's name has fewer words than the registered name, nothing is checked
+and **no attempt is used**; the model gets INVALID_ARGUMENT "Could I have your full name, please, your first name
+and surname?" (the demo brain speaks it as is). A wrong two-word name still counts as a failed try. Protects genuine
+customers whichever model is the brain. Kit mirror in `FakeCrm.t_verify_identity`. Tests: backend **67/67**
+(`inboundCallVerificationDetailsHandoffAndOptOut` now proves "Priya" is not a try and "Ravi Kumar" is), kit
+**61/61**; templates pass on 5 seeds; the 287 round 4 calls have no single-name checks, so they are unaffected.
+**Fair comparison:** `evaluate.CRM_VERSION = 3`; `crm_would_change(att, since)` now applies only rules added after
+the version a call ran under (it used to reapply all, which would have redone #43/#48 again). Round 3's 8B: **8
+calls** to redo under today's CRM (#3 #15 #16 #22 #27 #42 #49 #59, all with single-name checks) — checked with a
+dry run of evaluate.py on a copy. New **optional cell 10** in `train-8b-round4.ipynb` does that on Colab (~15 min,
+`test-results-r3-recheck.zip`). Kit in `Desktop\Colab training` 12:21.
+
 # 30 October 2026, noon: ROUND 4 TRAINING KIT READY — AND A REAL FAULT FOUND: GENUINE CUSTOMERS LOCKED OUT
 
 **Read-through of the 326 model-written calls** found habits the checker let through:

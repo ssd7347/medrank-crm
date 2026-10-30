@@ -253,7 +253,7 @@ NEED8_GB = 3.0              # checkpoints (~1 GB each, two kept) and the adapter
 
 
 def notebook_8b(keep: str = KEEP8, name: str = NAME8, per: int = PER, label: str = f"Round {ROUND} data",
-                hours: str = "~2 h", total: str = "4 hours") -> dict:
+                hours: str = "~2 h", total: str = "4 hours", extra: list | None = None) -> dict:
     results = f"{keep}/results"
     here = f"%cd {KIT}"
     find_gguf = (f'import glob\nlocal = sorted(glob.glob("{KIT}/out8b*/**/*.gguf", recursive=True))\n'
@@ -383,6 +383,7 @@ one and it carries on. Send a screenshot of the score at the end.
 !cd {results} && zip -q /content/test-results-{name}.zip eval-* && ls -l /content/test-results-{name}.zip
 """),
     ]
+    cells += extra or []
     return {"cells": cells, "metadata": {"accelerator": "GPU", "colab": {"provenance": []},
                                          "kernelspec": {"display_name": "Python 3", "name": "python3"},
                                          "language_info": {"name": "python"}},
@@ -497,6 +498,28 @@ NAME8_R4 = "ourvoice8b-r4"
 PER_R4 = 4
 
 
+def recheck_r3_cells() -> list:
+    """Round 3's 8B, its test calls that today's CRM would answer differently (evaluate.crm_would_change: the
+    single-name rule, 30 Oct), so round 3 and round 4 are compared under the same CRM. Optional, after cell 8."""
+    return [
+        md(f"""
+## 10. Optional (about 15 minutes): round 3's calls under today's CRM
+
+Round 3's test ran before the CRM asked for the full name instead of counting a first name alone as a failed try.
+This loads round 3's model (`{KEEP8}`) and redoes **only the 8 calls** that rule changes, so the two rounds are
+compared fairly. Then right-click **test-results-r3-recheck.zip** → **Download**.
+"""),
+        code(f"""
+%cd {KIT}
+import glob
+gguf = sorted(glob.glob("{KEEP8}/*.gguf"))[0]
+get_ipython().system(f'python make_modelfile.py "{{gguf}}" --base qwen3:4b-instruct --name {NAME8} --create 2>&1 | tail -2')
+!python -u evaluate.py --model {NAME8} --out-dir {RESULTS8} >> {RESULTS8}/eval-{NAME8}.log 2>&1; tail -22 {RESULTS8}/eval-{NAME8}.log
+!cd {RESULTS8} && zip -q /content/test-results-r3-recheck.zip eval-{NAME8}.* && ls -l /content/test-results-r3-recheck.zip
+"""),
+    ]
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
     zpath = OUT / "colab-kit.zip"
@@ -507,7 +530,8 @@ def main() -> None:
     for name, nb in (("train-on-colab.ipynb", notebook()), ("test-bigger-models.ipynb", test_notebook()),
                      ("train-8b-on-colab.ipynb", notebook_8b()), ("round4-calls-on-colab.ipynb", notebook_gen()),
                      ("train-8b-round4.ipynb", notebook_8b(KEEP8_R4, NAME8_R4, PER_R4, "Round 4 data (templates + the 287 calls "
-                                                           "our 8B wrote with the real caller)", "~2 h 30 min", "4½ hours"))):
+                                                           "our 8B wrote with the real caller)", "~2 h 30 min", "4½ hours",
+                                                           recheck_r3_cells()))):
         (OUT / name).write_text(json.dumps(nb, indent=1, ensure_ascii=False), encoding="utf-8")
         print(f"Wrote {OUT / name}")
     print(f"Wrote {zpath} ({len(files)} files, {zpath.stat().st_size // 1024} KB)")

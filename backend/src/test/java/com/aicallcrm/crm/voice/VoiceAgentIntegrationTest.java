@@ -112,10 +112,13 @@ class VoiceAgentIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         assertThat(before).doesNotContain("2,500").doesNotContain("CR-55821");
 
+        // A first name alone cannot match "Priya Shankar": the caller is asked for the full name and keeps all three tries.
         tool(call, "verify_identity", "{\"full_name\":\"Priya\",\"answers\":{\"customer_ref\":\"CR-55821\"}}")
-                .andExpect(jsonPath("$.data.verified").value(false))
-                .andExpect(jsonPath("$.data.attempts_left").value(2));
+                .andExpect(jsonPath("$.error.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.error.message").value(Matchers.containsString("full name")));
         tool(call, "verify_identity", "{\"full_name\":\"Priya Shankar\",\"answers\":{\"customer_ref\":\"0000\"}}")
+                .andExpect(jsonPath("$.data.attempts_left").value(2));
+        tool(call, "verify_identity", "{\"full_name\":\"Ravi Kumar\",\"answers\":{\"customer_ref\":\"CR-55821\"}}")
                 .andExpect(jsonPath("$.data.attempts_left").value(1));
         // The last four characters of a long reference are enough, as on most phone lines.
         tool(call, "verify_identity", "{\"full_name\":\"priya shankar\",\"answers\":{\"customer_ref\":\"5821\"}}")
@@ -163,7 +166,7 @@ class VoiceAgentIntegrationTest {
                 .andExpect(jsonPath("$.call.verified").value(true))
                 .andExpect(jsonPath("$.recordingRef").isEmpty())
                 .andExpect(jsonPath("$.transcript.length()").value(2))
-                .andExpect(jsonPath("$.tools[?(@.tool == 'verify_identity')]", Matchers.hasSize(3)));
+                .andExpect(jsonPath("$.tools[?(@.tool == 'verify_identity')]", Matchers.hasSize(4)));
         mvc.perform(auth(get("/api/voice/calls/" + call), otherAgent)).andExpect(status().isNotFound());
         mvc.perform(auth(get("/api/contacts/" + contact + "/calls"), agent))
                 .andExpect(jsonPath("$[?(@.provider == 'AI_AGENT')].voiceCallId").value(Matchers.hasItem(call)));

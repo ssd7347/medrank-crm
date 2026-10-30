@@ -122,6 +122,22 @@ class HarmlessTest(unittest.TestCase):
         self.assertEqual(fair(rec), "fail")
 
 
+class CrmChangeTest(unittest.TestCase):
+    """evaluate.crm_would_change(): a saved call is redone only for CRM rules added after the version it ran under."""
+
+    def test_only_newer_rules_count(self):
+        from evaluate import crm_would_change
+        single = judged({}, "Yes, this is Priya.", ("verify_identity", {"full_name": "Priya"}, '{"ok":true,"data":{"verified":false}}'))
+        full = judged({}, "Priya Rao.", ("verify_identity", {"full_name": "Priya Rao"}, '{"ok":true,"data":{"verified":false}}'))
+        self.assertTrue(crm_would_change(single, 2))
+        self.assertFalse(crm_would_change(single, 3))
+        self.assertFalse(crm_would_change(full, 1))
+        # A distressed caller's call-back: the urgent hand-over came with version 2; a call run under 2 is not redone.
+        cb = judged({}, "I lost my job and can't pay.", ("schedule_callback", {"preferred_time_text": "later"}, '{"ok":true,"data":{}}'))
+        self.assertTrue(crm_would_change(cb, 1))
+        self.assertFalse(crm_would_change(cb, 2))
+
+
 class RerunTest(unittest.TestCase):
     """evaluate.py with a fake simulator: which attempt counts, and that a stopped run carries on."""
 

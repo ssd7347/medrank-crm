@@ -382,6 +382,9 @@ class FakeCrm:
             return result_json(True, {"verified": True, "attempts_left": 3 - self.failures})
         if self.failures >= 3:
             return result_json(True, {"verified": False, "attempts_left": 0}, "I could not verify the details, so a member of our team will help you.")
+        if len(_words(str(args.get("full_name") or ""))) < len(_words(self.person.full_name)):
+            # As VoiceTools.verifyIdentity: a first name alone is not a try; the caller is asked for the full name.
+            return result_json(False, code="INVALID_ARGUMENT", msg="Could I have your full name, please, your first name and surname?")
         name_ok = _words(self.person.full_name) <= _words(str(args.get("full_name") or ""))
         answers = {str(k).lower(): str(v) for k, v in args.items() if isinstance(v, str)}
         if isinstance(args.get("answers"), dict):

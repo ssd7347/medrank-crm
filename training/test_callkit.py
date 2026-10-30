@@ -82,6 +82,21 @@ class FakeCrmTest(unittest.TestCase):
         self.assertEqual(res["data"]["handoff_mode"], "CALLBACK_TASK")
         self.assertEqual(call.handed_over, "VERIFICATION_FAILED")
 
+    def test_a_first_name_alone_is_not_a_try(self):
+        # As VoiceAgentIntegrationTest: the caller is asked for the full name and keeps all three tries.
+        call = new_call(script("Payment reminder"), random.Random(4))
+        p = call.person
+        right = {"customer_id": p.values["customer_id"]}
+        res = json.loads(call.run("verify_identity", {"full_name": p.first_name, "answers": right}))
+        self.assertEqual((res["ok"], res["error_code"]), (False, "INVALID_ARGUMENT"))
+        self.assertIn("full name", res["error_message"])
+        self.assertEqual(call.failures, 0)
+        # A wrong two-word name is a real try.
+        res = json.loads(call.run("verify_identity", {"full_name": "Sunil Varma", "answers": right}))
+        self.assertEqual(res["data"]["attempts_left"], 2)
+        res = json.loads(call.run("verify_identity", {"full_name": p.full_name, "answers": right}))
+        self.assertTrue(res["data"]["verified"])
+
     def test_answers_match_like_the_backend(self):
         ref = FieldDef("Loan account number", "TEXT", "NONE", True)
         self.assertTrue(answer_matches(ref, "LN-482913", "482913"))

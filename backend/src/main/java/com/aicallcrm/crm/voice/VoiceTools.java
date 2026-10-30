@@ -171,6 +171,12 @@ public class VoiceTools {
             data.put("attempts_left", 0);
             return ToolResult.ok(data, "I could not verify the details, so a member of our team will help you.");
         }
+        // A first name alone can never match a registered full name: ask for the whole name instead of spending one
+        // of the caller's three attempts (the trained models sent "Priya" and locked out the real customer, 30 Oct).
+        if (words(text(args, "full_name")).size() < words(c.getFullName()).size()) {
+            return ToolResult.error(ToolResult.INVALID_ARGUMENT,
+                    "Could I have your full name, please, your first name and surname?");
+        }
         boolean nameOk = nameMatches(text(args, "full_name"), c.getFullName());
         Map<String, String> answers = answers(args);
         Map<String, String> values = facts.values(c);
