@@ -540,6 +540,11 @@ Nothing is trained, so this needs only about **40 minutes** of GPU. Two runs of 
 """),
         md("## 1. Check the GPU and unpack the kit\nThe last line must say **OK**."),
         code(f"""
+import shutil
+if not shutil.which("nvidia-smi"):
+    # Without a GPU each reply takes over 5 minutes and the test stops with "timed out" (31 Oct).
+    raise SystemExit("NO GPU. Runtime -> Change runtime type -> T4 GPU -> Save, then run this cell again. "
+                     "If Colab refuses a GPU, try again later: do not run the test without one.")
 !nvidia-smi --query-gpu=name,memory.total --format=csv
 !unzip -o -q /content/colab-kit.zip -d /content/kit && echo "Kit unpacked"
 %cd {KIT}
