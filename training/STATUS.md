@@ -14,6 +14,34 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 31 October 2026: ROUND 4 TESTED — FAIR 42/60 (70%), SAME AS ROUND 3; PASS MARK IS 51/60
+
+Model `ourvoice8b-r4`, in `MyDrive/ourvoice-training-8b-r4` (the model file is in Drive). Results in Downloads:
+`test-results-ourvoice8b-r4.zip`, `test-results-r3-recheck.zip`.
+| Under today's CRM | Strict | Fair | Fair, scripts never seen | Fair, scripts seen |
+|---|---|---|---|---|
+| Round 3 (`ourvoice8b`, 8 calls redone) | 36/60 | 42/60 | 21/25 | 21/35 |
+| Round 4 (`ourvoice8b-r4`) | 40/60 | 42/60 | 16/25 | 26/35 |
+Replaces round 3's earlier 35 strict, 43 fair. Scripts never seen fell by 5 and scripts seen rose by 5 (small samples).
+Speed on the Colab T4: later turns median 0.8 s, slowest 1.6 s, first turn 2.5 s. Test took 12 min, not the ~1 h planned.
+**Leaks:** my separate scan of all 68 attempts found 0 private values before verification and 0 never-share values.
+**But that scan does not cover the reason for the call.** #7 told a stranger ("this is Sunil") "I'm calling about an
+overdue EMI payment". 15 calls mention the purpose before verification, mostly after a first name only, and
+`scenarios.py:177,452` teach that wording. Compliance risk for debt calls; not yet a checker rule.
+**The 18 fair failures, read one by one (my judgment):**
+- 6, behaviour fine but the test too narrow: #4 (reason "DISPUTE", which the CRM accepts as an alias), #12 #31 (refused
+  the trick, handed to a person), #36 #58 (caller asked for someone, call-back booked), #47 (call-back via hand-over).
+- 1, caller never asked the question: #10.
+- 2, minor: #23 #35 skipped the FAQ search, but the caller got the call-back they asked for.
+- 9, real: #5 distress missed (logged INTERESTED); #7 #19 wrong person logged NOT_INTERESTED; #24 hung up on a question;
+  #27 #59 endless loop, because the CRM's "full name, please" (30 Oct) has no limit, so this is **our CRM rule's fault**;
+  #33 ignored a question; #52 asked for a call-back, got NOT_INTERESTED; #11 irrelevant FAQ answer read out, 36 words.
+Accepting the first 7 would give 49/60. That is a change to the test, not an improvement in the model: never report it
+without the old score beside it, and re-measure on a **new seed** because these 60 calls have now been read.
+**Proposed next (awaiting the user's OK):** limit the full-name loop in the CRM and the simulator; neutral call purpose
+on sensitive scripts until verified, plus a checker rule; widen the test for the 7; rerun on the old and a new seed. No
+round 5 until then: round 4's data made no fair gain.
+
 # 30 October 2026, 10 pm: ROUND 4 TRAINED, MODEL FILE NOT BUILT; PLIVO SIGN-UP WITH THE CLIENT
 
 **Round 4:** Colab's runtime disconnected about 9:45 pm while converting to GGUF, so training had finished and the
