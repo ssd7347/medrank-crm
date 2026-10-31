@@ -53,6 +53,9 @@ class TrainingSpecTest {
         spec.put("handoff_reason_aliases", CallerSignals.REASON_ALIASES);
         spec.put("distress_words", CallerSignals.DISTRESS);
         spec.put("dispute_words", CallerSignals.DISPUTE);
+        spec.put("reason_words", FactGuard.REASON_WORDS);
+        spec.put("reason_fallback", FactGuard.REASON_FALLBACK);
+        spec.put("max_name_asks", VoiceTools.MAX_NAME_ASKS);
 
         String expected = JSON.writeValueAsString(spec) + "\n";
         if (Boolean.getBoolean("training.spec.write")) {

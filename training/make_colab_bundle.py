@@ -520,6 +520,82 @@ get_ipython().system(f'python make_modelfile.py "{{gguf}}" --base qwen3:4b-instr
     ]
 
 
+def notebook_retest() -> dict:
+    """Round 4's model, nothing trained, under the 31 Oct CRM fixes: the same 60 calls, and 60 with new callers. Each
+    seed has its own results folder, so no call from an older CRM is reused."""
+    seeds = (2026, 7)
+    results = {s: f"{KEEP8_R4}/results-crm4-seed{s}" for s in seeds}
+    cells = [
+        md(f"""
+# Retest round 4's model under the CRM fixes
+
+Nothing is trained, so this needs only about **40 minutes** of GPU. Two runs of 60 calls: **the same test as before**
+(seed 2026) and **new callers** (seed 7). Every finished call is saved in Google Drive.
+
+1. **Runtime → Change runtime type → T4 GPU**, then **Save**.
+2. Upload the new **colab-kit.zip** in the Files panel on the left (folder icon). The old one will not work.
+3. Run the cells **in order, one at a time**. Keep this tab open; click in it now and then.
+
+**After a disconnect:** reconnect, upload colab-kit.zip again and run the cells from the top. Finished calls are not run again.
+"""),
+        md("## 1. Check the GPU and unpack the kit\nThe last line must say **OK**."),
+        code(f"""
+!nvidia-smi --query-gpu=name,memory.total --format=csv
+!unzip -o -q /content/colab-kit.zip -d /content/kit && echo "Kit unpacked"
+%cd {KIT}
+!python -m unittest test_fairness test_callkit test_sim 2>&1 | tail -3
+"""),
+        md("## 2. Connect Google Drive\nColab asks you to allow access: choose the college account."),
+        code(f"""
+import glob
+from google.colab import drive
+drive.mount("/content/drive")
+print("Model file:", glob.glob("{KEEP8_R4}/*.gguf") or "NOT FOUND: send a screenshot")
+!mkdir -p {" ".join(results.values())} && echo "Results folders ready"
+"""),
+        md("## 3. Load round 4's model into Ollama (about 5 minutes)\nMust end with **Answers directly**."),
+        code(f"""
+%cd {KIT}
+import glob, json, os, subprocess, time, urllib.request
+!apt-get -qq install -y zstd pciutils > /dev/null
+!curl -fsSL https://ollama.com/install.sh | sh > /dev/null 2>&1 && echo "Ollama installed"
+env = dict(os.environ, OLLAMA_CONTEXT_LENGTH="8192", OLLAMA_MAX_LOADED_MODELS="2")
+subprocess.Popen(["ollama", "serve"], env=env, stdout=open("/content/ollama.log", "w"), stderr=subprocess.STDOUT)
+for _ in range(60):
+    try:
+        urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
+        print("Ollama is running")
+        break
+    except Exception:
+        time.sleep(1)
+else:
+    raise SystemExit("Ollama did not start: see /content/ollama.log")
+!ollama pull qwen2.5:7b 2>&1 | tail -1
+!ollama pull qwen3:4b-instruct 2>&1 | tail -1
+gguf = sorted(glob.glob("{KEEP8_R4}/*.gguf"))[0]
+get_ipython().system(f'python make_modelfile.py "{{gguf}}" --base qwen3:4b-instruct --name {NAME8_R4} --create 2>&1 | tail -2')
+body = {{"model": "{NAME8_R4}", "messages": [{{"role": "user", "content": "Say hello in five words."}}], "max_tokens": 60, "stream": False}}
+req = urllib.request.Request("http://localhost:11434/v1/chat/completions", json.dumps(body).encode(), {{"Content-Type": "application/json"}})
+text = json.load(urllib.request.urlopen(req, timeout=300))["choices"][0]["message"].get("content") or ""
+print(repr(text[:150]))
+print("Thinks first: send a screenshot." if "<think>" in text else "Answers directly")
+"""),
+    ]
+    for n, (seed, title) in enumerate(((seeds[0], "The same 60 calls as before"), (seeds[1], "60 calls with new callers")), 4):
+        log = f"{results[seed]}/eval-{NAME8_R4}.log"
+        cells += [md(f"## {n}. {title} (about 15 minutes)\nThe spinner runs with nothing printed until the end. Send a screenshot of the score."),
+                  code(f"""
+%cd {KIT}
+!python -u evaluate.py --model {NAME8_R4} --seed {seed} --out-dir {results[seed]} >> {log} 2>&1; tail -26 {log}
+""")]
+    cells += [md("## 6. Download the results\nRefresh the Files panel, right-click **retest-results.zip** → **Download**, and tell Claude."),
+              code(f"""
+!rm -f /content/retest-results.zip; cd {KEEP8_R4} && zip -q -r /content/retest-results.zip {" ".join(f"results-crm4-seed{s}" for s in seeds)} && ls -l /content/retest-results.zip
+""")]
+    return {"cells": cells, "metadata": {"accelerator": "GPU", "kernelspec": {"name": "python3", "display_name": "Python 3"}},
+            "nbformat": 4, "nbformat_minor": 0}
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
     zpath = OUT / "colab-kit.zip"
@@ -531,7 +607,8 @@ def main() -> None:
                      ("train-8b-on-colab.ipynb", notebook_8b()), ("round4-calls-on-colab.ipynb", notebook_gen()),
                      ("train-8b-round4.ipynb", notebook_8b(KEEP8_R4, NAME8_R4, PER_R4, "Round 4 data (templates + the 287 calls "
                                                            "our 8B wrote with the real caller)", "~2 h 30 min", "4½ hours",
-                                                           recheck_r3_cells()))):
+                                                           recheck_r3_cells())),
+                     ("retest-crm-fixes.ipynb", notebook_retest())):
         (OUT / name).write_text(json.dumps(nb, indent=1, ensure_ascii=False), encoding="utf-8")
         print(f"Wrote {OUT / name}")
     print(f"Wrote {zpath} ({len(files)} files, {zpath.stat().st_size // 1024} KB)")

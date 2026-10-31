@@ -177,6 +177,50 @@ class VoiceAgentIntegrationTest {
     }
 
     @Test
+    void theFullNameIsAskedForOnlyTwiceThenAPersonTakesOver() throws Exception {
+        approve("Incoming calls");
+        String phone = phone();
+        long contact = contact(admin, "Meena Iyer", phone, "\"customer_ref\":\"CR-77002\",\"balance_due\":\"900\"");
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        String firstName = "{\"full_name\":\"Meena\",\"answers\":{\"customer_ref\":\"CR-77002\"}}";
+        for (int ask = 1; ask <= VoiceTools.MAX_NAME_ASKS; ask++) {
+            tool(call, "verify_identity", firstName)
+                    .andExpect(jsonPath("$.error.code").value("INVALID_ARGUMENT"))
+                    .andExpect(jsonPath("$.error.message").value(Matchers.containsString("full name")));
+        }
+        tool(call, "verify_identity", firstName)
+                .andExpect(jsonPath("$.data.verified").value(false))
+                .andExpect(jsonPath("$.data.attempts_left").value(0))
+                .andExpect(jsonPath("$.data.handoff_mode").value("CALLBACK_TASK"));
+        // Locked like any other failed check: even the right details open nothing now.
+        tool(call, "verify_identity", "{\"full_name\":\"Meena Iyer\",\"answers\":{\"customer_ref\":\"CR-77002\"}}")
+                .andExpect(jsonPath("$.data.verified").value(false));
+        tool(call, "get_contact_details", "{}").andExpect(jsonPath("$.error.code").value("VERIFICATION_REQUIRED"));
+        hook("/webhooks/call-ended", "{\"call_id\":\"" + call + "\",\"status\":\"completed\"}");
+        mvc.perform(auth(get("/api/voice/calls/" + call), admin))
+                .andExpect(jsonPath("$.call.outcome").value("VERIFICATION_FAILED"));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin))
+                .andExpect(jsonPath("$[?(@.contactId == " + contact + ")].reason").value(Matchers.hasItem("VERIFICATION_FAILED")));
+    }
+
+    @Test
+    void aFirstNameThenTheFullNameStillPasses() throws Exception {
+        approve("Incoming calls");
+        String phone = phone();
+        contact(admin, "Meena Iyer", phone, "\"customer_ref\":\"CR-77003\",\"balance_due\":\"900\"");
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        tool(call, "verify_identity", "{\"full_name\":\"Meena\",\"answers\":{\"customer_ref\":\"CR-77003\"}}")
+                .andExpect(jsonPath("$.error.code").value("INVALID_ARGUMENT"));
+        tool(call, "verify_identity", "{\"full_name\":\"Meena\",\"answers\":{\"customer_ref\":\"CR-77003\"}}")
+                .andExpect(jsonPath("$.error.code").value("INVALID_ARGUMENT"));
+        tool(call, "verify_identity", "{\"full_name\":\"Meena Iyer\",\"answers\":{\"customer_ref\":\"CR-77003\"}}")
+                .andExpect(jsonPath("$.data.verified").value(true))
+                .andExpect(jsonPath("$.data.attempts_left").value(3));
+    }
+
+    @Test
     void threeFailedChecksLockTheCall() throws Exception {
         approve("Incoming calls");
         String phone = phone();

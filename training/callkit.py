@@ -310,6 +310,8 @@ class FakeCrm:
     over: bool = False
     tool_log: list[tuple[str, dict, dict]] = field(default_factory=list)   # (name, args, parsed result)
     corrections: list[list[str]] = field(default_factory=list)   # facts the CRM's FactGuard stopped (see sim.py)
+    reason_stops: list[list[str]] = field(default_factory=list)  # replies stopped for naming the reason too soon
+    name_asks: int = 0                                           # identity checks with only part of the name
     thinking: int = 0              # replies with hidden reasoning (removed before speaking, but they cost time)
     upgrades: list[dict] = field(default_factory=list)   # call-backs / hand-overs the CRM made urgent (upgrade())
 
@@ -383,8 +385,14 @@ class FakeCrm:
         if self.failures >= 3:
             return result_json(True, {"verified": False, "attempts_left": 0}, "I could not verify the details, so a member of our team will help you.")
         if len(_words(str(args.get("full_name") or ""))) < len(_words(self.person.full_name)):
-            # As VoiceTools.verifyIdentity: a first name alone is not a try; the caller is asked for the full name.
-            return result_json(False, code="INVALID_ARGUMENT", msg="Could I have your full name, please, your first name and surname?")
+            # As VoiceTools.verifyIdentity: a first name alone is not a try; the caller is asked for the full name, up
+            # to twice. After that asking again only loops, so a person takes over.
+            self.name_asks += 1
+            if self.name_asks <= SPEC["max_name_asks"]:
+                return result_json(False, code="INVALID_ARGUMENT", msg="Could I have your full name, please, your first name and surname?")
+            self.failures = 3
+            mode, msg = self._hand_over("VERIFICATION_FAILED", transfer=False)
+            return result_json(True, {"verified": False, "attempts_left": 0, "handoff_mode": mode}, "I could not verify the details. " + msg)
         name_ok = _words(self.person.full_name) <= _words(str(args.get("full_name") or ""))
         answers = {str(k).lower(): str(v) for k, v in args.items() if isinstance(v, str)}
         if isinstance(args.get("answers"), dict):
@@ -618,6 +626,26 @@ def upgrade(name: str, args: dict, caller_words: str) -> tuple[str, dict]:
                    + " (marked urgent by the CRM)." + ("" if note is None else f" Agent's note: {note}")}
 
 
+REASON_WORDS = re.compile(SPEC["reason_words"])
+REASON_FALLBACK: str = SPEC["reason_fallback"]
+
+
+def reason_words(said: str, allowed: str) -> list[str]:
+    """FactGuard.reasonWords(): the words in a reply that give away why we are calling and ``allowed`` never used."""
+    ok = set(REASON_WORDS.findall(allowed.lower()))
+    return list(dict.fromkeys(w for w in REASON_WORDS.findall(said.lower()) if w not in ok))
+
+
+def may_mention(system: str, opening: str) -> str:
+    """LlmBrain.mayMention: the opening line and the identity questions (the call reason in the context does not count)."""
+    return opening + " " + " ".join(re.findall(r'"ask_for":"([^"]*)"', system))
+
+
+def reason_hidden(system: str) -> bool:
+    """LlmBrain.reasonHidden at the start of a call: this call needs the identity check."""
+    return '"verification_required":true' in system
+
+
 def settles_the_call(name: str, res: dict) -> str | None:
     """LlmBrain.settlesTheCall(): the outcome a booked call-back or the identity lock-out already recorded, or None.
 
@@ -649,6 +677,9 @@ def check(rec: dict, crm_net: bool = False) -> list[str]:
     tool_text = ""
     faq_text = ""          # general answers may contain the same words as a private detail ("6 pm")
     heard = msgs[0]["content"].lower()   # what the agent may state: the script, the caller's words, tool results
+    # What the agent may mention before the identity check: the script's purpose does not count here.
+    mentioned = may_mention(msgs[0]["content"], msgs[2].get("content") or "")
+    hidden = reason_hidden(msgs[0]["content"])
     verified = False
     closing_at = None
     settled = None           # outcome recorded by the CRM itself (only counted with crm_net)
@@ -661,6 +692,7 @@ def check(rec: dict, crm_net: bool = False) -> list[str]:
             pending.discard(m.get("tool_call_id"))
             tool_text += m["content"]
             heard += " " + m["content"].lower()
+            mentioned += " " + m["content"]
             if m.get("name") == "search_faq":
                 faq_text += m["content"].lower()
             res = json.loads(m["content"])
@@ -684,6 +716,7 @@ def check(rec: dict, crm_net: bool = False) -> list[str]:
                 # On a real call every caller turn gets the agent's answer before the caller speaks again.
                 problems.append(f"message {i}: the caller speaks twice in a row")
             heard += " " + (m.get("content") or "").lower()
+            mentioned += " " + (m.get("content") or "")
             continue
         text = m.get("content") or ""
         if closing_at is not None and (m.get("tool_calls") or i != len(msgs) - 1):
@@ -709,6 +742,8 @@ def check(rec: dict, crm_net: bool = False) -> list[str]:
                 for v in private:
                     if v.lower() in low and v.lower() not in faq_text:
                         problems.append(f"message {i}: shares a private detail before verification ({v})")
+                if hidden and (early := reason_words(low, mentioned)):
+                    problems.append(f"message {i}: names the reason for the call before verification ({', '.join(early)})")
             for amount in re.findall(r"\d[\d,]*(?:\.\d+)? rupees", text):
                 if not re.search(r"(?<![\d,.])" + re.escape(amount), tool_text):
                     problems.append(f"message {i}: says an amount no tool returned ({amount})")
@@ -840,6 +875,7 @@ def record(call: FakeCrm, messages: list[dict], source: str, scenario: str, expe
             "meta": {"source": source, "script": call.script.name, "industry": call.script.industry, "scenario": scenario,
                      "expect": expect, "private_values": sorted(private), "never_values": sorted(never),
                      **({"crm_corrections": call.corrections} if call.corrections else {}),
+                     **({"crm_reason_stops": call.reason_stops} if call.reason_stops else {}),
                      **({"thinking_turns": call.thinking} if call.thinking else {}),
                      **({"crm_upgrades": call.upgrades} if call.upgrades else {})}}
 

@@ -32,14 +32,18 @@ from sim import caller_version, simulate, transcript
 RERUN_SEED = 100_000
 # Raised when the CRM's handling changes in a way that can change a saved call (2: CallerSignals, 28 Oct 2026 -
 # urgent hand-overs for distress / disputes, and hand-over reason aliases; 3: 30 Oct - a first name alone is not an
-# identity try, the caller is asked for the full name). Only calls it would change are redone.
-CRM_VERSION = 3
+# identity try, the caller is asked for the full name; 4: 31 Oct - only two such asks, then a person; the reason for the
+# call stays unsaid until the identity check). Only calls it would change are redone.
+CRM_VERSION = 4
 
 
 def crm_would_change(att: dict, since: int = 1) -> bool:
     """Would today's CRM have answered this saved call differently? Only the rules added after the CRM version
     ``since`` it was run under count: a call already run with a rule must not be redone for it again."""
     words = ""
+    if since < 4 and "messages" in att and any("names the reason for the call" in p for p in check(att, crm_net=True)):
+        return True           # today's CRM would have stopped that reply
+    singles = 0
     for m in att.get("messages", []):
         if m["role"] == "user":
             words += " " + m["content"]
@@ -53,6 +57,10 @@ def crm_would_change(att: dict, since: int = 1) -> bool:
                 return True       # an alias that used to be refused
             if since < 3 and name == "verify_identity" and len(str(args.get("full_name") or "").split()) < 2:
                 return True       # a single name, now answered "your full name, please" instead of a failed try
+            if name == "verify_identity" and len(str(args.get("full_name") or "").split()) < 2:
+                singles += 1
+                if since < 4 and singles > SPEC["max_name_asks"]:
+                    return True   # a third single name, now the point where a person takes over
     return False
 
 
@@ -72,6 +80,7 @@ def run_once(script, scenario, seed: int, a, caller: str) -> dict:
     rec = rec or {"meta": {"script": script.name, "scenario": scenario.id}}
     # A made-up fact the CRM's FactGuard stopped never reached the caller, but it is still the model's mistake.
     alone += [f"the CRM stopped a made-up fact ({', '.join(f)})" for f in rec["meta"].get("crm_corrections", [])]
+    alone += [f"the CRM stopped it naming the reason too soon ({', '.join(f)})" for f in rec["meta"].get("crm_reason_stops", [])]
     if rec["meta"].get("thinking_turns"):
         alone.append(f"wrote hidden reasoning in {rec['meta']['thinking_turns']} replies (slow on a phone)")
     rec["meta"].update(problems=problems, problems_alone=alone, caller_played=played, caller_why=why,
@@ -195,6 +204,10 @@ def main() -> None:
     print(f"  FAIR: {fairs['pass']}/{usable} calls where the caller played its part ({fairs['pass'] / max(usable, 1):.0%}); "
           f"{fairs['unusable']} unusable after {a.reruns} reruns; {sum(bool(r.get('reruns')) for r in rows)} calls rerun"
           + (f"; {fairs['unknown']} without transcript" if fairs["unknown"] else ""))
+    said = [p for r in rows for att in [r] + r.get("reruns", []) for p in att["meta"].get("problems", [])]
+    print(f"  private details before verification: {sum('shares a private detail' in p or 'never shared' in p for p in said)}; "
+          f"reason named too soon: {sum('names the reason' in p for p in said)}; "
+          f"replies the CRM stopped for it: {sum(len(att['meta'].get('crm_reason_stops', [])) for r in rows for att in [r] + r.get('reruns', []))}")
     for label, group in (("scripts never seen in training", [r for r in rows if r["meta"].get("script") in HELD_OUT_SCRIPTS]),
                          ("scripts seen in training", [r for r in rows if r["meta"].get("script") not in HELD_OUT_SCRIPTS])):
         if group:

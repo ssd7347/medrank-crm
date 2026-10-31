@@ -62,6 +62,41 @@ final class FactGuard {
         return new ArrayList<>(out);
     }
 
+    /**
+     * Words that tell whoever answered that someone owes money. Until the identity check passes the agent may use one
+     * only if the opening line, an identity question, the caller or a tool used it first (8B test call #7, 31 Oct: it
+     * told a stranger "I'm calling about an overdue EMI payment"). Matched against lower case; the kit reads this too.
+     */
+    static final String REASON_WORDS = "\\b(overdue|emis?|loans?|debts?|dues|arrears|outstanding|install?ments?|"
+            + "pay|paying|payments?|premiums?|fees?|amounts?|bills?|owe|owed|owing)\\b";
+    private static final Pattern REASON = Pattern.compile(REASON_WORDS);
+
+    /** Said instead when the model names the reason again after its private note; it names nothing. */
+    static final String REASON_FALLBACK = "I can only discuss this with the account holder. May I have your full name, please?";
+
+    /** The words in {@code said} that give away why we are calling and {@code allowed} never used; empty when none. */
+    static List<String> reasonWords(String said, String allowed) {
+        String s = said == null ? "" : said.toLowerCase(Locale.ROOT);
+        Set<String> ok = new HashSet<>();
+        for (Matcher m = REASON.matcher(allowed == null ? "" : allowed.toLowerCase(Locale.ROOT)); m.find(); ) {
+            ok.add(m.group());
+        }
+        Set<String> out = new LinkedHashSet<>();
+        for (Matcher m = REASON.matcher(s); m.find(); ) {
+            if (!ok.contains(m.group())) {
+                out.add(m.group());
+            }
+        }
+        return new ArrayList<>(out);
+    }
+
+    /** The private note the model gets once when it names the reason for the call too early. */
+    static String reasonReminder(List<String> words) {
+        return "\n\nPRIVATE NOTE (never mention it): your last reply said " + String.join(", ", words)
+                + " before the identity check passed. Whoever answered may not be the customer. Say only that it is about"
+                + " their account with us, and ask for their full name.";
+    }
+
     /** The private note the model gets once, with the reply it must not repeat left out of the call. */
     static String reminder(List<String> facts) {
         return "\n\nPRIVATE NOTE (never mention it): your last reply stated " + String.join(", ", facts)

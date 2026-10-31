@@ -97,6 +97,21 @@ class FakeCrmTest(unittest.TestCase):
         res = json.loads(call.run("verify_identity", {"full_name": p.full_name, "answers": right}))
         self.assertTrue(res["data"]["verified"])
 
+    def test_the_full_name_is_asked_for_only_twice(self):
+        # As VoiceAgentIntegrationTest: then a person takes over and the call is locked.
+        call = new_call(script("Payment reminder"), random.Random(4))
+        p = call.person
+        right = {"customer_id": p.values["customer_id"]}
+        for _ in range(2):
+            res = json.loads(call.run("verify_identity", {"full_name": p.first_name, "answers": right}))
+            self.assertEqual(res["error_code"], "INVALID_ARGUMENT")
+        res = json.loads(call.run("verify_identity", {"full_name": p.first_name, "answers": right}))
+        self.assertEqual((res["data"]["verified"], res["data"]["attempts_left"]), (False, 0))
+        self.assertEqual(call.outcome, "VERIFICATION_FAILED")
+        self.assertTrue(call.settled)
+        res = json.loads(call.run("verify_identity", {"full_name": p.full_name, "answers": right}))
+        self.assertFalse(res["data"]["verified"])
+
     def test_answers_match_like_the_backend(self):
         ref = FieldDef("Loan account number", "TEXT", "NONE", True)
         self.assertTrue(answer_matches(ref, "LN-482913", "482913"))

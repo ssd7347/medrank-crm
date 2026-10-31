@@ -49,6 +49,7 @@ class AiBrainIntegrationTest {
     private static final List<Map<String, Object>> REQUESTS = new CopyOnWriteArrayList<>();
     private static final AtomicInteger SEQ = new AtomicInteger(31000);
     private static final HttpServer MODEL = startModel();
+    private static boolean privateField;
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
@@ -191,6 +192,30 @@ class AiBrainIntegrationTest {
                 // The invented "Thursday, 20th April" is dropped; the caller hears only the second, honest answer.
                 .andExpect(jsonPath("$.added[?(@.role == 'agent')].text").value(Matchers.contains(
                         "I'm sorry, I can't check that right now. Shall I ask our team to call you?")));
+    }
+
+    @Test
+    void theReasonForTheCallStaysUnsaidUntilTheCheck() {
+        String allowed = "Hello, am I speaking with Asha? Loan account number";
+        assertThat(FactGuard.reasonWords("I'm calling about an overdue EMI payment.", allowed))
+                .containsExactly("overdue", "emi", "payment");
+        // An identity question may be asked, and a word the caller used first may be used back.
+        assertThat(FactGuard.reasonWords("May I have your loan account number?", allowed)).isEmpty();
+        assertThat(FactGuard.reasonWords("Yes, you can pay online.", "Can I pay online?")).isEmpty();
+        // The fixed line names nothing; ordinary words are left alone.
+        assertThat(FactGuard.reasonWords(FactGuard.REASON_FALLBACK, "")).isEmpty();
+        assertThat(FactGuard.reasonWords("Is now a good time? It is about your account with us.", "")).isEmpty();
+    }
+
+    @Test
+    void aStrangerNeverHearsThatSomeoneOwesMoney() throws Exception {
+        String admin = admin();
+        // The note makes the model behave: the caller hears only the second, neutral answer.
+        String heard = say(admin, reminderCall(admin), "Who is this? Why are you calling Harish?");
+        assertThat(heard).contains("It is about their account with us.").doesNotContainIgnoringCase("overdue");
+        // This model keeps saying it even after the note: the caller hears the fixed line instead.
+        heard = say(admin, reminderCall(admin), "This is Sunil. Tell me why you called.");
+        assertThat(heard).contains(FactGuard.REASON_FALLBACK).doesNotContainIgnoringCase("overdue");
     }
 
     @Test
@@ -367,6 +392,16 @@ class AiBrainIntegrationTest {
                     + "\"reason\": \"Wants a call later.\"}}\n</tool_call>");
             return;
         }
+        if (lastCaller.contains("Why are you calling Harish")) {
+            answer(ex, String.valueOf(messages.get(0).get("content")).contains("PRIVATE NOTE")
+                    ? "It is about their account with us. May I have your full name?"
+                    : "I'm calling about an overdue EMI payment.");
+            return;
+        }
+        if (lastCaller.contains("This is Sunil")) {
+            answer(ex, "I'm calling about an overdue EMI payment.");
+            return;
+        }
         if (lastCaller.contains("when is my visit")) {
             // Invents a date, unless the CRM's private note (FactGuard) told it not to guess.
             answer(ex, String.valueOf(messages.get(0).get("content")).contains("PRIVATE NOTE")
@@ -424,6 +459,33 @@ class AiBrainIntegrationTest {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /** A test call to a contact with a private detail, so this call needs the identity check. */
+    private String reminderCall(String token) throws Exception {
+        if (!privateField) {
+            mvc.perform(auth(post("/api/fields"), token).contentType(MediaType.APPLICATION_JSON).content(
+                            "{\"label\":\"Brain Private\",\"fieldType\":\"TEXT\",\"agentAccess\":\"AFTER_VERIFY\","
+                                    + "\"verifyWith\":false,\"sortOrder\":10,\"active\":true}"))
+                    .andExpect(status().isCreated());
+            privateField = true;
+        }
+        String phone = "9" + String.format("%09d", SEQ.incrementAndGet());
+        MvcResult r = mvc.perform(auth(post("/api/contacts"), token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Harish Kumar\",\"phone\":\"" + phone + "\",\"fields\":{\"brain_private\":\"1234\"}}"))
+                .andExpect(status().isCreated()).andReturn();
+        long contact = ((Number) JsonPath.read(r.getResponse().getContentAsString(), "$.id")).longValue();
+        return JsonPath.read(mvc.perform(auth(post("/api/voice/test-calls"), token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contactId\":" + contact + ",\"scriptName\":\"Payment reminder\",\"brain\":\"LOCAL\"}"))
+                .andExpect(jsonPath("$.callId").exists()).andReturn().getResponse().getContentAsString(), "$.callId");
+    }
+
+    /** Everything the caller hears in reply. */
+    private String say(String token, String callId, String text) throws Exception {
+        List<String> said = JsonPath.read(mvc.perform(auth(post("/api/voice/test-calls/" + callId + "/say"), token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"" + text + "\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.added[?(@.role == 'agent')].text");
+        return String.join(" ", said);
+    }
 
     private long contact(String token) throws Exception {
         String phone = "9" + String.format("%09d", SEQ.incrementAndGet());

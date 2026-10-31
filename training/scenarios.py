@@ -17,12 +17,13 @@ from typing import Callable
 from callkit import CONNECTED, FakeCrm, record
 
 TOPIC = {
-    "Payment reminder": "a payment that is due", "Appointment reminder": "your upcoming appointment",
+    # Said before the identity check, so calls about money name nothing (FactGuard.REASON_WORDS).
+    "Payment reminder": "your account with us", "Appointment reminder": "your upcoming appointment",
     "Enquiry follow-up": "the enquiry you made with us", "Feedback survey": "your recent experience with us",
     "Incoming calls": "questions about our services", "Clinic appointment reminder": "your upcoming appointment",
-    "Check-up recall": "your next check-up", "EMI due reminder": "your EMI that is due soon",
-    "Overdue follow-up": "your EMI payment", "Admission enquiry follow-up": "your admission enquiry",
-    "Fee reminder": "your fee payment", "Policy renewal reminder": "your policy renewal",
+    "Check-up recall": "your next check-up", "EMI due reminder": "your account with us",
+    "Overdue follow-up": "your account with us", "Admission enquiry follow-up": "your admission enquiry",
+    "Fee reminder": "your account with us", "Policy renewal reminder": "your policy renewal",
     "Property enquiry follow-up": "your property enquiry", "Site visit reminder": "your site visit",
 }
 

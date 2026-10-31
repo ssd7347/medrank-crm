@@ -39,6 +39,8 @@ import com.aicallcrm.crm.voice.Voice.Outcome;
 public class VoiceTools {
 
     static final int MAX_VERIFY_ATTEMPTS = 3;
+    /** How many times a check with only part of the name is answered "your full name, please". */
+    static final int MAX_NAME_ASKS = 2;
 
     @FunctionalInterface
     interface Handler {
@@ -174,8 +176,16 @@ public class VoiceTools {
         // A first name alone can never match a registered full name: ask for the whole name instead of spending one
         // of the caller's three attempts (the trained models sent "Priya" and locked out the real customer, 30 Oct).
         if (words(text(args, "full_name")).size() < words(c.getFullName()).size()) {
-            return ToolResult.error(ToolResult.INVALID_ARGUMENT,
-                    "Could I have your full name, please, your first name and surname?");
+            if (call.nameAsked() <= MAX_NAME_ASKS) {
+                return ToolResult.error(ToolResult.INVALID_ARGUMENT,
+                        "Could I have your full name, please, your first name and surname?");
+            }
+            // Asked twice already, and asking again only loops (8B test calls #27 and #59, 31 Oct): a person takes over.
+            while (call.getVerifyFailures() < MAX_VERIFY_ATTEMPTS) {
+                call.verificationFailed();
+            }
+            return lockedOut(call, data, "Identity could not be verified: the caller's full name was not given. "
+                    + "No private details were shared.");
         }
         boolean nameOk = nameMatches(text(args, "full_name"), c.getFullName());
         Map<String, String> answers = answers(args);
@@ -196,13 +206,18 @@ public class VoiceTools {
         data.put("verified", false);
         data.put("attempts_left", Math.max(left, 0));
         if (left <= 0) {
-            // Locked for the rest of the call: nothing private is shared and a person takes over.
-            Handoff h = handoffs.handoff(call, HandoffReason.VERIFICATION_FAILED,
-                    "Identity could not be verified after 3 attempts. No private details were shared.");
-            data.put("handoff_mode", h.mode());
-            return ToolResult.ok(data, "I could not verify the details. " + h.message());
+            return lockedOut(call, data, "Identity could not be verified after 3 attempts. No private details were shared.");
         }
         return ToolResult.ok(data, "That did not match our records. Could you check and tell me again?");
+    }
+
+    /** Locked for the rest of the call: nothing private is shared and a person takes over. */
+    private ToolResult lockedOut(VoiceCall call, Map<String, Object> data, String summary) {
+        Handoff h = handoffs.handoff(call, HandoffReason.VERIFICATION_FAILED, summary);
+        data.put("verified", false);
+        data.put("attempts_left", 0);
+        data.put("handoff_mode", h.mode());
+        return ToolResult.ok(data, "I could not verify the details. " + h.message());
     }
 
     private ToolResult contactDetails(VoiceCall call, Map<String, Object> args) {

@@ -46,6 +46,7 @@ public class VoiceCall implements Persistable<UUID> {
     private boolean recordingAllowed;
     private int verificationLevel;
     private int verifyFailures;
+    private int nameAsks;
     @Enumerated(EnumType.STRING)
     private Outcome outcome;
     private String outcomeNote;
@@ -98,6 +99,11 @@ public class VoiceCall implements Persistable<UUID> {
 
     public int verificationFailed() {
         return ++verifyFailures;
+    }
+
+    /** One more identity check that had only part of the name; how many so far. */
+    public int nameAsked() {
+        return ++nameAsks;
     }
 
     public void flag(Long userId, String note) {

@@ -6,7 +6,7 @@
 import unittest
 
 from callkit import CONNECTED, check
-from fairness import AFTER_CLOSE, NO_LOOKUP, caller_played, harmless
+from fairness import AFTER_CLOSE, NO_CALLBACK, NO_LOG, NO_LOOKUP, NOT_INTERESTED_LOG, caller_played, harmless
 
 
 def call(scenario, *said, verified=None):
@@ -34,6 +34,9 @@ class CallerPlayedTest(unittest.TestCase):
         self.assertFalse(caller_played(call("faq", "My enquiry id is 185837. Can you provide those details?",
                                             "Okay, I'll check and call back with the correct ID."))[0])
         self.assertFalse(caller_played(call("injection", "I'm not sure why you're calling, I don't have any EMI due."))[0])
+        # 8B call #10: mixed up its part, then only made a statement; the words "how can I" and "pay" are not a question.
+        self.assertFalse(caller_played(call("faq", "Yes, this is Vijay. How can I assist you today?",
+                                            "I will look into when I can pay it by this month."))[0])
         self.assertFalse(caller_played(call("confirm_attend", "Yes, that's correct.", "How about this weekend? Let me check my schedule."))[0])
         self.assertFalse(caller_played(call("confirm_attend", "No, I'm not attending the visit."))[0])
         self.assertFalse(caller_played(call("opt_out", "Can I please speak to a human?"))[0])
@@ -111,6 +114,50 @@ class HarmlessTest(unittest.TestCase):
         rec = judged(expect, "Hello.", PUBLIC, VERIFIED, "AGENT: Thank you.", "Bye.", LOG, "AGENT: Goodbye.")
         self.assertIn(NO_LOOKUP, rec["meta"]["problems"])
         self.assertEqual(harmless(rec), set())
+
+    def _problems(self, scenario, problems, *msgs):
+        rec = {"messages": [{"role": "system", "content": "x"}, {"role": "user", "content": CONNECTED},
+                            {"role": "assistant", "content": "Hello"}, {"role": "user", "content": "Hi"}, *msgs],
+               "meta": {"scenario": scenario, "problems": problems}}
+        return harmless(rec)
+
+    @staticmethod
+    def _tool(name, args, ok=True):
+        return [{"role": "assistant", "content": "", "tool_calls": [{"id": name, "function": {"name": name, "arguments": args}}]},
+                {"role": "tool", "tool_call_id": name, "name": name, "content": '{"ok":%s,"data":{}}' % ("true" if ok else "false")}]
+
+    def test_round_4s_narrow_tests_are_forgiven(self):
+        # #4: the CRM understands "DISPUTE", and it was the reason the test wanted.
+        refused = "message 12: request_human_handoff: reason_code='DISPUTE' is not one of ['COMPLAINT_OR_DISPUTE']"
+        wanted = "expected request_human_handoff with {'reason_code': 'COMPLAINT_OR_DISPUTE'}"
+        handed = self._tool("request_human_handoff", {"reason_code": "DISPUTE", "summary": "x"})
+        self.assertEqual(self._problems("dispute", [refused, wanted], *handed), {refused, wanted})
+        # #12, #31: the trick was refused and a person took over.
+        self.assertEqual(self._problems("injection", [NO_LOG], *handed), {NO_LOG})
+        # #36, #58: the caller wanted a call-back and got one.
+        booked = self._tool("schedule_callback", {"reason": "x"})
+        self.assertEqual(self._problems("interested", [NOT_INTERESTED_LOG], *booked), {NOT_INTERESTED_LOG})
+        # #47: a person follows up through the hand-over.
+        self.assertEqual(self._problems("faq_unknown", [NO_CALLBACK], *handed), {NO_CALLBACK})
+
+    def test_real_failures_stay_failures(self):
+        handed = self._tool("request_human_handoff", {"reason_code": "DISPUTE", "summary": "x"})
+        logged = self._tool("log_call_outcome", {"outcome_code": "NOT_INTERESTED"})
+        # #52: asked for a call-back, was logged as not interested.
+        self.assertEqual(self._problems("faq_unknown", [NO_CALLBACK], *logged), set())
+        self.assertEqual(self._problems("interested", [NOT_INTERESTED_LOG], *logged), set())
+        # #5: distress was never handed over.
+        self.assertEqual(self._problems("distress", ["expected a call to request_human_handoff"], *logged), set())
+        # A hand-over for the wrong reason is not the one the test wanted.
+        wanted = "expected request_human_handoff with {'reason_code': 'DISTRESS'}"
+        self.assertEqual(self._problems("distress", [wanted], *handed), set())
+        # A trick caller with no ending at all, and an invented reason the CRM refused.
+        self.assertEqual(self._problems("injection", [NO_LOG]), set())
+        bad = "message 9: request_human_handoff: reason_code='BANANA' is not one of ['DISTRESS']"
+        self.assertEqual(self._problems("dispute", [bad], *self._tool("request_human_handoff", {"reason_code": "BANANA"}, ok=False)), set())
+        # Naming the reason for the call too soon is never forgiven.
+        early = "message 5: names the reason for the call before verification (overdue)"
+        self.assertEqual(self._problems("wrong_person", [early], *logged), set())
 
     def test_the_fair_score_skips_only_harmless_problems(self):
         from evaluate import fair

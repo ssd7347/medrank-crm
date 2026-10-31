@@ -154,6 +154,47 @@ class SimTest(unittest.TestCase):
         self.assertEqual(rec["messages"][-1]["content"], "No problem. Thank you, goodbye.")
         self.assertEqual(rec["meta"]["thinking_turns"], 1)
 
+    def test_a_stranger_never_hears_the_reason_for_the_call(self):
+        # As AiBrainIntegrationTest: dropped, then asked again with a private note; the caller hears the second answer.
+        def agent(msgs, reminded):
+            if msgs[-1]["role"] == "tool":
+                return say("Thank you for your time, goodbye.")
+            if "PRIVATE NOTE" in msgs[0]["content"]:
+                return tool("log_call_outcome", outcome_code="WRONG_PERSON", note="Someone else answered.")
+            return say("I'm calling about an overdue EMI payment. Is now a good time?")
+        rec, why = self.run_call(FakeModel(lambda m: "This is Sunil.", agent), "Overdue follow-up", "wrong_person", coach=False)
+        self.assertEqual(why, "")
+        said = " ".join(m.get("content") or "" for m in rec["messages"] if m["role"] == "assistant")
+        self.assertNotIn("overdue", said.lower())
+        self.assertEqual(rec["meta"]["crm_reason_stops"], [["overdue", "emi", "payment"]])
+        self.assertFalse([p for p in callkit.check(rec, crm_net=True) if "names the reason" in p])
+
+    def test_a_model_that_keeps_saying_it_gets_the_fixed_line(self):
+        turns = []
+        def agent(msgs, reminded):
+            if msgs[-1]["role"] == "tool":
+                return say("Thank you for your time, goodbye.")
+            turns.append(1)
+            if len(turns) > 2:
+                return tool("log_call_outcome", outcome_code="WRONG_PERSON", note="Someone else answered.")
+            return say("I'm calling about an overdue EMI payment.")
+        rec, why = self.run_call(FakeModel(lambda m: "This is Sunil.", agent), "Overdue follow-up", "wrong_person", coach=False)
+        self.assertEqual(why, "")
+        self.assertEqual(rec["messages"][4]["content"], callkit.REASON_FALLBACK)
+        self.assertFalse(callkit.reason_words(callkit.REASON_FALLBACK, ""))
+
+    def test_the_reason_may_be_named_after_the_check_or_when_the_caller_named_it(self):
+        call = callkit.new_call(script("Overdue follow-up"), random.Random(2))
+        system = call.system_prompt()
+        history = [{"role": "user", "content": callkit.CONNECTED}, {"role": "assistant", "content": call.opening()}]
+        self.assertEqual(sim.too_soon("Your EMI is overdue.", history, system, call), ["emi", "overdue"])
+        # The identity question has to be asked, though the script's purpose ("overdue") does not unlock anything.
+        self.assertEqual(sim.too_soon("May I have your loan account number?", history, system, call), [])
+        history.append({"role": "user", "content": "Is this about my EMI?"})
+        self.assertEqual(sim.too_soon("Your EMI is overdue.", history, system, call), ["overdue"])
+        call.verified = True
+        self.assertEqual(sim.too_soon("Your EMI is overdue.", history, system, call), [])
+
     def test_an_invented_hand_over_reason_is_refused(self):
         call = callkit.new_call(script("Enquiry follow-up"), random.Random(3))
         # WRONG_PERSON is never a hand-over reason; "DISPUTE" is understood (CallerSignals.REASON_ALIASES).

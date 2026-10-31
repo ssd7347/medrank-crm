@@ -12,8 +12,11 @@
     "VERIFICATION_FAILURE" : "VERIFICATION_FAILED"
   },
   "handoff_reasons" : [ "COMPLAINT_OR_DISPUTE", "DISTRESS", "CALLER_REQUEST", "TOOL_FAILURE", "VERIFICATION_FAILED", "OUT_OF_SCOPE" ],
+  "max_name_asks" : 2,
   "max_tool_rounds" : 6,
   "outcomes" : [ "ACKNOWLEDGED", "WILL_ACT", "INTERESTED", "CALLBACK_REQUESTED", "HANDED_OFF", "NOT_INTERESTED", "OPTED_OUT", "WRONG_PERSON", "NO_INTERACTION", "VERIFICATION_FAILED" ],
+  "reason_fallback" : "I can only discuss this with the account holder. May I have your full name, please?",
+  "reason_words" : "\\b(overdue|emis?|loans?|debts?|dues|arrears|outstanding|install?ments?|pay|paying|payments?|premiums?|fees?|amounts?|bills?|owe|owed|owing)\\b",
   "tools" : [ {
     "function" : {
       "description" : "Checks the caller's identity. Ask for their full name and, if the call context lists any, one of the verification questions; then call this. At most 3 attempts.",
@@ -148,5 +151,5 @@
     },
     "type" : "function"
   } ],
-  "voice_rules" : "\nLIVE PHONE CALL\n- What you write is spoken aloud by a text-to-speech voice. Reply in one to three short sentences of plain spoken English: no lists, no markdown, no symbols, no emojis.\n- You have already said the opening line. Continue from the caller's reply.\n- Use the tools for every fact. Never make up amounts, dates, names or policies.\n- When the call is finished, call log_call_outcome (or opt_out or request_human_handoff when those apply), then say one short goodbye.\n"
+  "voice_rules" : "\nLIVE PHONE CALL\n- What you write is spoken aloud by a text-to-speech voice. Reply in one to three short sentences of plain spoken English: no lists, no markdown, no symbols, no emojis.\n- You have already said the opening line. Continue from the caller's reply.\n- Use the tools for every fact. Never make up amounts, dates, names or policies.\n- Whoever answered may not be the customer. Until verify_identity has passed, do not say what the call is about beyond your opening line: no EMI, loan, payment, fee or amount. If asked, say it is about their account with us.\n- When the call is finished, call log_call_outcome (or opt_out or request_human_handoff when those apply), then say one short goodbye.\n"
 }

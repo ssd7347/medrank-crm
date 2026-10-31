@@ -117,13 +117,23 @@ minutes is refused.
 | Tool | What it does |
 |---|---|
 | get_call_context | Why the call is happening, the first name, and which identity questions to ask |
-| verify_identity | Checks the full name plus a field marked "Ask to confirm" (e.g. customer ID; the number part or last four characters are enough). Three failures lock the call and hand it to a person |
+| verify_identity | Checks the full name plus a field marked "Ask to confirm" (e.g. customer ID; the number part or last four characters are enough). Three failures lock the call and hand it to a person. A check with only a first name is answered "your full name, please" without using a try, twice; the third locks the call the same way |
 | get_contact_details | The fields the AI may say: "To anyone" fields at once, "Only after verified" fields after the check, "Never" fields never |
 | search_faq | Answers from the AI knowledge base only |
 | schedule_callback | Books a call-back for staff; an unknown caller becomes a contact |
 | request_human_handoff | Live transfer, or an urgent call-back for complaints and distress |
 | log_call_outcome | Acknowledged, promised to act, interested, not interested, wrong person... (updates the contact's status) |
 | opt_out | Stops AI calls; "all calls" also marks the contact "Do not call" |
+
+## Keeping the reason for the call private
+
+When a call needs the identity check, our own model's replies are checked before the caller hears them
+(`FactGuard.reasonWords`, in `LlmBrain`): until the check passes, words such as overdue, EMI, loan, payment, fee or amount
+are stopped unless the opening line, an identity question, the caller or a tool used that word first. The model is asked
+again with a private note; if it repeats it, the caller hears a fixed line that names nothing. This protects only what
+the model says. **The opening line is the customer's own**: the clinic scripts' openings say "your check-up is due" and
+"your upcoming appointment", and asking for a "loan account number" also hints at a loan. Review these with the
+customer's compliance adviser before going live.
 
 ## Before the first real call
 

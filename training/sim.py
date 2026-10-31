@@ -12,7 +12,8 @@ import random
 import re
 import urllib.error
 
-from callkit import CONNECTED, MAX_ROUNDS, TOOLS, FakeCrm, new_call, ollama_chat, record, spoken, ungrounded, upgrade
+from callkit import (CONNECTED, MAX_ROUNDS, REASON_FALLBACK, TOOLS, FakeCrm, may_mention, new_call, ollama_chat, reason_hidden,
+                     reason_words, record, spoken, ungrounded, upgrade)
 from scenarios import TRICKS, Scenario, label_text
 
 MAX_CALLER_TURNS = 12
@@ -102,6 +103,21 @@ def fact_note(facts: list[str]) -> str:
             + " and offer a call-back.")
 
 
+def too_soon(said: str, history: list[dict], system: str, call) -> list[str]:
+    """LlmBrain.tooSoon(): the words in a reply that give away why we are calling, before the identity check passed."""
+    if call.verified or not reason_hidden(system):
+        return []
+    allowed = " ".join([may_mention(system, history[1]["content"])] + [m.get("content") or "" for m in history if m["role"] != "assistant"])
+    return reason_words(said, allowed)
+
+
+def reason_note(words: list[str]) -> str:
+    """FactGuard.reasonReminder(), word for word."""
+    return ("\n\nPRIVATE NOTE (never mention it): your last reply said " + ", ".join(words)
+            + " before the identity check passed. Whoever answered may not be the customer. Say only that it is about"
+            + " their account with us, and ask for their full name.")
+
+
 def clean_caller(text: str) -> str:
     t = re.sub(r"^\s*(\w+\s*)?(caller|customer|me|you)\s*:\s*", "", text.strip(), flags=re.I)
     t = re.sub(r"\(.*?\)|\*.*?\*", "", t).strip().strip('"').strip()
@@ -140,9 +156,10 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
         # ---- the agent answers, using tools as often as it needs (as LlmBrain.respond does)
         reminder = ""
         facts_note = ""          # as LlmBrain.respond: set once a reply invented a fact, for this caller turn
+        early_note = ""          # as LlmBrain.respond: set once a reply named the reason for the call too soon
         for _ in range(MAX_ROUNDS):
             try:
-                r = ollama_chat(agent_model, [{"role": "system", "content": hidden + reminder + facts_note}] + history, TOOLS,
+                r = ollama_chat(agent_model, [{"role": "system", "content": hidden + reminder + facts_note + early_note}] + history, TOOLS,
                                 temperature=agent_temperature, url=url, max_tokens=300, think=agent_think)
             except urllib.error.HTTPError as e:
                 # Ollama could not read the model's reply (usually a broken tool call): the model's mistake, so it
@@ -155,6 +172,14 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                 text = spoken(r["content"])
                 if not text:
                     return None, "the agent gave an empty reply"
+                early = too_soon(text, history, system, call)
+                if early:
+                    # The CRM's guard: the caller never hears it; one more try with a note, then a fixed line.
+                    call.reason_stops.append(early)
+                    if not early_note:
+                        early_note = reason_note(early)
+                        continue
+                    text = REASON_FALLBACK
                 made = unheard(text, history, system)
                 if made:
                     # The CRM's FactGuard: the caller never hears it; one more try with a note, then a person.
@@ -184,9 +209,10 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                 n += 1
                 calls.append({"id": f"call_{n}", "type": "function", "function": c["function"]})
             alongside = spoken(r["content"])
-            # As LlmBrain: words said alongside a tool call are spoken (and kept) only if they invent nothing.
-            history.append({"role": "assistant", "content": alongside if not unheard(alongside, history, system) else "",
-                            "tool_calls": calls})
+            # As LlmBrain: words said alongside a tool call are spoken (and kept) only if they invent nothing and give
+            # nothing away.
+            history.append({"role": "assistant", "content": alongside if not unheard(alongside, history, system)
+                            and not too_soon(alongside, history, system, call) else "", "tool_calls": calls})
             # As LlmBrain: a call-back or hand-over for a distressed or disputing caller becomes the urgent hand-over.
             # The transcript keeps the model's own call; "ran" says what the CRM ran instead.
             words = " ".join(m["content"] for m in history if m["role"] == "user")

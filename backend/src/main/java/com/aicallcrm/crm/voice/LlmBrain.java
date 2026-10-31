@@ -53,6 +53,7 @@ public class LlmBrain {
             - What you write is spoken aloud by a text-to-speech voice. Reply in one to three short sentences of plain spoken English: no lists, no markdown, no symbols, no emojis.
             - You have already said the opening line. Continue from the caller's reply.
             - Use the tools for every fact. Never make up amounts, dates, names or policies.
+            - Whoever answered may not be the customer. Until verify_identity has passed, do not say what the call is about beyond your opening line: no EMI, loan, payment, fee or amount. If asked, say it is about their account with us.
             - When the call is finished, call log_call_outcome (or opt_out or request_human_handoff when those apply), then say one short goodbye.
             """;
 
@@ -65,6 +66,10 @@ public class LlmBrain {
         /** A tool already recorded how the call ended (see {@link #settlesTheCall}), so a goodbye needs no review. */
         boolean settled;
         boolean over;
+        /** This call needs the identity check, and it has not passed yet: the reason for the call stays unsaid. */
+        boolean reasonHidden;
+        /** The words the agent may use before that check: the opening line and the identity questions. */
+        String mayMention = "";
 
         Session(ConversationBrain.Kind kind, LlmClient client, String system) {
             this.kind = kind;
@@ -157,6 +162,8 @@ public class LlmBrain {
             return prompt + VOICE_RULES + "\nCALL CONTEXT (from get_call_context): " + json(ctx) + "\n";
         });
         Session s = new Session(kind, client(kind), system);
+        s.reasonHidden = ctx.ok() && Boolean.TRUE.equals(ctx.data().get("verification_required"));
+        s.mayMention = openingLine + " " + (ctx.ok() ? ctx.data().get("verification_questions") : "");
         s.history.add(Message.user("(The call has connected.)"));
         s.history.add(Message.assistant(openingLine, List.of()));
         sessions.put(callId, s);
@@ -187,12 +194,24 @@ public class LlmBrain {
             try {
                 // Set once a reply stated a fact nobody gave it (FactGuard): the model is asked once more with a note.
                 String factNote = "";
+                // Set once a reply named the reason for the call before the identity check (FactGuard.reasonWords).
+                String reasonNote = "";
                 for (int round = 0; round < MAX_ROUNDS; round++) {
-                    Reply r = s.client.chat(s.system + factNote, s.history, specs);
+                    Reply r = s.client.chat(s.system + factNote + reasonNote, s.history, specs);
                     if (r.toolCalls().isEmpty()) {
                         String text = brief(spoken(r.text()));
                         if (text.isEmpty()) {
                             text = "Sorry, could you say that again?";
+                        }
+                        List<String> early = tooSoon(s, text);
+                        if (!early.isEmpty()) {
+                            // The caller never hears it: one more try with a note, then a fixed line that names nothing.
+                            log.info("Call {}: the {} brain named the reason for the call too soon: {}", callId, s.kind, early);
+                            if (reasonNote.isEmpty()) {
+                                reasonNote = FactGuard.reasonReminder(early);
+                                continue;
+                            }
+                            text = FactGuard.REASON_FALLBACK;
                         }
                         List<String> made = FactGuard.unheard(text, heard(s));
                         if (!made.isEmpty()) {
@@ -225,8 +244,9 @@ public class LlmBrain {
                     }
                     s.history.add(Message.assistant(r.text(), r.toolCalls(), r.raw()));
                     String alongside = brief(spoken(r.text()));
-                    // Words said alongside a tool call are spoken only if they invent nothing; the tools still run.
-                    if (!alongside.isEmpty() && FactGuard.unheard(alongside, heard(s)).isEmpty()) {
+                    // Words said alongside a tool call are spoken only if they invent nothing and give nothing away;
+                    // the tools still run.
+                    if (!alongside.isEmpty() && FactGuard.unheard(alongside, heard(s)).isEmpty() && tooSoon(s, alongside).isEmpty()) {
                         out.add(Line.agent(alongside));
                     }
                     String callerWords = callerWords(s);
@@ -244,6 +264,9 @@ public class LlmBrain {
                         }
                         if (settlesTheCall(c.name(), res)) {
                             s.settled = true;
+                        }
+                        if ("verify_identity".equals(c.name()) && res.ok() && Boolean.TRUE.equals(res.data().get("verified"))) {
+                            s.reasonHidden = false;
                         }
                     }
                 }
@@ -302,6 +325,20 @@ public class LlmBrain {
             }
         }
         return w.toString();
+    }
+
+    /** The words in {@code text} that give away why we are calling, while the identity check has not passed. */
+    private static List<String> tooSoon(Session s, String text) {
+        if (!s.reasonHidden) {
+            return List.of();
+        }
+        StringBuilder allowed = new StringBuilder(s.mayMention);
+        for (Message m : s.history) {
+            if (!"assistant".equals(m.role()) && m.text() != null) {
+                allowed.append(' ').append(m.text());
+            }
+        }
+        return FactGuard.reasonWords(text, allowed.toString());
     }
 
     /** What the agent may state: the script and call context, the caller's words and the tools' answers. */

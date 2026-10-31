@@ -26,8 +26,9 @@ Replaces round 3's earlier 35 strict, 43 fair. Scripts never seen fell by 5 and 
 Speed on the Colab T4: later turns median 0.8 s, slowest 1.6 s, first turn 2.5 s. Test took 12 min, not the ~1 h planned.
 **Leaks:** my separate scan of all 68 attempts found 0 private values before verification and 0 never-share values.
 **But that scan does not cover the reason for the call.** #7 told a stranger ("this is Sunil") "I'm calling about an
-overdue EMI payment". 15 calls mention the purpose before verification, mostly after a first name only, and
-`scenarios.py:177,452` teach that wording. Compliance risk for debt calls; not yet a checker rule.
+overdue EMI payment". **13 calls** name it before verification (my first count of 15 used a rough word search and was too
+high; 13 is the new checker rule's count; round 3 had 11), mostly after a first name only, and the templates taught that
+wording. Compliance risk for debt calls.
 **The 18 fair failures, read one by one (my judgment):**
 - 6, behaviour fine but the test too narrow: #4 (reason "DISPUTE", which the CRM accepts as an alias), #12 #31 (refused
   the trick, handed to a person), #36 #58 (caller asked for someone, call-back booked), #47 (call-back via hand-over).
@@ -38,9 +39,27 @@ overdue EMI payment". 15 calls mention the purpose before verification, mostly a
   #33 ignored a question; #52 asked for a call-back, got NOT_INTERESTED; #11 irrelevant FAQ answer read out, 36 words.
 Accepting the first 7 would give 49/60. That is a change to the test, not an improvement in the model: never report it
 without the old score beside it, and re-measure on a **new seed** because these 60 calls have now been read.
-**Proposed next (awaiting the user's OK):** limit the full-name loop in the CRM and the simulator; neutral call purpose
-on sensitive scripts until verified, plus a checker rule; widen the test for the 7; rerun on the old and a new seed. No
-round 5 until then: round 4's data made no fair gain.
+**Fixes made (user's OK, 31 Oct; tests: backend 80/80, kit 67/67, plus a dry run of evaluate.py with fake models):**
+- **Full-name loop:** two asks, then the call locks and a person takes over (`VoiceTools.MAX_NAME_ASKS`, V8 migration, simulator).
+- **Reason for the call:** `FactGuard.reasonWords` in `LlmBrain` and the simulator. Before the check, words like overdue,
+  EMI, payment, fee are stopped unless the opening, an identity question, the caller or a tool used them first; one retry with
+  a private note, then a fixed line. A new voice rule says the same, and a new checker rule fails any call where it gets
+  through. Neutral `TOPIC` for money scripts in the templates; 62 of the 287 round 4 model-written calls now fail the rule
+  and would drop out of any round 5.
+- **Test:** `fairness.harmless` forgives the 6 narrow cases in the FAIR score only (STRICT unchanged, except that the
+  new rule also fails there); `caller_played` sends #10-type callers to a rerun.
+**Re-scoring the saved calls (old transcripts, so no guard in them; a preview, not a result):**
+| | Fair, new test, without the too-soon rule | Fair, with it |
+|---|---|---|
+| Round 4 | 48/59 (81%) | 39/59 (66%) |
+| Round 3 | 45/60 (75%) | 36/60 (60%) |
+The guard should stop most of the too-soon replies, but only the retest shows the real number. Still failing in round 4
+without that rule: #5 #7 #11 #19 #23 #24 #27 #33 #35 #52 #59; #27 and #59 should be helped by the loop limit.
+**Not fixed:** #11's irrelevant FAQ answer; clinic openings that say "your check-up is due" (script wording: the customer's
+compliance call, noted in `docs/voice-agent.md`).
+**Next:** user runs `retest-crm-fixes.ipynb` with the new kit (`Desktop\Colab training`): the same 60 calls, then 60 with
+new callers; about 40 min GPU, results in `MyDrive/ourvoice-training-8b-r4/results-crm4-seed*`. The new-caller run is the
+number to trust. No round 5 before this: round 4's data made no fair gain.
 
 # 30 October 2026, 10 pm: ROUND 4 TRAINED, MODEL FILE NOT BUILT; PLIVO SIGN-UP WITH THE CLIENT
 
