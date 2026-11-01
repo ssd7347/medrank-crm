@@ -14,6 +14,32 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 1 November 2026: RETEST UNDER THE CRM FIXES — NEW CALLERS 53/60 (88%), SAME TEST 48/60 (80%); NOT YET A PASS
+
+Model `ourvoice8b-r4`, not retrained. Results: `Downloads\retest-results.zip`,
+`MyDrive/ourvoice-training-8b-r4/results-crm4-seed{2026,7}`.
+| | Fair | Fair without the 31 Oct forgiveness | Strict | Model alone | Fixed line heard in |
+|---|---|---|---|---|---|
+| Same 60 calls (seed 2026) | 48/60 (80%) | 43/60 | 39/60 | 28/60 | 13 calls |
+| New callers (seed 7) | 53/60 (88%) | 50/60 | 44/60 | 30/60 | 15 calls |
+| Together | 101/120 (84%) | 93/120 (78%) | 83/120 | 58/120 | 28 calls |
+Pass mark is 85%. Fair on scripts never seen: 21/25 and 23/25. Not a pass yet: one run is above, one below, and the
+two runs have different scenario mixes.
+**Leaks:** my separate scan of all 134 attempts: 0 private details before verification, 0 never-share values, 0 reason
+words reaching the caller. The guard stopped 80 replies, so the model has NOT unlearned the habit; only the CRM stops it.
+**Real problems found by reading all 19 failures and 5 passes (none fixed yet):**
+- **"Stop calling me" logged as NOT_INTERESTED, no opt-out** (s7 #31): compliance risk; the CRM has no net for it.
+- **The fixed line is too blunt:** 28 of 120 calls hear it. It answers "Is this a real person?" (s2026 #45) and "Who's
+  asking?" with "I can only discuss this with the account holder", even to the real customer.
+- **A correct name without the ID burns a try** and says "That did not match our records" (s7 #1 #5 #37, s2026 #47).
+- **Endless same reply:** s2026 #7 and #45 repeat one line to the 12-turn limit, no outcome. No CRM net.
+- **Call-back promised with no booking:** s7 #36, s2026 #53 say someone will call, but no task exists.
+- Wrong person still handled wrongly at times (s2026 #7 #19); FAQ returns unrelated answers (s2026 #53, s7 #36);
+  questions ignored at the end of a call (s2026 #33 #55).
+**Test too strict again, left as failures on purpose:** s2026 #3 #27 (identity failed, person arranged, outcome recorded).
+No more forgiveness rules without the user's decision: the last ones already added 8 calls.
+**Proposed next (awaiting the user's OK):** CRM nets for the first five, then retest on a third seed (2 runs were read).
+
 # 31 October 2026: ROUND 4 TESTED — FAIR 42/60 (70%), SAME AS ROUND 3; PASS MARK IS 51/60
 
 Model `ourvoice8b-r4`, in `MyDrive/ourvoice-training-8b-r4` (the model file is in Drive). Results in Downloads:
