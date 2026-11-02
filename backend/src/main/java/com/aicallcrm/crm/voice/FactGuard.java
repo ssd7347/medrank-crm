@@ -72,7 +72,16 @@ final class FactGuard {
     private static final Pattern REASON = Pattern.compile(REASON_WORDS);
 
     /** Said instead when the model names the reason again after its private note; it names nothing. */
-    static final String REASON_FALLBACK = "I can only discuss this with the account holder. May I have your full name, please?";
+    static final String REASON_FALLBACK = "It is about your account with us. May I have your full name, please?";
+    /** The same, when the caller asked whether this is a person: that question always gets a true answer. */
+    static final String REASON_FALLBACK_AI = "I am an AI assistant, not a person. It is about your account with us. May I have your full name, please?";
+    static final String AI_QUESTION = "real person|human|robot|machine|\\bai\\b|\\bbot\\b|automated|computer";
+    private static final Pattern AI_ASKED = Pattern.compile(AI_QUESTION);
+
+    /** The fixed line for what the caller just said. */
+    static String reasonFallback(String said) {
+        return said != null && AI_ASKED.matcher(said.toLowerCase(Locale.ROOT)).find() ? REASON_FALLBACK_AI : REASON_FALLBACK;
+    }
 
     /** The words in {@code said} that give away why we are calling and {@code allowed} never used; empty when none. */
     static List<String> reasonWords(String said, String allowed) {

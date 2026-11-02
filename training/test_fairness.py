@@ -175,7 +175,8 @@ class CrmChangeTest(unittest.TestCase):
     def test_only_newer_rules_count(self):
         from evaluate import crm_would_change
         single = judged({}, "Yes, this is Priya.", ("verify_identity", {"full_name": "Priya"}, '{"ok":true,"data":{"verified":false}}'))
-        full = judged({}, "Priya Rao.", ("verify_identity", {"full_name": "Priya Rao"}, '{"ok":true,"data":{"verified":false}}'))
+        full = judged({}, "Priya Rao, 4471.", ("verify_identity", {"full_name": "Priya Rao", "answers": {"customer_id": "4471"}},
+                                               '{"ok":true,"data":{"verified":false}}'))
         self.assertTrue(crm_would_change(single, 2))
         self.assertFalse(crm_would_change(single, 3))
         self.assertFalse(crm_would_change(full, 1))
@@ -183,6 +184,29 @@ class CrmChangeTest(unittest.TestCase):
         cb = judged({}, "I lost my job and can't pay.", ("schedule_callback", {"preferred_time_text": "later"}, '{"ok":true,"data":{}}'))
         self.assertTrue(crm_would_change(cb, 1))
         self.assertFalse(crm_would_change(cb, 2))
+        self.assertFalse(crm_would_change(cb, 5))
+
+    def test_version_5_rules(self):
+        from evaluate import OLD_REASON_FALLBACK, crm_would_change
+        logged = ("log_call_outcome", {"outcome_code": "NOT_INTERESTED"}, '{"ok":true,"data":{"recorded":true}}')
+        cases = {
+            "stop calling": judged({}, "Please stop calling me.", logged),
+            "call-back only recorded": judged({}, "Call me after 5.", ("log_call_outcome", {"outcome_code": "CALLBACK_REQUESTED"},
+                                                                         '{"ok":true,"data":{"recorded":true}}')),
+            "no identity answer": judged({}, "Priya Rao.", ("verify_identity", {"full_name": "Priya Rao", "answers": {"customer_id": " "}},
+                                                            '{"ok":true,"data":{"verified":false,"attempts_left":2}}')),
+            "old fixed line": judged({}, "Why are you calling?", "AGENT: " + OLD_REASON_FALLBACK + " May I have your full name, please?"),
+            "a reply three times": judged({}, "Hello?", "AGENT: Sorry?", "Hello?", "AGENT: Sorry?", "Hello?", "AGENT: Sorry?"),
+        }
+        for why, rec in cases.items():
+            with self.subTest(why):
+                self.assertTrue(crm_would_change(rec, 4))
+                self.assertFalse(crm_would_change(rec, 5))
+        # Left alone: a booked call-back recorded afterwards, an ordinary ending, a reply said only twice.
+        booked = judged({}, "Call me after 5.", ("schedule_callback", {}, '{"ok":true,"data":{"callback_id":7}}'),
+                        ("log_call_outcome", {"outcome_code": "CALLBACK_REQUESTED"}, '{"ok":true,"data":{"recorded":true}}'))
+        for rec in (booked, judged({}, "Not interested.", logged), judged({}, "Hello?", "AGENT: Sorry?", "Hello?", "AGENT: Sorry?")):
+            self.assertFalse(crm_would_change(rec, 4))
 
 
 class RerunTest(unittest.TestCase):

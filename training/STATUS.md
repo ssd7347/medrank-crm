@@ -14,6 +14,27 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 2 November 2026: THE FIVE CRM FIXES ARE BUILT — RETEST READY (same test + a third set of callers)
+
+User's OK: "Yes, build them". Model unchanged (`ourvoice8b-r4`). CRM version 5 (`evaluate.CRM_VERSION`).
+| Problem (1 Nov retest) | Fix, in the live CRM and the same in the simulator |
+|---|---|
+| "Stop calling me" logged as NOT_INTERESTED (s7 #31) | Whatever outcome the model logs, the CRM runs `opt_out` (AI calls) if the caller said "stop calling", "don't call me again", "remove my number"... (`CallerSignals.OPT_OUT`) |
+| Fixed line too blunt, and wrong for "Is this a real person?" | Now "It is about your account with us. May I have your full name, please?"; if the caller asked about a person, robot, AI or machine, it starts "I am an AI assistant, not a person." (`FactGuard.reasonFallback`) |
+| Correct name without the ID burns a try (s7 #1 #5 #37, s2026 #47) | Asked "Could I also have your Customer ID, please?" without using a try; shares the two-ask limit with the full-name ask, then a person takes over |
+| Same reply repeated to the 12-turn limit (s2026 #7 #45) | A reply about to be said a third time in a row goes to a person (`LlmBrain.saidTwiceAlready`). In the test this still counts as a **failure** |
+| Call-back promised, none booked (s7 #36, s2026 #53) | `log_call_outcome` CALLBACK_REQUESTED books one when none is booked and no hand-over or opt-out is recorded |
+**Tests:** backend 85/85 (5 new), kit 74/74 (7 new), engine 15/15. A fake-model run of all 60 calls hit every new rule
+(opt-out 12, booked call-back 12, repeat hand-over 24, AI line 10) without errors. The spec file was regenerated.
+The kit unzipped fresh passes its own tests.
+**No new forgiveness rule.** The repeat hand-over and the old s2026 #3 #27 strictness stay failures.
+Not fixed (the model's own weaknesses): wrong-person handling, questions ignored at the end, unrelated FAQ answers.
+**Next, the user on Colab:** `retest-crm-fixes.ipynb` in `Desktop\Colab training` with the new `colab-kit.zip`. Runtime
+must show **T4 (Python 3)**. Seed 2026 (the same 60 calls) and **seed 11 (callers never read, the honest number)**,
+results in `MyDrive/ourvoice-training-8b-r4/results-crm5-seed{2026,11}`, download `retest-results.zip`.
+About 40 min of GPU. Checkpoint 6 Nov: ≥ 51/60 fair on each run decides "own model"; I report both, with strict
+and model-alone beside them.
+
 # 1 November 2026: RETEST UNDER THE CRM FIXES — NEW CALLERS 53/60 (88%), SAME TEST 48/60 (80%); NOT YET A PASS
 
 Model `ourvoice8b-r4`, not retrained. Results: `Downloads\retest-results.zip`,
@@ -38,7 +59,7 @@ words reaching the caller. The guard stopped 80 replies, so the model has NOT un
   questions ignored at the end of a call (s2026 #33 #55).
 **Test too strict again, left as failures on purpose:** s2026 #3 #27 (identity failed, person arranged, outcome recorded).
 No more forgiveness rules without the user's decision: the last ones already added 8 calls.
-**Proposed next (awaiting the user's OK):** CRM nets for the first five, then retest on a third seed (2 runs were read).
+**Next:** CRM nets for the first five (built 2 Nov, see above), then a retest on a third seed (2 runs were read).
 
 # 31 October 2026: ROUND 4 TESTED — FAIR 42/60 (70%), SAME AS ROUND 3; PASS MARK IS 51/60
 

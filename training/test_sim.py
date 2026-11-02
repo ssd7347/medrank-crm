@@ -183,6 +183,61 @@ class SimTest(unittest.TestCase):
         self.assertEqual(rec["messages"][4]["content"], callkit.REASON_FALLBACK)
         self.assertFalse(callkit.reason_words(callkit.REASON_FALLBACK, ""))
 
+    def test_the_fixed_line_answers_whether_this_is_a_person(self):
+        # As AiBrainIntegrationTest.theFixedLineAnswersWhetherThisIsAPerson.
+        for said in ("Are you a robot or what?", "Am I talking to a human?", "Is this an AI?"):
+            self.assertEqual(callkit.reason_fallback(said), callkit.SPEC["reason_fallback_ai"])
+        self.assertEqual(callkit.reason_fallback("Who is this? Why are you calling Harish?"), callkit.REASON_FALLBACK)
+        self.assertEqual(callkit.reason_fallback(None), callkit.REASON_FALLBACK)
+        self.assertFalse(callkit.reason_words(callkit.SPEC["reason_fallback_ai"], ""))
+        turns = []
+        def agent(msgs, reminded):
+            if msgs[-1]["role"] == "tool":
+                return say("Thank you for your time, goodbye.")
+            turns.append(1)
+            if len(turns) > 2:
+                return tool("log_call_outcome", outcome_code="WRONG_PERSON", note="Someone else answered.")
+            return say("I'm calling about an overdue EMI payment.")
+        rec, why = self.run_call(FakeModel(lambda m: "Is this a real person? Who are you?", agent), "Overdue follow-up",
+                                 "wrong_person", coach=False)
+        self.assertEqual(why, "")
+        self.assertEqual(rec["messages"][4]["content"], callkit.SPEC["reason_fallback_ai"])
+
+    def test_a_caller_who_says_stop_calling_is_opted_out(self):
+        # As AiBrainIntegrationTest.aCallerWhoSaysStopCallingIsOptedOut.
+        def agent(msgs, reminded):
+            if msgs[-1]["role"] == "tool":
+                return say("Understood. Goodbye.")
+            return tool("log_call_outcome", outcome_code="NOT_INTERESTED")
+        rec, why = self.run_call(FakeModel(lambda m: "Not interested. Please stop calling me.", agent), "Enquiry follow-up",
+                                 "opt_out", coach=False)
+        self.assertEqual(why, "")
+        res = [m for m in rec["messages"] if m["role"] == "tool"][-1]
+        self.assertEqual((res["name"], res["ran"]), ("log_call_outcome", "opt_out"))
+        self.assertEqual(rec["meta"]["crm_upgrades"], [{"from": "log_call_outcome", "tool": "opt_out"}])
+        self.assertFalse([p for p in check(rec, crm_net=True) if "opt_out" in p])
+        self.assertTrue([p for p in check(rec) if "opt_out" in p])
+        self.assertEqual(callkit.upgrade("log_call_outcome", {"outcome_code": "NOT_INTERESTED"}, " Not now, call me again tomorrow.")[0],
+                         "log_call_outcome")
+
+    def test_a_reply_said_twice_is_not_said_a_third_time(self):
+        # As AiBrainIntegrationTest.aReplySaidTwiceIsNotSaidAThirdTime.
+        rec, why = self.run_call(FakeModel(lambda m: "Hello? Hello?", lambda msgs, r: say("Sorry, could you say that again?")),
+                                 "Enquiry follow-up", "will_act", coach=False)
+        self.assertEqual(why, "the CRM handed the call to a person: the agent kept repeating the same reply")
+        said = [m["content"] for m in rec["messages"] if m["role"] == "assistant"]
+        self.assertEqual(said.count("Sorry, could you say that again?"), 2)
+
+    def test_a_recorded_call_back_counts_as_booked_with_the_crm(self):
+        def agent(msgs, reminded):
+            if msgs[-1]["role"] == "tool":
+                return say("Of course. Our team will call you back. Thank you, goodbye.")
+            return tool("log_call_outcome", outcome_code="CALLBACK_REQUESTED", note="Busy, call later.")
+        rec, why = self.run_call(FakeModel(lambda m: "I'm driving, call me later.", agent), "Enquiry follow-up", "busy", coach=False)
+        self.assertEqual(why, "")
+        self.assertFalse([p for p in check(rec, crm_net=True) if "schedule_callback" in p])
+        self.assertTrue([p for p in check(rec) if "schedule_callback" in p])
+
     def test_the_reason_may_be_named_after_the_check_or_when_the_caller_named_it(self):
         call = callkit.new_call(script("Overdue follow-up"), random.Random(2))
         system = call.system_prompt()

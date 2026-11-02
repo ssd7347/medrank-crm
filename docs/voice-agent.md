@@ -117,23 +117,31 @@ minutes is refused.
 | Tool | What it does |
 |---|---|
 | get_call_context | Why the call is happening, the first name, and which identity questions to ask |
-| verify_identity | Checks the full name plus a field marked "Ask to confirm" (e.g. customer ID; the number part or last four characters are enough). Three failures lock the call and hand it to a person. A check with only a first name is answered "your full name, please" without using a try, twice; the third locks the call the same way |
+| verify_identity | Checks the full name plus a field marked "Ask to confirm" (e.g. customer ID; the number part or last four characters are enough). Three failures lock the call and hand it to a person. A check with only a first name, or the right name with no answer to the identity question, is answered by asking for it without using a try, twice; the third locks the call the same way |
 | get_contact_details | The fields the AI may say: "To anyone" fields at once, "Only after verified" fields after the check, "Never" fields never |
 | search_faq | Answers from the AI knowledge base only |
 | schedule_callback | Books a call-back for staff; an unknown caller becomes a contact |
 | request_human_handoff | Live transfer, or an urgent call-back for complaints and distress |
-| log_call_outcome | Acknowledged, promised to act, interested, not interested, wrong person... (updates the contact's status) |
-| opt_out | Stops AI calls; "all calls" also marks the contact "Do not call" |
+| log_call_outcome | Acknowledged, promised to act, interested, not interested, wrong person... (updates the contact's status). "Call-back requested" with none booked yet books one, so nobody waits for a call the team does not know about |
+| opt_out | Stops AI calls; "all calls" also marks the contact "Do not call". If the caller said "stop calling", "don't call me again", "remove my number" and the like, the CRM runs this instead of whatever outcome the model records (`CallerSignals.OPT_OUT`) |
 
 ## Keeping the reason for the call private
 
 When a call needs the identity check, our own model's replies are checked before the caller hears them
 (`FactGuard.reasonWords`, in `LlmBrain`): until the check passes, words such as overdue, EMI, loan, payment, fee or amount
 are stopped unless the opening line, an identity question, the caller or a tool used that word first. The model is asked
-again with a private note; if it repeats it, the caller hears a fixed line that names nothing. This protects only what
+again with a private note; if it repeats it, the caller hears a fixed line that names nothing: "It is about your account
+with us. May I have your full name, please?" If the caller just asked whether this is a person or a machine, the line
+starts "I am an AI assistant, not a person." This protects only what
 the model says. **The opening line is the customer's own**: the clinic scripts' openings say "your check-up is due" and
 "your upcoming appointment", and asking for a "loan account number" also hints at a loan. Review these with the
 customer's compliance adviser before going live.
+
+## When the model gets stuck
+
+If the model is about to say, word for word, the reply it already gave the last two times, the caller does not hear it a
+third time: a person takes over (`LlmBrain`, the same hand-over as when the model fails). Closing words after an
+outcome is recorded are not counted.
 
 ## Before the first real call
 

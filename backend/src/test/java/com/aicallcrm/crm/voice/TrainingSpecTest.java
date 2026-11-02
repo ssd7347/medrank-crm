@@ -55,6 +55,9 @@ class TrainingSpecTest {
         spec.put("dispute_words", CallerSignals.DISPUTE);
         spec.put("reason_words", FactGuard.REASON_WORDS);
         spec.put("reason_fallback", FactGuard.REASON_FALLBACK);
+        spec.put("reason_fallback_ai", FactGuard.REASON_FALLBACK_AI);
+        spec.put("ai_question_words", FactGuard.AI_QUESTION);
+        spec.put("opt_out_words", CallerSignals.OPT_OUT);
         spec.put("max_name_asks", VoiceTools.MAX_NAME_ASKS);
 
         String expected = JSON.writeValueAsString(spec) + "\n";

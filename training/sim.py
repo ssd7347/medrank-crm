@@ -12,7 +12,7 @@ import random
 import re
 import urllib.error
 
-from callkit import (CONNECTED, MAX_ROUNDS, REASON_FALLBACK, TOOLS, FakeCrm, may_mention, new_call, ollama_chat, reason_hidden,
+from callkit import (CONNECTED, MAX_ROUNDS, TOOLS, FakeCrm, may_mention, new_call, ollama_chat, reason_fallback, reason_hidden,
                      reason_words, record, spoken, ungrounded, upgrade)
 from scenarios import TRICKS, Scenario, label_text
 
@@ -111,6 +111,13 @@ def too_soon(said: str, history: list[dict], system: str, call) -> list[str]:
     return reason_words(said, allowed)
 
 
+def said_twice_already(history: list[dict], text: str) -> bool:
+    """LlmBrain.saidTwiceAlready(): were the agent's last two spoken replies both this one?"""
+    same = " ".join(text.lower().split())
+    spoken_replies = [" ".join(m["content"].lower().split()) for m in history if m["role"] == "assistant" and (m.get("content") or "").strip()]
+    return spoken_replies[-2:] == [same, same]
+
+
 def reason_note(words: list[str]) -> str:
     """FactGuard.reasonReminder(), word for word."""
     return ("\n\nPRIVATE NOTE (never mention it): your last reply said " + ", ".join(words)
@@ -179,7 +186,7 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                     if not early_note:
                         early_note = reason_note(early)
                         continue
-                    text = REASON_FALLBACK
+                    text = reason_fallback(said)
                 made = unheard(text, history, system)
                 if made:
                     # The CRM's FactGuard: the caller never hears it; one more try with a note, then a person.
@@ -189,6 +196,10 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                         continue
                     return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id,
                                   scenario.expect), "the CRM handed the call to a person: the agent kept stating facts it was not given"
+                if not call.closing and said_twice_already(history, text):
+                    # As LlmBrain.saidTwiceAlready: a third time helps nobody, so a person takes over.
+                    return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id,
+                                  scenario.expect), "the CRM handed the call to a person: the agent kept repeating the same reply"
                 if not call.closing and coach and not reminder and CLOSING_WORDS.search(text):
                     # Writing training calls: drop this reply and ask again with a private reminder, so only the
                     # corrected turn is kept. (Never while testing: there the mistake must count.)
@@ -223,7 +234,8 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                 msg = {"role": "tool", "tool_call_id": c["id"], "name": name, "content": out}
                 if run_args is not args:
                     msg["ran"] = run_name
-                    call.upgrades.append({"from": name, "reason_code": run_args["reason_code"]})
+                    call.upgrades.append({"from": name, "tool": "opt_out"} if run_name == "opt_out"
+                                         else {"from": name, "reason_code": run_args["reason_code"]})
                 history.append(msg)
         else:
             return record(call, [{"role": "system", "content": system}] + history, "generated", scenario.id, scenario.expect), \

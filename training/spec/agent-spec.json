@@ -1,4 +1,5 @@
 {
+  "ai_question_words" : "real person|human|robot|machine|\\bai\\b|\\bbot\\b|automated|computer",
   "closing_tools" : [ "log_call_outcome", "opt_out", "request_human_handoff" ],
   "dispute_words" : "already paid|already cleared|amount[^.?!]{0,30}(wrong|incorrect|not due)|paid (it|this|that) (already|last)|(amount|charge|bill) (is|was) (wrong|incorrect|not correct)|charged twice|double charged|refund|money back|not my (loan|account|charge)|never (took|agreed)|wrong amount|incorrect amount|overcharged|lawyer|consumer court|i want to complain|file a complaint",
   "distress_words" : "lost (my|our) (job|income|business)|laid off|no (job|income)|(can'?t|cannot) afford|hospital|passed away|(very|so|really) stressed|depress|crying|falling apart|(can'?t|cannot) cope|medical (bills|emergency)|struggling (to pay|financially|with money)|no money|don'?t have (the |any )?money|don'?t know how i('ll| will| am going to) (manage|pay|cope)",
@@ -14,8 +15,10 @@
   "handoff_reasons" : [ "COMPLAINT_OR_DISPUTE", "DISTRESS", "CALLER_REQUEST", "TOOL_FAILURE", "VERIFICATION_FAILED", "OUT_OF_SCOPE" ],
   "max_name_asks" : 2,
   "max_tool_rounds" : 6,
+  "opt_out_words" : "stop calling|stop these calls|(don'?t|do not|never) (ever )?call (me |this number )?(again|any ?more)|no more calls|remove my (number|name)|take (me|my number) off|unsubscribe|don'?t want (these|any|your) calls",
   "outcomes" : [ "ACKNOWLEDGED", "WILL_ACT", "INTERESTED", "CALLBACK_REQUESTED", "HANDED_OFF", "NOT_INTERESTED", "OPTED_OUT", "WRONG_PERSON", "NO_INTERACTION", "VERIFICATION_FAILED" ],
-  "reason_fallback" : "I can only discuss this with the account holder. May I have your full name, please?",
+  "reason_fallback" : "It is about your account with us. May I have your full name, please?",
+  "reason_fallback_ai" : "I am an AI assistant, not a person. It is about your account with us. May I have your full name, please?",
   "reason_words" : "\\b(overdue|emis?|loans?|debts?|dues|arrears|outstanding|install?ments?|pay|paying|payments?|premiums?|fees?|amounts?|bills?|owe|owed|owing)\\b",
   "tools" : [ {
     "function" : {

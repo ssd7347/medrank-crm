@@ -39,7 +39,7 @@ import com.aicallcrm.crm.voice.Voice.Outcome;
 public class VoiceTools {
 
     static final int MAX_VERIFY_ATTEMPTS = 3;
-    /** How many times a check with only part of the name is answered "your full name, please". */
+    /** How many times a check missing part of the name, or the answer, is answered by asking for it. */
     static final int MAX_NAME_ASKS = 2;
 
     @FunctionalInterface
@@ -180,22 +180,23 @@ public class VoiceTools {
                 return ToolResult.error(ToolResult.INVALID_ARGUMENT,
                         "Could I have your full name, please, your first name and surname?");
             }
-            // Asked twice already, and asking again only loops (8B test calls #27 and #59, 31 Oct): a person takes over.
-            while (call.getVerifyFailures() < MAX_VERIFY_ATTEMPTS) {
-                call.verificationFailed();
-            }
-            return lockedOut(call, data, "Identity could not be verified: the caller's full name was not given. "
-                    + "No private details were shared.");
+            return askedEnough(call, data, "the caller's full name was not given");
         }
         boolean nameOk = nameMatches(text(args, "full_name"), c.getFullName());
         Map<String, String> answers = answers(args);
         Map<String, String> values = facts.values(c);
         List<FieldDefinition> checks = facts.verificationFields().stream()
                 .filter(f -> values.get(f.getFieldKey()) != null).toList();
-        boolean extraOk = checks.isEmpty() || checks.stream().anyMatch(f -> {
-            String said = answers.getOrDefault(f.getFieldKey(), answers.get(f.getLabel().toLowerCase(Locale.ROOT)));
-            return answerMatches(f, values.get(f.getFieldKey()), said);
-        });
+        // The right name with no answer yet is not a wrong answer: ask for it instead of spending a try and telling the
+        // caller "that did not match" (8B retest calls, 1 Nov).
+        if (nameOk && !checks.isEmpty() && checks.stream().allMatch(f -> said(f, answers) == null || said(f, answers).isBlank())) {
+            if (call.nameAsked() <= MAX_NAME_ASKS) {
+                return ToolResult.error(ToolResult.INVALID_ARGUMENT,
+                        "Thank you. Could I also have your " + checks.get(0).getLabel() + ", please?");
+            }
+            return askedEnough(call, data, "the caller did not answer the identity question");
+        }
+        boolean extraOk = checks.isEmpty() || checks.stream().anyMatch(f -> answerMatches(f, values.get(f.getFieldKey()), said(f, answers)));
         if (nameOk && extraOk) {
             call.verified();
             data.put("verified", true);
@@ -209,6 +210,18 @@ public class VoiceTools {
             return lockedOut(call, data, "Identity could not be verified after 3 attempts. No private details were shared.");
         }
         return ToolResult.ok(data, "That did not match our records. Could you check and tell me again?");
+    }
+
+    private static String said(FieldDefinition f, Map<String, String> answers) {
+        return answers.getOrDefault(f.getFieldKey(), answers.get(f.getLabel().toLowerCase(Locale.ROOT)));
+    }
+
+    /** Asked twice already, and asking again only loops (8B test calls #27 and #59, 31 Oct): a person takes over. */
+    private ToolResult askedEnough(VoiceCall call, Map<String, Object> data, String why) {
+        while (call.getVerifyFailures() < MAX_VERIFY_ATTEMPTS) {
+            call.verificationFailed();
+        }
+        return lockedOut(call, data, "Identity could not be verified: " + why + ". No private details were shared.");
     }
 
     /** Locked for the rest of the call: nothing private is shared and a person takes over. */
@@ -387,12 +400,23 @@ public class VoiceTools {
         }
         // An opt-out, a failed identity check or a hand-over to a person is never overwritten by a politer-sounding
         // ending: the team must still see that a person has to act.
-        if (call.getOutcome() != Outcome.OPTED_OUT && call.getOutcome() != Outcome.VERIFICATION_FAILED
-                && call.getOutcome() != Outcome.HANDED_OFF) {
+        boolean settled = call.getOutcome() == Outcome.OPTED_OUT || call.getOutcome() == Outcome.VERIFICATION_FAILED
+                || call.getOutcome() == Outcome.HANDED_OFF;
+        // "A call-back was requested" with none booked would leave the caller waiting for a call nobody knows about
+        // (8B retest call #36, 1 Nov): the call-back is booked here. A booked one has already set this outcome.
+        Map<String, Object> data = new LinkedHashMap<>(Map.of("recorded", true));
+        String hint = null;
+        if (outcome == Outcome.CALLBACK_REQUESTED && !settled && call.getOutcome() != Outcome.CALLBACK_REQUESTED) {
+            String note = text(args, "note");
+            ToolResult booked = scheduleCallback(call, note == null ? Map.of() : Map.of("reason", note));
+            data.putAll(booked.data());
+            hint = booked.speakHint();
+        }
+        if (!settled) {
             call.setOutcome(outcome);
         }
         call.setOutcomeNote(cut(text(args, "note"), 1000));
-        return ToolResult.ok(Map.of("recorded", true), null);
+        return ToolResult.ok(data, hint);
     }
 
     private ToolResult optOut(VoiceCall call, Map<String, Object> args) {

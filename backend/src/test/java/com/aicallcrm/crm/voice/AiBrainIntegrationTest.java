@@ -216,6 +216,55 @@ class AiBrainIntegrationTest {
         // This model keeps saying it even after the note: the caller hears the fixed line instead.
         heard = say(admin, reminderCall(admin), "This is Sunil. Tell me why you called.");
         assertThat(heard).contains(FactGuard.REASON_FALLBACK).doesNotContainIgnoringCase("overdue");
+        // Asked whether this is a person: the fixed line answers that truthfully too.
+        heard = say(admin, reminderCall(admin), "Is this a real person? Why did you call?");
+        assertThat(heard).contains(FactGuard.REASON_FALLBACK_AI).doesNotContainIgnoringCase("overdue");
+    }
+
+    @Test
+    void theFixedLineAnswersWhetherThisIsAPerson() {
+        assertThat(FactGuard.reasonFallback("Are you a robot or what?")).isEqualTo(FactGuard.REASON_FALLBACK_AI);
+        assertThat(FactGuard.reasonFallback("Am I talking to a human?")).isEqualTo(FactGuard.REASON_FALLBACK_AI);
+        assertThat(FactGuard.reasonFallback("Is this an AI?")).isEqualTo(FactGuard.REASON_FALLBACK_AI);
+        assertThat(FactGuard.reasonFallback("Who is this? Why are you calling Harish?")).isEqualTo(FactGuard.REASON_FALLBACK);
+        assertThat(FactGuard.reasonFallback(null)).isEqualTo(FactGuard.REASON_FALLBACK);
+        assertThat(FactGuard.reasonWords(FactGuard.REASON_FALLBACK_AI, "")).isEmpty();
+    }
+
+    @Test
+    void aCallerWhoSaysStopCallingIsOptedOut() throws Exception {
+        String admin = admin();
+        long contact = contact(admin);
+        String callId = JsonPath.read(mvc.perform(auth(post("/api/voice/test-calls"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contactId\":" + contact + ",\"scriptName\":\"Enquiry follow-up\",\"brain\":\"LOCAL\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        // The stand-in model only records NOT_INTERESTED; the CRM runs the opt-out the caller asked for.
+        mvc.perform(auth(post("/api/voice/test-calls/" + callId + "/say"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"Not interested. Please stop calling me.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.added[*].tool").value(Matchers.hasItem("opt_out")))
+                .andExpect(jsonPath("$.added[*].tool").value(Matchers.not(Matchers.hasItem("log_call_outcome"))))
+                .andExpect(jsonPath("$.outcome").value("OPTED_OUT"))
+                .andExpect(jsonPath("$.over").value(true));
+    }
+
+    @Test
+    void aReplySaidTwiceIsNotSaidAThirdTime() throws Exception {
+        String admin = admin();
+        long contact = contact(admin);
+        String callId = JsonPath.read(mvc.perform(auth(post("/api/voice/test-calls"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contactId\":" + contact + ",\"scriptName\":\"Enquiry follow-up\",\"brain\":\"LOCAL\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        assertThat(say(admin, callId, "Hello? Hello?")).isEqualTo("Sorry, could you say that again?");
+        assertThat(say(admin, callId, "Hello? Hello?")).isEqualTo("Sorry, could you say that again?");
+        // The third time a person takes over instead.
+        mvc.perform(auth(post("/api/voice/test-calls/" + callId + "/say"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"Hello? Hello?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.added[*].tool").value(Matchers.hasItem("request_human_handoff")))
+                .andExpect(jsonPath("$.added[?(@.role == 'agent')].text").value(Matchers.not(
+                        Matchers.hasItem("Sorry, could you say that again?"))))
+                .andExpect(jsonPath("$.over").value(true));
     }
 
     @Test
@@ -257,6 +306,17 @@ class AiBrainIntegrationTest {
         assertThat(CallerSignals.upgrade(verifyFailed, distress)).isSameAs(verifyFailed);
         assertThat(CallerSignals.upgrade(lookup, distress)).isSameAs(lookup);
         assertThat(CallerSignals.upgrade(callback, " I'm in a meeting, call me at 5.")).isSameAs(callback);
+        // Whatever outcome the model records, a caller who asked not to be called again is opted out.
+        LlmClient.ToolCall logged = new LlmClient.ToolCall("c5", "log_call_outcome", Map.of("outcome_code", "NOT_INTERESTED"));
+        for (String stop : List.of(" Please stop calling me.", " Don't call me again.", " Remove my number.", " I don't want these calls.")) {
+            assertThat(CallerSignals.upgrade(logged, stop)).satisfies(c -> {
+                assertThat(c.name()).isEqualTo("opt_out");
+                assertThat(c.id()).isEqualTo("c5");
+                assertThat(c.arguments()).containsEntry("scope", "AI_CALLS");
+            });
+        }
+        assertThat(CallerSignals.upgrade(logged, " Not now, call me again tomorrow.")).isSameAs(logged);
+        assertThat(CallerSignals.upgrade(callback, " Please stop calling me.")).isSameAs(callback);
         // Invented reasons models use are understood; a wrong person is not a hand-over.
         assertThat(CallerSignals.reason("DISPUTE")).isEqualTo(Voice.HandoffReason.COMPLAINT_OR_DISPUTE);
         assertThat(CallerSignals.reason("human")).isEqualTo(Voice.HandoffReason.CALLER_REQUEST);
@@ -398,8 +458,18 @@ class AiBrainIntegrationTest {
                     : "I'm calling about an overdue EMI payment.");
             return;
         }
-        if (lastCaller.contains("This is Sunil")) {
+        if (lastCaller.contains("This is Sunil") || lastCaller.contains("real person")) {
             answer(ex, "I'm calling about an overdue EMI payment.");
+            return;
+        }
+        if (lastCaller.contains("stop calling")) {
+            // Records only that the caller is not interested; the CRM should run the opt-out.
+            answer(ex, "tool".equals(lastMsg.get("role")) ? "Understood. Goodbye."
+                    : "<tool_call>\n{\"name\": \"log_call_outcome\", \"arguments\": {\"outcome_code\": \"NOT_INTERESTED\"}}\n</tool_call>");
+            return;
+        }
+        if (lastCaller.contains("Hello? Hello?")) {
+            answer(ex, "Sorry, could you say that again?");
             return;
         }
         if (lastCaller.contains("when is my visit")) {

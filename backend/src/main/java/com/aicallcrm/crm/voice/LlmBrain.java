@@ -3,6 +3,7 @@ package com.aicallcrm.crm.voice;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -211,7 +212,7 @@ public class LlmBrain {
                                 reasonNote = FactGuard.reasonReminder(early);
                                 continue;
                             }
-                            text = FactGuard.REASON_FALLBACK;
+                            text = FactGuard.reasonFallback(said);
                         }
                         List<String> made = FactGuard.unheard(text, heard(s));
                         if (!made.isEmpty()) {
@@ -222,6 +223,12 @@ public class LlmBrain {
                                 continue;
                             }
                             handOver(callId, s, "The AI agent kept stating facts it was not given (" + String.join(", ", made) + ").", out);
+                            return out;
+                        }
+                        if (!s.closing && saidTwiceAlready(s, text)) {
+                            // A third time helps nobody (8B retest calls #7 and #45, 1 Nov: one line for 12 turns).
+                            log.info("Call {}: the {} brain kept repeating itself", callId, s.kind);
+                            handOver(callId, s, "The AI agent kept repeating the same reply.", out);
                             return out;
                         }
                         s.history.add(Message.assistant(text, List.of(), r.raw()));
@@ -254,7 +261,7 @@ public class LlmBrain {
                         // A call-back or hand-over for a distressed or disputing caller becomes the urgent hand-over.
                         ToolCall c = CallerSignals.upgrade(asked, callerWords);
                         if (c != asked) {
-                            log.info("Call {}: {} made an urgent {} hand-over", callId, asked.name(), c.arguments().get("reason_code"));
+                            log.info("Call {}: the CRM ran {} {} instead of {}", callId, c.name(), c.arguments().get("reason_code"), asked.name());
                         }
                         ToolResult res = executor.execute(callId, c.name(), c.arguments());
                         out.add(Line.tool(c.name(), res.status(), res.ok() ? null : res.errorMessage()));
@@ -325,6 +332,26 @@ public class LlmBrain {
             }
         }
         return w.toString();
+    }
+
+    /** Were the agent's last two spoken replies both this one? */
+    private static boolean saidTwiceAlready(Session s, String text) {
+        String same = sameWords(text);
+        int found = 0;
+        for (int i = s.history.size() - 1; i >= 0 && found < 2; i--) {
+            Message m = s.history.get(i);
+            if ("assistant".equals(m.role()) && m.text() != null && !m.text().isBlank()) {
+                if (!sameWords(m.text()).equals(same)) {
+                    return false;
+                }
+                found++;
+            }
+        }
+        return found == 2;
+    }
+
+    private static String sameWords(String text) {
+        return text.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 
     /** The words in {@code text} that give away why we are calling, while the identity check has not passed. */

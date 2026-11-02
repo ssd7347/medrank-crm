@@ -33,8 +33,11 @@ RERUN_SEED = 100_000
 # Raised when the CRM's handling changes in a way that can change a saved call (2: CallerSignals, 28 Oct 2026 -
 # urgent hand-overs for distress / disputes, and hand-over reason aliases; 3: 30 Oct - a first name alone is not an
 # identity try, the caller is asked for the full name; 4: 31 Oct - only two such asks, then a person; the reason for the
-# call stays unsaid until the identity check). Only calls it would change are redone.
-CRM_VERSION = 4
+# call stays unsaid until the identity check; 5: 1 Nov - "stop calling" opts out, a recorded call-back is booked, a missing
+# identity answer is asked for, a person takes over from a repeated reply). Only calls it would change are redone.
+CRM_VERSION = 5
+# The fixed line before version 5 (FactGuard.REASON_FALLBACK).
+OLD_REASON_FALLBACK = "I can only discuss this with the account holder."
 
 
 def crm_would_change(att: dict, since: int = 1) -> bool:
@@ -43,14 +46,31 @@ def crm_would_change(att: dict, since: int = 1) -> bool:
     words = ""
     if since < 4 and "messages" in att and any("names the reason for the call" in p for p in check(att, crm_net=True)):
         return True           # today's CRM would have stopped that reply
-    singles = 0
+    singles, booked, replies = 0, False, []
     for m in att.get("messages", []):
         if m["role"] == "user":
             words += " " + m["content"]
+        if m["role"] == "assistant" and (m.get("content") or "").strip():
+            replies.append(" ".join(m["content"].lower().split()))
+            if since < 5 and OLD_REASON_FALLBACK in m["content"]:
+                return True   # the fixed line has new words, and answers whether this is a person
+            if since < 5 and len(replies) >= 3 and len(set(replies[-3:])) == 1:
+                return True   # a reply said a third time, now the point where a person takes over
         for c in m.get("tool_calls") or []:
             name, args = c["function"]["name"], c["function"]["arguments"] if isinstance(c["function"]["arguments"], dict) else {}
             if since < 2 and upgrade(name, args, words)[1] is not args:
                 return True
+            if since < 5 and name == "log_call_outcome" and upgrade(name, args, words)[0] == "opt_out":
+                return True   # the caller asked not to be called again: now an opt-out, whatever was logged
+            booked = booked or name == "schedule_callback"
+            if since < 5 and name == "log_call_outcome" and not booked \
+                    and str(args.get("outcome_code") or "").upper() == "CALLBACK_REQUESTED":
+                return True   # a call-back only recorded, now booked as well
+            answers = args.get("answers") if isinstance(args.get("answers"), dict) else {}
+            if since < 5 and name == "verify_identity" and len(str(args.get("full_name") or "").split()) >= 2 \
+                    and not any(str(v or "").strip() for k, v in list(answers.items()) + list(args.items())
+                                if k not in ("full_name", "answers") and not isinstance(v, dict)):
+                return True   # no identity answer yet, now asked for instead of a failed try
             raw = args.get("reason_code")
             if since < 2 and name == "request_human_handoff" and raw is not None \
                     and str(raw) not in SPEC["handoff_reasons"] and handoff_reason(raw) is not None:

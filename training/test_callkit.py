@@ -112,6 +112,43 @@ class FakeCrmTest(unittest.TestCase):
         res = json.loads(call.run("verify_identity", {"full_name": p.full_name, "answers": right}))
         self.assertFalse(res["data"]["verified"])
 
+    def test_a_missing_identity_answer_is_asked_for_without_using_a_try(self):
+        # As VoiceAgentIntegrationTest.aMissingIdentityAnswerIsAskedForWithoutUsingATry.
+        call = new_call(script("Payment reminder"), random.Random(4))
+        p = call.person
+        res = json.loads(call.run("verify_identity", {"full_name": p.full_name}))
+        self.assertEqual((res["ok"], res["error_code"]), (False, "INVALID_ARGUMENT"))
+        self.assertIn("Could I also have your Customer ID", res["error_message"])
+        self.assertEqual(call.failures, 0)
+        res = json.loads(call.run("verify_identity", {"full_name": p.full_name, "answers": {"customer_id": p.values["customer_id"]}}))
+        self.assertEqual((res["data"]["verified"], res["data"]["attempts_left"]), (True, 3))
+        # Never answered: asked twice, then a person takes over.
+        call = new_call(script("Payment reminder"), random.Random(4))
+        for _ in range(2):
+            res = json.loads(call.run("verify_identity", {"full_name": call.person.full_name, "answers": {"customer_id": " "}}))
+            self.assertEqual(res["error_code"], "INVALID_ARGUMENT")
+        res = json.loads(call.run("verify_identity", {"full_name": call.person.full_name}))
+        self.assertEqual((res["data"]["verified"], res["data"]["attempts_left"]), (False, 0))
+        self.assertEqual(call.outcome, "VERIFICATION_FAILED")
+
+    def test_a_recorded_call_back_is_booked_once(self):
+        # As VoiceAgentIntegrationTest.aRecordedCallBackIsBookedOnce.
+        call = new_call(script("Payment reminder"), random.Random(4))
+        res = json.loads(call.run("log_call_outcome", {"outcome_code": "CALLBACK_REQUESTED", "note": "Busy, call after 5."}))
+        self.assertTrue(res["data"]["recorded"])
+        self.assertIn("callback_id", res["data"])
+        self.assertIn("call you back", res["say"])
+        self.assertEqual(call.outcome, "CALLBACK_REQUESTED")
+        self.assertNotIn("callback_id", json.loads(call.run("log_call_outcome", {"outcome_code": "CALLBACK_REQUESTED"}))["data"])
+        call = new_call(script("Payment reminder"), random.Random(4))
+        call.run("schedule_callback", {"preferred_time_text": "after 5"})
+        self.assertNotIn("callback_id", json.loads(call.run("log_call_outcome", {"outcome_code": "CALLBACK_REQUESTED"}))["data"])
+        # Nor after a hand-over, which a call-back must never overwrite.
+        call = new_call(script("Payment reminder"), random.Random(4))
+        call.run("request_human_handoff", {"reason_code": "CALLER_REQUEST"})
+        self.assertNotIn("callback_id", json.loads(call.run("log_call_outcome", {"outcome_code": "CALLBACK_REQUESTED"}))["data"])
+        self.assertEqual(call.outcome, "HANDED_OFF")
+
     def test_answers_match_like_the_backend(self):
         ref = FieldDef("Loan account number", "TEXT", "NONE", True)
         self.assertTrue(answer_matches(ref, "LN-482913", "482913"))

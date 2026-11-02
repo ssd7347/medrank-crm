@@ -398,6 +398,14 @@ class FakeCrm:
         if isinstance(args.get("answers"), dict):
             answers.update({str(k).lower(): str(v) for k, v in args["answers"].items() if v is not None})
         checks = self.verify_fields()
+        if name_ok and checks and not any(str(answers.get(f.key, answers.get(f.label.lower())) or "").strip() for f in checks):
+            # As VoiceTools.verifyIdentity: the right name with no answer yet is asked for, not counted as a wrong answer.
+            self.name_asks += 1
+            if self.name_asks <= SPEC["max_name_asks"]:
+                return result_json(False, code="INVALID_ARGUMENT", msg=f"Thank you. Could I also have your {checks[0].label}, please?")
+            self.failures = 3
+            mode, msg = self._hand_over("VERIFICATION_FAILED", transfer=False)
+            return result_json(True, {"verified": False, "attempts_left": 0, "handoff_mode": mode}, "I could not verify the details. " + msg)
         extra_ok = not checks or any(answer_matches(f, self.person.values.get(f.key), answers.get(f.key, answers.get(f.label.lower()))) for f in checks)
         if name_ok and extra_ok:
             self.verified = True
@@ -484,10 +492,17 @@ class FakeCrm:
         code = str(args.get("outcome_code") or "").upper()
         if code not in SPEC["outcomes"]:
             return result_json(False, code="INVALID_ARGUMENT", msg="Unknown outcome code.")
-        # As VoiceTools.logOutcome: an opt-out, a lock-out or a hand-over is never overwritten.
-        if self.outcome not in ("OPTED_OUT", "VERIFICATION_FAILED", "HANDED_OFF"):
+        # As VoiceTools.logOutcome: an opt-out, a lock-out or a hand-over is never overwritten, and a call-back that was
+        # recorded but not booked gets booked.
+        settled = self.outcome in ("OPTED_OUT", "VERIFICATION_FAILED", "HANDED_OFF")
+        data, say = {"recorded": True}, None
+        if code == "CALLBACK_REQUESTED" and not settled and self.outcome != "CALLBACK_REQUESTED":
+            booked = json.loads(self.t_schedule_callback({}))
+            data.update(booked["data"])
+            say = booked["say"]
+        if not settled:
             self.outcome = code
-        return result_json(True, {"recorded": True})
+        return result_json(True, data, say)
 
     def t_opt_out(self, args):
         scope = "ALL_CALLS" if str(args.get("scope")).upper() == "ALL_CALLS" else "AI_CALLS"
@@ -583,6 +598,7 @@ def ungrounded(said: str, heard: str) -> list[str]:
 REASON_ALIASES: dict[str, str] = SPEC["handoff_reason_aliases"]
 DISTRESS_WORDS = re.compile(SPEC["distress_words"])
 DISPUTE_WORDS = re.compile(SPEC["dispute_words"])
+OPT_OUT_WORDS = re.compile(SPEC["opt_out_words"])
 
 
 def handoff_reason(raw) -> str | None:
@@ -610,6 +626,8 @@ def heard_signal(caller_words: str) -> str | None:
 def upgrade(name: str, args: dict, caller_words: str) -> tuple[str, dict]:
     """CallerSignals.upgrade(): the tool the CRM actually runs. Returns (name, args) unchanged - the same args
     object - when nothing changes."""
+    if name == "log_call_outcome" and OPT_OUT_WORDS.search((caller_words or "").lower()):
+        return "opt_out", {"scope": "AI_CALLS"}
     handoff = name == "request_human_handoff"
     if not handoff and name != "schedule_callback":
         return name, args
@@ -628,6 +646,12 @@ def upgrade(name: str, args: dict, caller_words: str) -> tuple[str, dict]:
 
 REASON_WORDS = re.compile(SPEC["reason_words"])
 REASON_FALLBACK: str = SPEC["reason_fallback"]
+AI_ASKED = re.compile(SPEC["ai_question_words"])
+
+
+def reason_fallback(said: str) -> str:
+    """FactGuard.reasonFallback(): the fixed line for what the caller just said."""
+    return SPEC["reason_fallback_ai"] if AI_ASKED.search((said or "").lower()) else REASON_FALLBACK
 
 
 def reason_words(said: str, allowed: str) -> list[str]:
@@ -842,8 +866,11 @@ def check_expectation(rec: dict, settled: str | None = None, crm_net: bool = Fal
     if settled:
         calls = calls + [("log_call_outcome", {"outcome_code": settled})]
     if crm_net:
-        calls = calls + [("request_human_handoff", {"reason_code": u["reason_code"]})
+        calls = calls + [("opt_out", {}) if u.get("tool") == "opt_out" else ("request_human_handoff", {"reason_code": u["reason_code"]})
                          for u in rec.get("meta", {}).get("crm_upgrades", [])]
+        # A call-back the CRM booked when the model only recorded that one was requested (VoiceTools.logOutcome).
+        if any(m["role"] == "tool" and m.get("name") == "log_call_outcome" and '"callback_id"' in m["content"] for m in rec["messages"]):
+            calls = calls + [("schedule_callback", {})]
     out = []
     for name, want in expect.get("calls", {}).items():
         hits = [a for n, a in calls if n == name]

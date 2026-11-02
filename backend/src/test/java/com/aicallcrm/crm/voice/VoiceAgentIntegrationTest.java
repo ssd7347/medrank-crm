@@ -221,6 +221,68 @@ class VoiceAgentIntegrationTest {
     }
 
     @Test
+    void aMissingIdentityAnswerIsAskedForWithoutUsingATry() throws Exception {
+        approve("Incoming calls");
+        String phone = phone();
+        long contact = contact(admin, "Meena Iyer", phone, "\"customer_ref\":\"CR-77004\",\"balance_due\":\"900\"");
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        // The right name and no answer yet: asked for, not "that did not match".
+        tool(call, "verify_identity", "{\"full_name\":\"Meena Iyer\"}")
+                .andExpect(jsonPath("$.error.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.error.message").value(Matchers.containsString("Could I also have your")));
+        tool(call, "verify_identity", "{\"full_name\":\"Meena Iyer\",\"answers\":{\"customer_ref\":\"CR-77004\"}}")
+                .andExpect(jsonPath("$.data.verified").value(true))
+                .andExpect(jsonPath("$.data.attempts_left").value(3));
+
+        // Never answered: asked twice, as for the full name, then a person takes over.
+        phone = phone();
+        contact = contact(admin, "Meena Iyer", phone, "\"customer_ref\":\"CR-77005\",\"balance_due\":\"900\"");
+        call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        for (int ask = 1; ask <= VoiceTools.MAX_NAME_ASKS; ask++) {
+            tool(call, "verify_identity", "{\"full_name\":\"Meena Iyer\",\"answers\":{\"customer_ref\":\" \"}}")
+                    .andExpect(jsonPath("$.error.code").value("INVALID_ARGUMENT"));
+        }
+        tool(call, "verify_identity", "{\"full_name\":\"Meena Iyer\"}")
+                .andExpect(jsonPath("$.data.verified").value(false))
+                .andExpect(jsonPath("$.data.attempts_left").value(0))
+                .andExpect(jsonPath("$.data.handoff_mode").value("CALLBACK_TASK"));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin))
+                .andExpect(jsonPath("$[?(@.contactId == " + contact + ")].reason").value(Matchers.hasItem("VERIFICATION_FAILED")));
+    }
+
+    @Test
+    void aRecordedCallBackIsBookedOnce() throws Exception {
+        approve("Incoming calls");
+        String phone = phone();
+        long contact = contact(admin, "Kavya Menon", phone, "\"customer_ref\":\"CR-66121\"");
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        String byContact = "$[?(@.contactId == " + contact + ")]";
+        // Only recorded, never booked: the CRM books it, so somebody does call back.
+        tool(call, "log_call_outcome", "{\"outcome_code\":\"CALLBACK_REQUESTED\",\"note\":\"Busy, call after 5.\"}")
+                .andExpect(jsonPath("$.data.recorded").value(true))
+                .andExpect(jsonPath("$.data.callback_id").isNotEmpty())
+                .andExpect(jsonPath("$.speak_hint").value(Matchers.containsString("call you back")));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin))
+                .andExpect(jsonPath(byContact, Matchers.hasSize(1)))
+                .andExpect(jsonPath(byContact + ".reason").value(Matchers.contains("CALLBACK_REQUESTED")));
+        // Recording it again, or after schedule_callback, books nothing more.
+        tool(call, "log_call_outcome", "{\"outcome_code\":\"CALLBACK_REQUESTED\"}")
+                .andExpect(jsonPath("$.data.callback_id").doesNotExist());
+        phone = phone();
+        contact = contact(admin, "Kavya Menon", phone, "\"customer_ref\":\"CR-66122\"");
+        call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"after 5\"}").andExpect(jsonPath("$.ok").value(true));
+        tool(call, "log_call_outcome", "{\"outcome_code\":\"CALLBACK_REQUESTED\"}")
+                .andExpect(jsonPath("$.data.callback_id").doesNotExist());
+        mvc.perform(auth(get("/api/voice/callbacks"), admin))
+                .andExpect(jsonPath("$[?(@.contactId == " + contact + ")]", Matchers.hasSize(1)));
+    }
+
+    @Test
     void threeFailedChecksLockTheCall() throws Exception {
         approve("Incoming calls");
         String phone = phone();

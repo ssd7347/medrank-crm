@@ -33,6 +33,9 @@ final class CallerSignals {
             + "paid (it|this|that) (already|last)|(amount|charge|bill) (is|was) (wrong|incorrect|not correct)|"
             + "charged twice|double charged|refund|money back|not my (loan|account|charge)|never (took|agreed)|"
             + "wrong amount|incorrect amount|overcharged|lawyer|consumer court|i want to complain|file a complaint";
+    static final String OPT_OUT = "stop calling|stop these calls|(don'?t|do not|never) (ever )?call (me |this number )?(again|any ?more)|"
+            + "no more calls|remove my (number|name)|take (me|my number) off|unsubscribe|don'?t want (these|any|your) calls";
+    private static final Pattern OPT_OUT_WORDS = Pattern.compile(OPT_OUT);
     private static final Pattern DISTRESS_WORDS = Pattern.compile(DISTRESS);
     private static final Pattern DISPUTE_WORDS = Pattern.compile(DISPUTE);
 
@@ -68,9 +71,15 @@ final class CallerSignals {
     /**
      * The tool call the CRM actually runs: a call-back or hand-over becomes an urgent DISTRESS / COMPLAINT_OR_DISPUTE
      * hand-over when the caller's words show it. A VERIFICATION_FAILED hand-over is left alone (the caller's identity
-     * is not known), and distress is never downgraded to a dispute. Any other call is returned unchanged.
+     * is not known), and distress is never downgraded to a dispute. Logging an outcome for a caller who asked not to be
+     * called again becomes the opt-out, whatever the model meant to log (8B retest call #31, 1 Nov). Any other call is
+     * returned unchanged.
      */
     static ToolCall upgrade(ToolCall c, String callerWords) {
+        if ("log_call_outcome".equals(c.name()) && callerWords != null
+                && OPT_OUT_WORDS.matcher(callerWords.toLowerCase(Locale.ROOT)).find()) {
+            return new ToolCall(c.id(), "opt_out", Map.of("scope", "AI_CALLS"));
+        }
         boolean handoff = "request_human_handoff".equals(c.name());
         if (!handoff && !"schedule_callback".equals(c.name())) {
             return c;

@@ -521,16 +521,18 @@ get_ipython().system(f'python make_modelfile.py "{{gguf}}" --base qwen3:4b-instr
 
 
 def notebook_retest() -> dict:
-    """Round 4's model, nothing trained, under the 31 Oct CRM fixes: the same 60 calls, and 60 with new callers. Each
-    seed has its own results folder, so no call from an older CRM is reused."""
-    seeds = (2026, 7)
-    results = {s: f"{KEEP8_R4}/results-crm4-seed{s}" for s in seeds}
+    """Round 4's model, nothing trained, under the CRM fixes of 1 Nov (CRM version 5): the same 60 calls, and 60 with a
+    third set of callers that no fix was made from (seed 7's calls were read to make them). Each seed has its own
+    results folder, so no call from an older CRM is reused."""
+    seeds = (2026, 11)
+    folder = {s: f"results-crm5-seed{s}" for s in seeds}
+    results = {s: f"{KEEP8_R4}/{folder[s]}" for s in seeds}
     cells = [
         md(f"""
 # Retest round 4's model under the CRM fixes
 
 Nothing is trained, so this needs only about **40 minutes** of GPU. Two runs of 60 calls: **the same test as before**
-(seed 2026) and **new callers** (seed 7). Every finished call is saved in Google Drive.
+(seed 2026) and **callers it has never met** (seed 11). Every finished call is saved in Google Drive.
 
 1. **Runtime → Change runtime type → T4 GPU**, then **Save**.
 2. Upload the new **colab-kit.zip** in the Files panel on the left (folder icon). The old one will not work.
@@ -586,7 +588,7 @@ print(repr(text[:150]))
 print("Thinks first: send a screenshot." if "<think>" in text else "Answers directly")
 """),
     ]
-    for n, (seed, title) in enumerate(((seeds[0], "The same 60 calls as before"), (seeds[1], "60 calls with new callers")), 4):
+    for n, (seed, title) in enumerate(((seeds[0], "The same 60 calls as before"), (seeds[1], "60 calls with callers it has never met")), 4):
         log = f"{results[seed]}/eval-{NAME8_R4}.log"
         cells += [md(f"## {n}. {title} (about 15 minutes)\nThe spinner runs with nothing printed until the end. Send a screenshot of the score."),
                   code(f"""
@@ -595,7 +597,7 @@ print("Thinks first: send a screenshot." if "<think>" in text else "Answers dire
 """)]
     cells += [md("## 6. Download the results\nRefresh the Files panel, right-click **retest-results.zip** → **Download**, and tell Claude."),
               code(f"""
-!rm -f /content/retest-results.zip; cd {KEEP8_R4} && zip -q -r /content/retest-results.zip {" ".join(f"results-crm4-seed{s}" for s in seeds)} && ls -l /content/retest-results.zip
+!rm -f /content/retest-results.zip; cd {KEEP8_R4} && zip -q -r /content/retest-results.zip {" ".join(folder.values())} && ls -l /content/retest-results.zip
 """)]
     return {"cells": cells, "metadata": {"accelerator": "GPU", "kernelspec": {"name": "python3", "display_name": "Python 3"}},
             "nbformat": 4, "nbformat_minor": 0}
