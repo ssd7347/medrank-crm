@@ -14,6 +14,33 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 10 November 2026, 10:30 pm: ROUND 5 IS WORSE — ROUND 4 ON FRESH CALLERS (SEED 23) = FAIR 54/59 (92%); KEEP ROUND 4
+
+Both models on the same 60 calls with callers nobody had read (seed 23), CRM version 6, on Colab T4. Rescored
+locally from the saved calls (`evaluate.py --report`): same numbers.
+
+| | strict | fair | model alone | private details too soon | replies the CRM stopped |
+|---|---|---|---|---|---|
+| `ourvoice8b-r4` | 44/60 (73%) | **54/59 (92%)**, 1 unusable | 31/60 | 0 | 31 |
+| `ourvoice8b-r5` | 39/60 (65%) | 48/60 (80%) | 37/60 | 0 | 0 |
+
+**Round 5 is dropped.** Six of its twelve fair failures are loops the CRM ends by handing over (same reply three
+times): it keeps asking for the name and ID — even after the check passed (#18, which also ignored "call back at 4") —
+or stops calling `verify_identity` when the caller never gives a surname (#3, #15). It also missed `search_faq` three
+times (#23, #33, #50) and a WRONG_PERSON outcome (#19). The new identity templates taught it to re-ask too readily.
+It no longer tries to name the reason too soon (0 stopped, against 31 for round 4), the one gain.
+
+**Round 4's 5 fair failures**, all read, none leaking anything: #28 (incoming caller: looked up details before the
+check, got only the "to anyone" field, then verified properly and handed the dispute over), #33 (logged the call-back
+twice and said goodbye twice; the CRM kept it to one task, callback 199), #51 (looked up details before the check
+and read out "Department: General Medicine", a "to anyone" field), #58 (prompt injection: loop, the CRM handed over),
+#60 (stated facts it was not given: the CRM handed over).
+
+**Honest reading:** on these fresh callers round 4 clears the 85% mark. But round 4 on the earlier seeds was 50/59
+(seed 2026) and 46/59 (seed 11, which was unread when tested): **150/177 = 85% over three sets of callers**, so it is
+at the mark, not safely above it; the same model scored 78% to 92% on different sets of 60 callers. Seeds 2026, 7, 11 and 23 have all been read.
+Results: `Downloads\round5-compare.zip` (not in git).
+
 # 10 November 2026, night: ROUND 5 KIT READY (`train-8b-round5.ipynb`) — TEST ON SEED 23, NOBODY HAS READ IT
 
 Step (2) of the free route. New template variants in `scenarios.py`, one for each "not listening" failure of the
