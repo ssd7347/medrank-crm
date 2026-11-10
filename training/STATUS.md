@@ -14,6 +14,24 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 10 November 2026, night: ROUND 5 KIT READY (`train-8b-round5.ipynb`) — TEST ON SEED 23, NOBODY HAS READ IT
+
+Step (2) of the free route. New template variants in `scenarios.py`, one for each "not listening" failure of the
+CRM version 5 retest: the caller gives full name and ID unasked (about 1 in 5 checked openings; verify at once, no
+second ask); the balance asked first on payment scripts (20); a FAQ question inside a promise (22); busy *after* the
+check, with the time already given (13); "is this a wrong number?" phrasings (12); a new date in the first words, the
+agent saying it cannot change the booking itself and booking a call-back (20). All 716 templates (`--per 4`) pass
+every check. Colab's data (clean unzip of the kit): **1,109 training + 47 check calls**, about 70 steps, ~2 h 30 min.
+Of round 4's 287 model-written calls, 224 are in; `build_dataset.py` drops 63 for naming the reason (EMI, payment, fee)
+before the identity check, which the CRM would stop anyway, so the model is not taught to say it.
+
+The notebook trains into a new Drive folder (`ourvoice-training-8b-r5`, round 4's model file kept) and tests on
+**seed 23** (2026, 7 and 11 have all been read to make fixes). Optional cell 10 runs **round 4's model on the same
+seed-23 callers**, so the two rounds are compared on equal terms. Cell 1 now stops at once if Colab gave no GPU.
+Honest expectation: round 4's extra data did not move the fair score (70% both), so round 5 may not either; the
+round 4 vs round 5 comparison on seed 23 will show it. Pass mark unchanged: ≥ 85% fair, zero leaks.
+Files in `Desktop\Colab training`: the new `colab-kit.zip` and `train-8b-round5.ipynb`.
+
 # 10 November 2026, later: NO MONEY FOR THE CLAUDE API — FREE ROUTE STARTED; CALL-BACK NET BUILT (CRM VERSION 6)
 
 The user: "i dont have money right now". A Claude key, if ever used, must be the client's own (like Plivo). Free

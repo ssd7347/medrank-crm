@@ -253,8 +253,15 @@ NEED8_GB = 3.0              # checkpoints (~1 GB each, two kept) and the adapter
 
 
 def notebook_8b(keep: str = KEEP8, name: str = NAME8, per: int = PER, label: str = f"Round {ROUND} data",
-                hours: str = "~2 h", total: str = "4 hours", extra: list | None = None) -> dict:
-    results = f"{keep}/results"
+                hours: str = "~2 h", total: str = "4 hours", extra: list | None = None, seed: int | None = None) -> dict:
+    # A seed of its own gives test callers nobody has read (seeds 2026, 7 and 11 were read to make fixes).
+    results = f"{keep}/results" if seed is None else f"{keep}/results-seed{seed}"
+    seed_arg = "" if seed is None else f" --seed {seed}"
+    # Round 3's 8B was replaced by round 4's, which round 5 is compared with: only round 3's folder may go.
+    spare = (", and the folder ourvoice-training-8b-r3 (never ourvoice-training-8b-r4)"
+             if keep not in (KEEP8, KEEP8_R4) else "")
+    test_intro = ("60 calls (the first 30 are the earlier test)" if seed is None else
+                  f"60 calls with **callers nobody has read** (seed {seed}), so the score is an honest one")
     here = f"%cd {KIT}"
     find_gguf = (f'import glob\nlocal = sorted(glob.glob("{KIT}/out8b*/**/*.gguf", recursive=True))\n'
                  f'saved = sorted(glob.glob("{keep}/*.gguf"))\ngguf = (local or saved or [None])[0]\n'
@@ -277,6 +284,10 @@ carry on where they stopped; cell 5 skips finished training and only rebuilds th
 """),
         md("## 1. Check the GPU and unpack the kit"),
         code(f"""
+import shutil
+if not shutil.which("nvidia-smi"):
+    raise SystemExit("NO GPU. Runtime -> Change runtime type -> T4 GPU -> Save, then run this cell again. "
+                     "If Colab refuses a GPU, try again later.")
 !nvidia-smi --query-gpu=name,memory.total --format=csv
 !unzip -o -q /content/colab-kit.zip -d /content/kit && echo "Kit unpacked"
 {here}
@@ -292,7 +303,7 @@ print(f"Google Drive free space: {{free_gb:.1f}} GB")
 if free_gb < {NEED8_GB}:
     raise SystemExit("Not enough Google Drive space (need {NEED8_GB} GB). In Drive, delete the checkpoints folders inside "
                      "MyDrive/ourvoice-training, ourvoice-training-r2 and ourvoice-training-r3 (keep ourvoice-lora) and "
-                     "any .gguf file there, empty the Trash, then run this cell again.")
+                     "any .gguf file there{spare}, empty the Trash, then run this cell again.")
 !mkdir -p {results} && echo "Saving to {keep}"
 """),
         md("## 3. Install the training tool (3–5 minutes)"),
@@ -308,7 +319,7 @@ if free_gb < {NEED8_GB}:
 ## 5. Train ({hours}), then build the model file (30–45 minutes)
 
 Progress is saved to Google Drive every 10 steps. The first lines must show the 8B model loading and a step count
-of about 64. If it stops with **out of memory**, send a screenshot.
+of about 60–80. If it stops with **out of memory**, send a screenshot.
 """),
         code(f"""
 {here}
@@ -369,14 +380,14 @@ print("Thinks first: the CRM removes it, but it costs time. Send a screenshot." 
         md(f"""
 ## 8. The 60 test calls, with reruns (about 1 hour)
 
-60 calls (the first 30 are the earlier test). A call whose simulated caller went off-script is rerun with a new
+{test_intro}. A call whose simulated caller went off-script is rerun with a new
 caller, up to 2 times; the end shows the strict score and the FAIR score. Every finished call is saved in Google
 Drive (`{results}`): calls already there are not run again, and after a disconnect, rerun cells 1, 2, 6 and this
 one and it carries on. Send a screenshot of the score at the end.
 """),
         code(f"""
 {here}
-!python -u evaluate.py --model {name} --out-dir {results} >> {results}/eval-{name}.log 2>&1; tail -22 {results}/eval-{name}.log
+!python -u evaluate.py --model {name}{seed_arg} --out-dir {results} >> {results}/eval-{name}.log 2>&1; tail -26 {results}/eval-{name}.log
 """),
         md("## 9. Download the results\nRight-click **test-results-{name}.zip** in the Files panel → **Download** (small), and tell Claude."),
         code(f"""
@@ -603,6 +614,38 @@ print("Thinks first: send a screenshot." if "<think>" in text else "Answers dire
             "nbformat": 4, "nbformat_minor": 0}
 
 
+# Round 5 (10 Nov): template variants for the "not listening" failures of the CRM version 5 retest (details given
+# unasked, the balance asked first, a FAQ question inside a promise, busy after the check, "is this a wrong number?",
+# a new date in the first words). Tested on a seed nobody has read; round 4 is run on the same callers to compare.
+KEEP8_R5 = "/content/drive/MyDrive/ourvoice-training-8b-r5"
+NAME8_R5 = "ourvoice8b-r5"
+PER_R5 = 4
+SEED_R5 = 23
+
+
+def baseline_r4_cells(seed: int = SEED_R5) -> list:
+    results = f"{KEEP8_R4}/results-seed{seed}"
+    log = f"{results}/eval-{NAME8_R4}.log"
+    return [
+        md(f"""
+## 10. Round 4's model on the same new callers (about 20 minutes)
+
+The fair comparison: round 4's model (`{KEEP8_R4}`) meets the same callers (seed {seed}) under the same CRM. Only
+round 4's model file is needed; nothing is trained. Then right-click **round5-compare.zip** → **Download**, and tell Claude.
+After a disconnect, run cells 1, 2, 6 and this one: finished calls are not run again.
+"""),
+        code(f"""
+%cd {KIT}
+import glob
+gguf = sorted(glob.glob("{KEEP8_R4}/*.gguf"))[0]
+get_ipython().system(f'python make_modelfile.py "{{gguf}}" --base qwen3:4b-instruct --name {NAME8_R4} --create 2>&1 | tail -2')
+!mkdir -p {results}
+!python -u evaluate.py --model {NAME8_R4} --seed {seed} --out-dir {results} >> {log} 2>&1; tail -26 {log}
+!rm -f /content/round5-compare.zip; zip -q -j /content/round5-compare.zip {KEEP8_R5}/results-seed{seed}/eval-* {results}/eval-* && ls -l /content/round5-compare.zip
+"""),
+    ]
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
     zpath = OUT / "colab-kit.zip"
@@ -615,7 +658,10 @@ def main() -> None:
                      ("train-8b-round4.ipynb", notebook_8b(KEEP8_R4, NAME8_R4, PER_R4, "Round 4 data (templates + the 287 calls "
                                                            "our 8B wrote with the real caller)", "~2 h 30 min", "4½ hours",
                                                            recheck_r3_cells())),
-                     ("retest-crm-fixes.ipynb", notebook_retest())):
+                     ("retest-crm-fixes.ipynb", notebook_retest()),
+                     ("train-8b-round5.ipynb", notebook_8b(KEEP8_R5, NAME8_R5, PER_R5, "Round 5 data (round 4's, plus "
+                                                           "templates for the callers it did not listen to)", "~2 h 30 min",
+                                                           "4½ hours", baseline_r4_cells(), SEED_R5))):
         (OUT / name).write_text(json.dumps(nb, indent=1, ensure_ascii=False), encoding="utf-8")
         print(f"Wrote {OUT / name}")
     print(f"Wrote {zpath} ({len(files)} files, {zpath.stat().st_size // 1024} KB)")

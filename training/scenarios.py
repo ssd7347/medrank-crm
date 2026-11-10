@@ -98,14 +98,34 @@ class Conv:
                                     "To keep your details safe, may I have {what}, please?",
                                     "To confirm it's you, could you tell me {what}?", what=what))
 
-    def identity(self, wrong: int = 0, lead: str = "") -> bool:
-        """Asks for the identity details and checks them; the first ``wrong`` answers are mistaken."""
-        self.ask_identity(lead)
+    def volunteer(self, wrong: int = 0) -> tuple[str, dict]:
+        """Round 5: the caller answers the opening with their full name and identity answer, unasked, and asks what it
+        is about (the 8B skipped the check and read details to such a caller, retest #15, 2 Nov). Returns what to check."""
+        q = self.call.verify_fields()[0]
+        said = self.p.said[q.key] if not wrong else ("3 March 1979" if q.type == "DATE" else "4 4 5 5 6 6")
+        self.caller(self.pick("Yes, this is {name}. My {label} is {said}. What is this about?",
+                              "{name} speaking, {label} {said}. Tell me.", "Yes. I'm {name}, my {label} is {said}. Go ahead.",
+                              name=self.p.full_name, label=label_text(q.label), said=said))
+        return self.p.full_name, {q.key: said}
+
+    def identity(self, wrong: int = 0, lead: str = "", volunteered: tuple[str, dict] | None = None) -> bool:
+        """Asks for the identity details and checks them; the first ``wrong`` answers are mistaken. ``volunteered``:
+        what the caller already gave unasked (volunteer()), checked first without asking."""
+        if volunteered is None:
+            self.ask_identity(lead)
         qs = self.call.verify_fields()
         for attempt in range(3):
             bad = attempt < wrong
             name = self.p.full_name
             answers = {}
+            if attempt == 0 and volunteered is not None:
+                name, answers = volunteered
+                res = self.tool("verify_identity", {"full_name": name, "answers": answers})
+                data = res.get("data", {})
+                if data.get("verified"):
+                    return True
+                self.agent(res.get("say") or "That did not match our records. Could you check and tell me again?")
+                continue
             if attempt == 0 and not bad and self.rng.random() < 0.25:
                 # Round 4: callers often give only their first name. A single name can never pass the check (the 8B
                 # locked out a genuine customer that way, 30 Oct), so the agent asks for the full name first.
@@ -193,15 +213,41 @@ WHEN_PAY = ["by this Friday", "tomorrow evening", "on the 20th", "by next Monday
 WHEN_CALL = ["this evening", "tomorrow morning", "after 5 pm", "Saturday morning", "in two hours", "tomorrow after lunch"]
 
 
-def f_will_act(c: Conv, wrong: int = 0) -> None:
+def checked_opening(c: Conv, wrong: int = 0) -> bool:
+    """The caller answers the opening and, if this call needs it, proves who they are; False if the check failed.
+    Round 5: sometimes the caller gives their details unasked, or asks for the amount before anything is checked
+    (the 8B told such a caller "I don't have that information", retest #59, 2 Nov): the check still comes first."""
+    if not c.needs_check():
+        c.answer_opening()
+        return True
+    roll = c.rng.random()
+    if roll < 0.2 and c.call.verify_fields() and "Am I speaking with" in c.call.opening():
+        return c.identity(wrong, volunteered=c.volunteer(wrong))
+    if roll < 0.35 and c.call.script.tag == "payment" and "Am I speaking with" in c.call.opening():
+        c.caller(c.pick("Yes, this is {first}. How much do I have to pay, and by when?", "Yes. Tell me my balance and due date.",
+                        "Speaking. What is my due amount?"))
+        return c.identity(wrong, c.pick("I can tell you that once I have confirmed it's you. ", "Sure, I'll check that for you. "))
     c.answer_opening()
-    if c.needs_check() and not c.identity(wrong, c.lead()):
+    return c.identity(wrong, c.lead())
+
+
+def f_will_act(c: Conv, wrong: int = 0) -> None:
+    if not checked_opening(c, wrong):
         return fail_close(c)
     rows = c.details()
     c.agent(c.tell(rows) + c.pick(" When do you think you will be able to pay?", " Could you tell me when you plan to pay?",
                                   " When would it be convenient for you to pay?"))
     when = c.rng.choice(WHEN_PAY)
-    c.caller(c.pick("I'll pay it {when}.", "Okay, I will pay {when}.", "Yes, I know. I'll clear it {when}.", when=when))
+    if c.call.script.faqs and c.rng.random() < 0.25:
+        # Round 5: a question tucked into the promise is answered before the call is closed (the 8B ignored such
+        # questions, retest #11 #46, 2 Nov).
+        said, q = c.faq_question()
+        c.caller(c.pick("Okay, I will pay {when}.", "I'll clear it {when}.", when=when) + " " + said)
+        res = c.tool("search_faq", {"query": q})
+        c.agent((res.get("say") or "I'm sorry, I don't have that information.") + c.pick(" Is there anything else?", " Does that help?"))
+        c.caller(c.pick("No, that's all. Thank you.", "Okay, that helps. Thanks."))
+    else:
+        c.caller(c.pick("I'll pay it {when}.", "Okay, I will pay {when}.", "Yes, I know. I'll clear it {when}.", when=when))
     c.close("WILL_ACT", f"Promised to pay {when}.",
             c.pick("Thank you, {first}. I have noted that you will pay {when}. Have a good day, goodbye.",
                    "That's noted, you plan to pay {when}. Thank you for your time, goodbye.", when=when))
@@ -213,8 +259,7 @@ def fail_close(c: Conv) -> None:
 
 
 def f_verify_fail(c: Conv) -> None:
-    c.answer_opening()
-    c.identity(3, c.pick("Thank you, I'm calling about {topic}. "))
+    checked_opening(c, 3)
     fail_close(c)
 
 
@@ -287,8 +332,7 @@ def f_distress(c: Conv) -> None:
 
 
 def f_confirm_attend(c: Conv, wrong: int = 0) -> None:
-    c.answer_opening()
-    if c.needs_check() and not c.identity(wrong, c.lead()):
+    if not checked_opening(c, wrong):
         return fail_close(c)
     rows = c.details()
     c.agent(c.tell(rows) + c.pick(" Will you be able to come?", " Can you make it?", " Will that time work for you?",
@@ -311,8 +355,21 @@ def f_confirm_attend(c: Conv, wrong: int = 0) -> None:
 
 
 def f_cannot_attend(c: Conv) -> None:
-    c.answer_opening()
-    if c.needs_check() and not c.identity(0, c.lead()):
+    if "Am I speaking with" in c.call.opening() and c.rng.random() < 0.3:
+        # Round 5: the new date is asked for in the first words. Nothing private is needed to pass it on, and the
+        # agent never says it can arrange it (the 8B said "Sure, I can arrange that" and then confirmed the old date,
+        # retest #17, 2 Nov).
+        day = c.rng.choice(["Saturday", "next Monday", "next Tuesday", "next week", "the 28th"])
+        c.caller(c.pick("Yes, this is {first}. Can we change it to {day} instead?", "Yes. I can't come that day, can you move it to {day}?",
+                        "Speaking. Is it possible to reschedule to {day}?", day=day))
+        c.agent(c.pick("I can't change the booking myself, but our team can. When is a good time for them to call you about {day}?",
+                       "I'm not able to rebook it on this call, but I'll ask our team to arrange {day}. When should they call you?",
+                       day=day))
+        when = c.rng.choice(WHEN_CALL)
+        c.caller(c.pick("{When} is fine.", "Please call {when}.", when=when, When=when[0].upper() + when[1:]))
+        res = c.tool("schedule_callback", {"preferred_time_text": when, "reason": f"Cannot attend; would like to come {day} instead."})
+        return c.close("CALLBACK_REQUESTED", f"Wants to move it to {day}; asked for a call {when}.", f"{res.get('say', '')} Thank you, goodbye.")
+    if not checked_opening(c):
         return fail_close(c)
     rows = c.details()
     c.agent(c.tell(rows) + c.pick(" Will you be able to come?", " Can you make it?", " Is that still fine for you?"))
@@ -376,13 +433,24 @@ def f_not_interested(c: Conv) -> None:
 
 
 def f_busy(c: Conv) -> None:
-    c.answer_opening()
-    c.intro()
-    c.caller(c.pick("I'm driving right now. Can you call later?", "I'm in a meeting, call me later please.",
-                    "This is not a good time. Can someone call me back?"))
-    c.agent(c.pick("Of course. When would be a good time to call you?", "No problem. What time suits you better?"))
     when = c.rng.choice(WHEN_CALL)
-    c.caller(c.pick("{when}.", "Maybe {when}.", "Call {when}.", when=when))
+    if c.call.script.tag in ("payment", "appointment") and c.p and c.rng.random() < 0.4:
+        # Round 5: busy only after the details, with the time already given. The call-back is booked for that time,
+        # not answered with a goodbye (the 8B logged ACKNOWLEDGED, retest #41, 2 Nov).
+        if not checked_opening(c):
+            return fail_close(c)
+        rows = c.details()
+        c.agent(c.tell(rows) + (c.pick(" When do you think you will be able to pay?", " Could you tell me when you plan to pay?")
+                                if c.call.script.tag == "payment" else c.pick(" Will you be able to come?", " Is that still fine for you?")))
+        c.caller(c.pick("I'm busy right now. Can you call me back {when}?", "Sorry, I'm in the middle of something. Call me back {when}, please.",
+                        "Okay, noted. But I can't talk now, can someone call me {when}?", when=when))
+    else:
+        c.answer_opening()
+        c.intro()
+        c.caller(c.pick("I'm driving right now. Can you call later?", "I'm in a meeting, call me later please.",
+                        "This is not a good time. Can someone call me back?"))
+        c.agent(c.pick("Of course. When would be a good time to call you?", "No problem. What time suits you better?"))
+        c.caller(c.pick("{when}.", "Maybe {when}.", "Call {when}.", when=when))
     res = c.tool("schedule_callback", {"preferred_time_text": when, "reason": f"Busy; asked for a call later about {c.topic}."})
     c.close("CALLBACK_REQUESTED", f"Busy; asked for a call {when}.", f"{res.get('say', '')} Thank you, goodbye.")
 
@@ -391,9 +459,13 @@ def f_wrong_person(c: Conv) -> None:
     kind = c.rng.random()
     if kind < 0.3:
         # Round 4: test callers ask what it is about. Nothing is said about it, and no call-back is booked.
+        # Round 5: and they ask whether it is the wrong number. The agent never asks a stranger for identity details
+        # (the 8B asked "Sunil" for the loan account number, retest #7, 2 Nov).
         c.caller(c.pick("No, this is Sunil. I think you have the wrong number. What is this about?",
                         "I'm a relative of {first}. What is it about? I can pass it on.",
-                        "No, {first} is not here. Who is calling and why?"))
+                        "No, {first} is not here. Who is calling and why?",
+                        "No, this is Sunil. Is this the wrong number?", "This is Sunil. Who are you looking for? Is it a wrong number?",
+                        "I'm not {first}, this is Sunil. Can you check if you have the right number?"))
         c.close("WRONG_PERSON", "Answered by someone else; nothing was shared.",
                 c.pick("I'm sorry, I can only talk about this with {first}. Sorry to disturb you, goodbye.",
                        "Thank you, but I can only discuss it with {first} directly. Sorry for the trouble, goodbye."))
