@@ -73,7 +73,13 @@ Whisper to text, the CRM's brain decides the reply (`POST /api/voice/hooks/live/
 8 kHz mu-law. The caller can talk over the agent; after the goodbye has been played the CRM hangs up.
 
 The engine needs two more settings: `VOICE_HMAC_SECRET` (the CRM's, it checks each call's stream token and signs the
-CRM requests; blank refuses every call) and `CRM_URL`. It must be reachable from the internet as `wss://...`.
+CRM requests; blank refuses every call) and `CRM_URL`.
+
+**Never put the CRM or the engine on the internet directly.** Point the one public tunnel at the gateway instead
+(`uvicorn gateway:app --host 127.0.0.1 --port 8099`, settings `CRM_URL` and `ENGINE_URL`): it passes on only Plivo's
+three callbacks (`/api/voice/hooks/plivo/answer|hangup|desk`, unchanged, so Plivo's signature is still checked by the
+CRM) and the `/call` stream, and answers 404 to everything else, including the CRM's sign-in and the engine's
+`/stt` and `/tts`. Then `PLIVO_PUBLIC_URL=https://<tunnel>` and `PLIVO_ENGINE_URL=wss://<tunnel>/call`.
 Setting up the CRM and Plivo: `docs/voice-agent.md`, "Plivo as the phone line".
 
-Tests, with no phone line or models: `.venv\Scripts\python -m unittest test_phone`.
+Tests, with no phone line or models: `.venv\Scripts\python -m unittest test_phone test_gateway`.

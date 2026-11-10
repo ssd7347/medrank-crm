@@ -30,7 +30,9 @@ Plivo API and on one machine with the real speech models; **not yet tried on a r
 own account is for demos and test calls to your team.
 
 1. In Plivo, choose the **India data region** at sign-up (it cannot be changed), finish KYC and rent a number.
-2. Host the CRM and `voice-engine/` on public HTTPS addresses, with the brain on a GPU server.
+2. Host the CRM and `voice-engine/` with the brain on a GPU server, and make only Plivo's callbacks and the call
+   stream public, through `voice-engine/gateway.py` (see `voice-engine/README.md`). The CRM itself goes on a public
+   address only once staff sign-in codes are really sent (`OTP_SHOW_ON_SCREEN=false`).
 3. CRM settings: `VOICE_PLATFORM=plivo`, `VOICE_HMAC_SECRET`, `PLIVO_AUTH_ID`, `PLIVO_AUTH_TOKEN`,
    `PLIVO_FROM_NUMBER`, `PLIVO_PUBLIC_URL` (the CRM's address exactly as Plivo reaches it: signatures are checked
    against it), `PLIVO_ENGINE_URL` (`wss://your-engine/call`), and `AI_BRAIN`.

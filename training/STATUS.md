@@ -14,6 +14,20 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 10 November 2026, night: ITEM (3) DONE — ONLY PLIVO'S DOORS ARE PUBLIC (`voice-engine/gateway.py`)
+
+User: "Make CRM safe online". The tunnel now points at a small gateway (port 8099), never at the CRM or the engine.
+It passes on only `POST /api/voice/hooks/plivo/answer|hangup|desk` (body, query and Plivo's two signature headers
+unchanged; cookies and other headers dropped; 64 KB limit) and the `/call` WebSocket (the engine checks its token), and
+answers 404 to everything else: sign-in, the whole API, the live and tool hooks, the engine's `/stt`, `/tts`, `/health`,
+and no `/docs`. One tunnel now serves both Plivo URLs. `OTP_SHOW_ON_SCREEN=true` can stay while only the gateway is
+public; the CRM itself needs real OTP delivery before it is ever put online.
+Tests: `test_gateway` 8/8 (fake CRM; a real WebSocket server as the engine), engine total 23/23. **End to end against
+the real CRM (port 8093, test-only Plivo keys, `VOICE_PLATFORM` left simulated so nothing dialled) and the real engine:
+14/14** — a correctly signed Plivo callback through the gateway accepted by the CRM, a wrongly signed one refused (401),
+sign-in and the rest 404 through the gateway while answering directly on the laptop, wrong stream token refused, right
+one reaches the engine. Test servers stopped afterwards. `httpx` added to `voice-engine/requirements.txt`.
+
 # 10 November 2026, 10:50 pm: PREPARING THE FIRST REAL CALL (user: "Prepare the real call") — `docs/first-real-call.md`
 
 Round 4 is the brain. Four things stand between us and the first call to the user's phone:

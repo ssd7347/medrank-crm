@@ -23,10 +23,13 @@ until that call and a pilot (20–50 consenting contacts, every transcript read)
    100 ms of network delay is heard). For the first call, rented by the hour; for live use, monthly. Free Colab's terms
    do not allow using it to offer a web service, which a phone line's brain is; Kaggle's notebooks are likewise meant
    for interactive work (check its terms before relying on it).
-3. **The CRM must be safe to put online (developer, before any tunnel).** Today `OTP_SHOW_ON_SCREEN=true`, because
-   SMS/WhatsApp codes are not connected: on a public address anyone who knows a staff mobile number could sign in.
-   Either connect real OTP delivery and set it to `false`, or expose **only** Plivo's paths
-   (`/api/voice/hooks/plivo/*`) and keep the rest of the CRM on `localhost`. Also `COOKIE_SECURE=true` behind HTTPS.
+3. **Done (10 Nov): only Plivo's doors are public.** `OTP_SHOW_ON_SCREEN=true` locally (SMS/WhatsApp codes are not
+   connected), so the CRM itself must never be on a public address: anyone who knows a staff mobile number could sign
+   in. The tunnel points at `voice-engine/gateway.py` instead, which passes on only Plivo's three callbacks and the
+   `/call` stream and answers 404 to everything else (sign-in, the whole API, the engine's `/stt` and `/tts`). Checked
+   against the real CRM and engine: a correctly signed Plivo callback is accepted through it, a wrongly signed one is
+   refused, a wrong stream token is refused. Staff keep using the CRM on `localhost`. Before the CRM itself goes on a
+   public address (hosting), real OTP delivery and `OTP_SHOW_ON_SCREEN=false`, `COOKIE_SECURE=true` are required.
 4. **Indian English on an 8 kHz phone line (free; can be checked now).** The ear is Whisper `base.en` and the voice is
    Piper's US `en_US-lessac-medium`; neither has heard an Indian caller on a phone line yet. This is the biggest open
    risk. Check before paying for anything: record the developer and a few others reading test sentences, pass the
@@ -35,12 +38,13 @@ until that call and a pilot (20–50 consenting contacts, every transcript read)
 ## The layout for the first call
 
 ```
-Developer's phone ── Plivo ──HTTPS──> CRM (laptop, :8082)      ── SSH tunnel ──> Ollama + ourvoice8b-r4 (GPU machine)
-                       └──── WSS ───> speech engine (laptop, :8090)
+Developer's phone ── Plivo ── HTTPS + WSS ──> gateway (laptop, :8099) ──> CRM (:8082)  ── SSH tunnel ──> Ollama + ourvoice8b-r4
+                                                                   └──> engine (:8090)          (GPU machine)
 ```
 
-* CRM and engine stay on the laptop (the engine measured 0.88 s on the laptop's CPU), reached through one HTTPS
-  tunnel each (ngrok is installed; check the free plan's limits on tunnels and WebSockets first).
+* CRM, engine and gateway stay on the laptop (the engine measured 0.88 s on the laptop's CPU). **One** HTTPS tunnel,
+  to the gateway only (ngrok is installed; check that its free plan carries WebSockets). Never point a tunnel at
+  :8082 or :8090.
 * The brain runs on the GPU machine. **Ollama is never put on the internet**: the laptop reaches it through
   `ssh -N -L 11434:localhost:11434 <gpu-machine>`, so `LOCAL_LLM_URL=http://localhost:11434` stays unchanged.
 * On the GPU machine: install Ollama, copy the `.gguf` from Drive, `ollama pull qwen3:4b-instruct`, then
@@ -57,25 +61,28 @@ above the ~2 s target; the first call measures it.
 | `VOICE_PLATFORM` | `plivo` |
 | `VOICE_HMAC_SECRET` | 32+ random characters; the same value for the engine |
 | `PLIVO_AUTH_ID`, `PLIVO_AUTH_TOKEN`, `PLIVO_FROM_NUMBER` | from the client's Plivo account |
-| `PLIVO_PUBLIC_URL` | the CRM tunnel's `https://` address, exactly as Plivo calls it (signatures are checked against it) |
-| `PLIVO_ENGINE_URL` | the engine tunnel's address as `wss://.../call` |
+| `PLIVO_PUBLIC_URL` | the gateway tunnel's `https://` address, exactly as Plivo calls it (signatures are checked against it) |
+| `PLIVO_ENGINE_URL` | the same address as `wss://.../call` |
 | `AI_BRAIN` | `LOCAL` |
 | `LOCAL_LLM_MODEL` | `ourvoice8b-r4` (the default `qwen2.5:3b` is not ours) |
-| `OTP_SHOW_ON_SCREEN`, `COOKIE_SECURE` | see item 3 above |
+| `OTP_SHOW_ON_SCREEN`, `COOKIE_SECURE` | unchanged while only the gateway is public (item 3 above) |
 
 Engine: `VOICE_HMAC_SECRET` (same) and `CRM_URL=http://127.0.0.1:8082`.
+Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
 
 ## Order on the day
 
-1. Laptop: start the CRM and the engine; `/health` on the engine answers.
+1. Laptop: start the CRM, the engine and the gateway (`uvicorn gateway:app --host 127.0.0.1 --port 8099`); `/health`
+   on the engine answers on `127.0.0.1:8090`, and through the gateway it must give 404.
 2. GPU machine: model loaded and warmed; SSH tunnel up; the CRM's test console with "Our own model" answers in ~1 s.
-3. Tunnels up; settings filled in; CRM restarted.
+3. The tunnel up (to :8099 only); settings filled in; CRM restarted. From mobile data, open
+   `https://<tunnel>/api/auth/me`: it must say 404.
 4. In the CRM: one contact (the developer's own number) with AI-call consent recorded, an approved script, a one-contact
    campaign. Start it during the calling window (09:00–20:00 IST).
 5. On the call, try: answering normally, the identity check with the right details, "call me back at 4", a question
    from the FAQ, "stop calling me". Note any long silences.
 6. Afterwards: read the transcript and tool trail on `/voice/calls`; write down what Whisper heard against what was
-   said, and the reply times. Then take the tunnels down and stop the GPU machine.
+   said, and the reply times. Then take the tunnel down and stop the GPU machine.
 
 Known limits that stay for now: no call recording (the scripts say "may be recorded": adjust before live use); a desk
 transfer cuts "I am connecting you"; the model loads on the first call after the engine starts.
