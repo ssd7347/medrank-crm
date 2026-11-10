@@ -14,6 +14,17 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# NEXT (stopped 10 Nov, 10:50 pm): ITEM (4) — INDIAN ENGLISH ON THE PHONE LINE ("Yes, build it")
+
+Not started in code. Plan: `voice-engine/ear_check.py` takes recordings (any format; folder per speaker, files
+numbered like the lines of a test-sentences file: names, IDs as digits, dates, rupee amounts, "call me back at 4",
+"stop calling me", "wrong number") and for each runs: plain → Whisper; and the phone path exactly as `phone.py` does
+it (resample to 8 kHz, `ulaw_encode` → `ulaw_decode`, `resample(audio, RATE, STT_RATE) / 32768`, then `stt_pcm`'s
+settings: language en, beam 1, no VAD). Word error rate per sentence and overall, `base.en` against `small.en`, with
+what was heard against what was said. First a baseline with Piper's own voice; then the user and a few others record.
+`small.en` download was started at 10:45 pm (may not have finished before the 11 pm cut; rerun
+`faster_whisper.download_model('small.en')`).
+
 # 10 November 2026, night: ITEM (3) DONE — ONLY PLIVO'S DOORS ARE PUBLIC (`voice-engine/gateway.py`)
 
 User: "Make CRM safe online". The tunnel now points at a small gateway (port 8099), never at the CRM or the engine.
