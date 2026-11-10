@@ -1,5 +1,7 @@
 {
   "ai_question_words" : "real person|human|robot|machine|\\bai\\b|\\bbot\\b|automated|computer",
+  "callback_asked_arg" : "caller_asked_for_callback",
+  "callback_words" : "call (me )?back|call me (again )?(later|tomorrow|after|in an? |next|this evening|tonight|some ?time)|ring me (back|later)|call-?back|re-?schedule|postpone|(change|move|shift) (it|the (date|time|day|appointment|visit|slot)|my (appointment|visit|slot|booking))|(another|some other|a different) (day|date|time|slot)",
   "closing_tools" : [ "log_call_outcome", "opt_out", "request_human_handoff" ],
   "dispute_words" : "already paid|already cleared|amount[^.?!]{0,30}(wrong|incorrect|not due)|paid (it|this|that) (already|last)|(amount|charge|bill) (is|was) (wrong|incorrect|not correct)|charged twice|double charged|refund|money back|not my (loan|account|charge)|never (took|agreed)|wrong amount|incorrect amount|overcharged|lawyer|consumer court|i want to complain|file a complaint",
   "distress_words" : "lost (my|our) (job|income|business)|laid off|no (job|income)|(can'?t|cannot) afford|hospital|passed away|(very|so|really) stressed|depress|crying|falling apart|(can'?t|cannot) cope|medical (bills|emergency)|struggling (to pay|financially|with money)|no money|don'?t have (the |any )?money|don'?t know how i('ll| will| am going to) (manage|pay|cope)",
@@ -15,6 +17,7 @@
   "handoff_reasons" : [ "COMPLAINT_OR_DISPUTE", "DISTRESS", "CALLER_REQUEST", "TOOL_FAILURE", "VERIFICATION_FAILED", "OUT_OF_SCOPE" ],
   "max_name_asks" : 2,
   "max_tool_rounds" : 6,
+  "no_callback_words" : "(don'?t|do not|never|no need to|not) (need |want )?(to )?(a |an |any )?(call (me )?back|call-?back|re-?schedule|postpone|(change|move|shift) (it|the|my))|no call-? ?back|no need (to|for) (a |any )?call",
   "opt_out_words" : "stop calling|stop these calls|(don'?t|do not|never) (ever )?call (me |this number )?(again|any ?more)|no more calls|remove my (number|name)|take (me|my number) off|unsubscribe|don'?t want (these|any|your) calls",
   "outcomes" : [ "ACKNOWLEDGED", "WILL_ACT", "INTERESTED", "CALLBACK_REQUESTED", "HANDED_OFF", "NOT_INTERESTED", "OPTED_OUT", "WRONG_PERSON", "NO_INTERACTION", "VERIFICATION_FAILED" ],
   "reason_fallback" : "It is about your account with us. May I have your full name, please?",

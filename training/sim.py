@@ -12,7 +12,7 @@ import random
 import re
 import urllib.error
 
-from callkit import (CONNECTED, MAX_ROUNDS, TOOLS, FakeCrm, may_mention, new_call, ollama_chat, reason_fallback, reason_hidden,
+from callkit import (CALLBACK_ASKED, CONNECTED, MAX_ROUNDS, TOOLS, FakeCrm, may_mention, new_call, ollama_chat, reason_fallback, reason_hidden,
                      reason_words, record, spoken, ungrounded, upgrade)
 from scenarios import TRICKS, Scenario, label_text
 
@@ -235,6 +235,7 @@ def simulate(script, scenario: Scenario, rng: random.Random, agent_model: str, c
                 if run_args is not args:
                     msg["ran"] = run_name
                     call.upgrades.append({"from": name, "tool": "opt_out"} if run_name == "opt_out"
+                                         else {"from": name, "tool": "schedule_callback"} if CALLBACK_ASKED in run_args
                                          else {"from": name, "reason_code": run_args["reason_code"]})
                 history.append(msg)
         else:

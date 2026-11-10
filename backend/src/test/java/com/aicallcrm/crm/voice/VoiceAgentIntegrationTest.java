@@ -283,6 +283,31 @@ class VoiceAgentIntegrationTest {
     }
 
     @Test
+    void aCallBackTheCallerAskedForIsBookedWithTheModelsOutcomeKept() throws Exception {
+        approve("Incoming calls");
+        String phone = phone();
+        long contact = contact(admin, "Kavya Menon", phone, "\"customer_ref\":\"CR-66123\"");
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        String byContact = "$[?(@.contactId == " + contact + ")]";
+        // As LlmBrain sends it after CallerSignals.upgrade: the model logged ACKNOWLEDGED, the caller asked for 4 pm.
+        tool(call, "log_call_outcome", "{\"outcome_code\":\"ACKNOWLEDGED\",\"note\":\"Confirmed.\",\""
+                + CallerSignals.CALLBACK_ASKED + "\":\"can you call me back at 4 pm?\"}")
+                .andExpect(jsonPath("$.data.callback_id").isNotEmpty())
+                .andExpect(jsonPath("$.speak_hint").value(Matchers.containsString("call you back")));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin))
+                .andExpect(jsonPath(byContact, Matchers.hasSize(1)))
+                .andExpect(jsonPath(byContact + ".preferredTimeText").value(Matchers.contains("Caller said: can you call me back at 4 pm?")));
+        // The model booking it as well, or logging again: still one task.
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"4 pm\"}").andExpect(jsonPath("$.ok").value(true));
+        tool(call, "log_call_outcome", "{\"outcome_code\":\"ACKNOWLEDGED\",\"" + CallerSignals.CALLBACK_ASKED + "\":\"call me at 4\"}")
+                .andExpect(jsonPath("$.ok").value(true));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin)).andExpect(jsonPath(byContact, Matchers.hasSize(1)));
+        hook("/webhooks/call-ended", "{\"call_id\":\"" + call + "\",\"status\":\"completed\"}");
+        mvc.perform(auth(get("/api/voice/calls/" + call), admin)).andExpect(jsonPath("$.call.outcome").value("ACKNOWLEDGED"));
+    }
+
+    @Test
     void threeFailedChecksLockTheCall() throws Exception {
         approve("Incoming calls");
         String phone = phone();

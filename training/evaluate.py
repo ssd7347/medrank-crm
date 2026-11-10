@@ -22,8 +22,8 @@ import re
 import sys
 from pathlib import Path
 
-from callkit import (DATA, SPEC, all_scripts, check, handoff_reason, identity_habits, installed_models, read_jsonl, upgrade,
-                     write_jsonl)
+from callkit import (CALLBACK_ASKED, DATA, SPEC, all_scripts, check, handoff_reason, identity_habits, installed_models,
+                     read_jsonl, upgrade, write_jsonl)
 from fairness import caller_played, harmless
 from scenarios import HELD_OUT_SCRIPTS, for_script
 from sim import caller_version, simulate, transcript
@@ -34,8 +34,9 @@ RERUN_SEED = 100_000
 # urgent hand-overs for distress / disputes, and hand-over reason aliases; 3: 30 Oct - a first name alone is not an
 # identity try, the caller is asked for the full name; 4: 31 Oct - only two such asks, then a person; the reason for the
 # call stays unsaid until the identity check; 5: 1 Nov - "stop calling" opts out, a recorded call-back is booked, a missing
-# identity answer is asked for, a person takes over from a repeated reply). Only calls it would change are redone.
-CRM_VERSION = 5
+# identity answer is asked for, a person takes over from a repeated reply; 6: 10 Nov - a call-back or new date the caller
+# asked for is booked whatever outcome is logged). Only calls it would change are redone.
+CRM_VERSION = 6
 # The fixed line before version 5 (FactGuard.REASON_FALLBACK).
 OLD_REASON_FALLBACK = "I can only discuss this with the account holder."
 
@@ -66,6 +67,8 @@ def crm_would_change(att: dict, since: int = 1) -> bool:
             if since < 5 and name == "log_call_outcome" and not booked \
                     and str(args.get("outcome_code") or "").upper() == "CALLBACK_REQUESTED":
                 return True   # a call-back only recorded, now booked as well
+            if since < 6 and name == "log_call_outcome" and not booked and CALLBACK_ASKED in upgrade(name, args, words)[1]:
+                return True   # the caller asked for a call-back the model never booked: now booked
             answers = args.get("answers") if isinstance(args.get("answers"), dict) else {}
             if since < 5 and name == "verify_identity" and len(str(args.get("full_name") or "").split()) >= 2 \
                     and not any(str(v or "").strip() for k, v in list(answers.items()) + list(args.items())

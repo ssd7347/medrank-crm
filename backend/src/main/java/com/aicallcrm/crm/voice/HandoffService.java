@@ -95,6 +95,13 @@ public class HandoffService {
         if (call.isTestCall()) {
             return new Handoff(CALLBACK_TASK, callbackMessage(due), null, due);
         }
+        // Asked twice in one call (the model booking again, or the CRM booking for a logged outcome): one task.
+        CallbackRequest open = callbacks.findByVoiceCallId(call.getId()).stream()
+                .filter(c -> "CALLBACK_REQUESTED".equals(c.getReason()) && c.getStatus() != Voice.CallbackStatus.DONE)
+                .findFirst().orElse(null);
+        if (open != null) {
+            return new Handoff(CALLBACK_TASK, callbackMessage(open.getDueAt()), open.getId(), open.getDueAt());
+        }
         CallbackRequest cb = task(call, contact(call), "CALLBACK_REQUESTED", preferredTimeText, reason, Priority.NORMAL,
                 due);
         return new Handoff(CALLBACK_TASK, callbackMessage(cb.getDueAt()), cb.getId(), cb.getDueAt());

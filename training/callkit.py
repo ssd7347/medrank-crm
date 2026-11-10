@@ -314,6 +314,7 @@ class FakeCrm:
     name_asks: int = 0                                           # identity checks with only part of the name
     thinking: int = 0              # replies with hidden reasoning (removed before speaking, but they cost time)
     upgrades: list[dict] = field(default_factory=list)   # call-backs / hand-overs the CRM made urgent (upgrade())
+    callback: tuple[int, str] | None = None              # this call's booked call-back: (id, slot)
 
     # ---- context and prompt
 
@@ -460,8 +461,11 @@ class FakeCrm:
     def t_schedule_callback(self, args):
         if self.outcome is None:
             self.outcome = "CALLBACK_REQUESTED"
-        slot = self._callback_slot(120)
-        return result_json(True, {"callback_id": self.rng.randint(100, 999), "confirmed_slot": slot},
+        # As HandoffService.callback: booking twice in one call makes one task.
+        if self.callback is None:
+            self.callback = (self.rng.randint(100, 999), self._callback_slot(120))
+        cb_id, slot = self.callback
+        return result_json(True, {"callback_id": cb_id, "confirmed_slot": slot},
                            "A member of our team will call you back by " + slot + ".")
 
     def t_request_human_handoff(self, args):
@@ -493,10 +497,12 @@ class FakeCrm:
         if code not in SPEC["outcomes"]:
             return result_json(False, code="INVALID_ARGUMENT", msg="Unknown outcome code.")
         # As VoiceTools.logOutcome: an opt-out, a lock-out or a hand-over is never overwritten, and a call-back that was
-        # recorded but not booked gets booked.
+        # recorded, or that the caller asked for (CALLBACK_ASKED, added by upgrade()), but not booked gets booked; the
+        # model's outcome is kept.
         settled = self.outcome in ("OPTED_OUT", "VERIFICATION_FAILED", "HANDED_OFF")
         data, say = {"recorded": True}, None
-        if code == "CALLBACK_REQUESTED" and not settled and self.outcome != "CALLBACK_REQUESTED":
+        asked = args.get(CALLBACK_ASKED)
+        if (code == "CALLBACK_REQUESTED" or asked) and not settled and self.outcome != "CALLBACK_REQUESTED":
             booked = json.loads(self.t_schedule_callback({}))
             data.update(booked["data"])
             say = booked["say"]
@@ -599,6 +605,17 @@ REASON_ALIASES: dict[str, str] = SPEC["handoff_reason_aliases"]
 DISTRESS_WORDS = re.compile(SPEC["distress_words"])
 DISPUTE_WORDS = re.compile(SPEC["dispute_words"])
 OPT_OUT_WORDS = re.compile(SPEC["opt_out_words"])
+CALLBACK_WORDS = re.compile(SPEC["callback_words"])
+NO_CALLBACK_WORDS = re.compile(SPEC["no_callback_words"])
+CALLBACK_ASKED: str = SPEC["callback_asked_arg"]
+SENTENCE = re.compile(r"[^.?!]+[.?!]?")
+
+
+def callback_asked(caller_words: str) -> str | None:
+    """CallerSignals.callbackAsked(): the caller's last sentence asking for a call-back or a new date, or None."""
+    hits = [s.strip() for s in SENTENCE.findall((caller_words or "").lower())
+            if CALLBACK_WORDS.search(s) and not NO_CALLBACK_WORDS.search(s)]
+    return hits[-1] if hits else None
 
 
 def handoff_reason(raw) -> str | None:
@@ -626,8 +643,13 @@ def heard_signal(caller_words: str) -> str | None:
 def upgrade(name: str, args: dict, caller_words: str) -> tuple[str, dict]:
     """CallerSignals.upgrade(): the tool the CRM actually runs. Returns (name, args) unchanged - the same args
     object - when nothing changes."""
-    if name == "log_call_outcome" and OPT_OUT_WORDS.search((caller_words or "").lower()):
-        return "opt_out", {"scope": "AI_CALLS"}
+    if name == "log_call_outcome":
+        if OPT_OUT_WORDS.search((caller_words or "").lower()):
+            return "opt_out", {"scope": "AI_CALLS"}
+        asked = callback_asked(caller_words)
+        if asked is None or CALLBACK_ASKED in args or str(args.get("outcome_code")).upper() == "CALLBACK_REQUESTED":
+            return name, args     # nothing asked, or the outcome itself books it
+        return name, {**args, CALLBACK_ASKED: asked}
     handoff = name == "request_human_handoff"
     if not handoff and name != "schedule_callback":
         return name, args
@@ -866,7 +888,7 @@ def check_expectation(rec: dict, settled: str | None = None, crm_net: bool = Fal
     if settled:
         calls = calls + [("log_call_outcome", {"outcome_code": settled})]
     if crm_net:
-        calls = calls + [("opt_out", {}) if u.get("tool") == "opt_out" else ("request_human_handoff", {"reason_code": u["reason_code"]})
+        calls = calls + [(u["tool"], {}) if "tool" in u else ("request_human_handoff", {"reason_code": u["reason_code"]})
                          for u in rec.get("meta", {}).get("crm_upgrades", [])]
         # A call-back the CRM booked when the model only recorded that one was requested (VoiceTools.logOutcome).
         if any(m["role"] == "tool" and m.get("name") == "log_call_outcome" and '"callback_id"' in m["content"] for m in rec["messages"]):

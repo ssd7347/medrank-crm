@@ -8,8 +8,8 @@ import json
 import random
 import unittest
 
-from callkit import (EMPTY_THINK, TOOLS, FieldDef, all_scripts, answer_matches, check, identity_habits, new_call,
-                     read_tool_call_tags, render_for_training, spoken_amount, tools_in_system)
+from callkit import (CALLBACK_ASKED, EMPTY_THINK, TOOLS, FieldDef, all_scripts, answer_matches, callback_asked, check,
+                     identity_habits, new_call, read_tool_call_tags, render_for_training, spoken_amount, tools_in_system, upgrade)
 from scenarios import SCENARIOS, build, for_script
 
 
@@ -148,6 +148,38 @@ class FakeCrmTest(unittest.TestCase):
         call.run("request_human_handoff", {"reason_code": "CALLER_REQUEST"})
         self.assertNotIn("callback_id", json.loads(call.run("log_call_outcome", {"outcome_code": "CALLBACK_REQUESTED"}))["data"])
         self.assertEqual(call.outcome, "HANDED_OFF")
+
+    def test_a_call_back_the_caller_asked_for_is_booked_with_the_models_outcome_kept(self):
+        # As VoiceAgentIntegrationTest.aCallBackTheCallerAskedForIsBookedWithTheModelsOutcomeKept.
+        call = new_call(script("Payment reminder"), random.Random(4))
+        res = json.loads(call.run("log_call_outcome", {"outcome_code": "ACKNOWLEDGED", CALLBACK_ASKED: "can you call me back at 4 pm?"}))
+        self.assertIn("callback_id", res["data"])
+        self.assertIn("call you back", res["say"])
+        self.assertEqual(call.outcome, "ACKNOWLEDGED")
+        # Booking again in the same call gives the same task.
+        again = json.loads(call.run("schedule_callback", {"preferred_time_text": "4 pm"}))
+        self.assertEqual(again["data"], {k: res["data"][k] for k in ("callback_id", "confirmed_slot")})
+
+    def test_a_call_back_asked_for_is_heard_in_the_callers_words(self):
+        # As AiBrainIntegrationTest.aCallBackAskedForIsHeardInTheCallersWords.
+        asked = {"I'm busy, call me back later.": "i'm busy, call me back later.",
+                 "Can we change it to next Tuesday instead?": "can we change it to next tuesday instead?",
+                 "Call me in an hour.": "call me in an hour.",
+                 "I'm not free now. Call me tomorrow.": "call me tomorrow.",
+                 "Don't call me now, call me back later.": "don't call me now, call me back later.",
+                 "Don't call me back. Actually, call me back tomorrow.": "actually, call me back tomorrow."}
+        for said, sentence in asked.items():
+            self.assertEqual(callback_asked(said), sentence, said)
+        for said in ("I don't need a callback.", "I don't need a call-back, thank you.", "No need to call me back.",
+                     "Please don't reschedule it.", "I don't want to change the date.", "Why did you call me?", "I will pay tomorrow.", None):
+            self.assertIsNone(callback_asked(said), said)
+        logged = {"outcome_code": "NOT_INTERESTED"}
+        self.assertEqual(upgrade("log_call_outcome", logged, " Fine. Not now, call me again tomorrow."),
+                         ("log_call_outcome", {"outcome_code": "NOT_INTERESTED", CALLBACK_ASKED: "not now, call me again tomorrow."}))
+        self.assertIs(upgrade("log_call_outcome", logged, " I will pay tomorrow.")[1], logged)
+        logged_callback = {"outcome_code": "CALLBACK_REQUESTED"}
+        self.assertIs(upgrade("log_call_outcome", logged_callback, " Call me back later.")[1], logged_callback)
+        self.assertEqual(upgrade("log_call_outcome", logged, " Please stop calling me. Call me back never.")[0], "opt_out")
 
     def test_answers_match_like_the_backend(self):
         ref = FieldDef("Loan account number", "TEXT", "NONE", True)

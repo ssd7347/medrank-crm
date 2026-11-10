@@ -258,10 +258,13 @@ public class LlmBrain {
                     }
                     String callerWords = callerWords(s);
                     for (ToolCall asked : r.toolCalls()) {
-                        // A call-back or hand-over for a distressed or disputing caller becomes the urgent hand-over.
+                        // A call-back or hand-over for a distressed or disputing caller becomes the urgent hand-over; a
+                        // logged outcome becomes the opt-out, or books the call-back, the caller asked for.
                         ToolCall c = CallerSignals.upgrade(asked, callerWords);
                         if (c != asked) {
-                            log.info("Call {}: the CRM ran {} {} instead of {}", callId, c.name(), c.arguments().get("reason_code"), asked.name());
+                            log.info("Call {}: the CRM ran {} {} for the model's {}", callId, c.name(),
+                                    c.arguments().containsKey(CallerSignals.CALLBACK_ASKED) ? "with a call-back"
+                                            : c.arguments().getOrDefault("reason_code", ""), asked.name());
                         }
                         ToolResult res = executor.execute(callId, c.name(), c.arguments());
                         out.add(Line.tool(c.name(), res.status(), res.ok() ? null : res.errorMessage()));

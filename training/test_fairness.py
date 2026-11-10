@@ -202,6 +202,11 @@ class CrmChangeTest(unittest.TestCase):
             with self.subTest(why):
                 self.assertTrue(crm_would_change(rec, 4))
                 self.assertFalse(crm_would_change(rec, 5))
+        # Version 6: a call-back the caller asked for, never booked.
+        forgot = judged({}, "Can you call me back at 4 PM?", ("log_call_outcome", {"outcome_code": "ACKNOWLEDGED"},
+                                                               '{"ok":true,"data":{"recorded":true}}'))
+        self.assertTrue(crm_would_change(forgot, 5))
+        self.assertFalse(crm_would_change(forgot, 6))
         # Left alone: a booked call-back recorded afterwards, an ordinary ending, a reply said only twice.
         booked = judged({}, "Call me after 5.", ("schedule_callback", {}, '{"ok":true,"data":{"callback_id":7}}'),
                         ("log_call_outcome", {"outcome_code": "CALLBACK_REQUESTED"}, '{"ok":true,"data":{"recorded":true}}'))

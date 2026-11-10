@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -315,8 +316,56 @@ class AiBrainIntegrationTest {
                 assertThat(c.arguments()).containsEntry("scope", "AI_CALLS");
             });
         }
-        assertThat(CallerSignals.upgrade(logged, " Not now, call me again tomorrow.")).isSameAs(logged);
         assertThat(CallerSignals.upgrade(callback, " Please stop calling me.")).isSameAs(callback);
+        // A caller who asked for a call-back or a new date: the logged outcome carries their words, so one gets booked.
+        assertThat(CallerSignals.upgrade(logged, " Fine. Not now, call me again tomorrow.")).satisfies(c -> {
+            assertThat(c.name()).isEqualTo("log_call_outcome");
+            assertThat(c.id()).isEqualTo("c5");
+            assertThat(c.arguments()).containsEntry("outcome_code", "NOT_INTERESTED")
+                    .containsEntry(CallerSignals.CALLBACK_ASKED, "not now, call me again tomorrow.");
+        });
+        assertThat(CallerSignals.upgrade(logged, " I will pay tomorrow.")).isSameAs(logged);
+        LlmClient.ToolCall loggedCallback = new LlmClient.ToolCall("c6", "log_call_outcome", Map.of("outcome_code", "CALLBACK_REQUESTED"));
+        assertThat(CallerSignals.upgrade(loggedCallback, " Call me back later.")).isSameAs(loggedCallback);
+        assertThat(CallerSignals.upgrade(callback, " Call me back later.")).isSameAs(callback);
+    }
+
+    @Test
+    void aCallBackAskedForIsHeardInTheCallersWords() {
+        Map<String, String> asked = new LinkedHashMap<>();
+        asked.put("I'm busy, call me back later.", "i'm busy, call me back later.");
+        asked.put("Can we change it to next Tuesday instead?", "can we change it to next tuesday instead?");
+        asked.put("Call me in an hour.", "call me in an hour.");
+        asked.put("I'm not free now. Call me tomorrow.", "call me tomorrow.");
+        // The negative is checked sentence by sentence and only for the call-back itself.
+        asked.put("Don't call me now, call me back later.", "don't call me now, call me back later.");
+        asked.put("Don't call me back. Actually, call me back tomorrow.", "actually, call me back tomorrow.");
+        asked.forEach((said, sentence) -> assertThat(CallerSignals.callbackAsked(said)).as(said).isEqualTo(sentence));
+        for (String said : List.of("I don't need a callback.", "I don't need a call-back, thank you.", "No need to call me back.",
+                "Please don't reschedule it.", "I don't want to change the date.", "Why did you call me?", "I will pay tomorrow.")) {
+            assertThat(CallerSignals.callbackAsked(said)).as(said).isNull();
+        }
+        assertThat(CallerSignals.callbackAsked(null)).isNull();
+    }
+
+    @Test
+    void aCallBackTheModelForgotIsBookedAnyway() throws Exception {
+        String admin = admin();
+        long contact = contact(admin);
+        String callId = JsonPath.read(mvc.perform(auth(post("/api/voice/test-calls"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contactId\":" + contact + ",\"scriptName\":\"Enquiry follow-up\",\"brain\":\"LOCAL\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        int before = REQUESTS.size();
+        // The stand-in model only records ACKNOWLEDGED; the caller asked to be called at 4.
+        mvc.perform(auth(post("/api/voice/test-calls/" + callId + "/say"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"Okay, noted. Can you call me back at 4 PM?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.added[?(@.tool == 'log_call_outcome')].status").value(Matchers.contains("OK")))
+                .andExpect(jsonPath("$.outcome").value("ACKNOWLEDGED"));
+        // The model is told the call-back was booked, so it can say so.
+        List<Map<String, Object>> sent = cast(REQUESTS.get(REQUESTS.size() - 1).get("messages"));
+        assertThat(REQUESTS.size()).isGreaterThan(before);
+        assertThat(String.valueOf(sent.get(sent.size() - 1).get("content"))).contains("callback_id").contains("call you back");
         // Invented reasons models use are understood; a wrong person is not a hand-over.
         assertThat(CallerSignals.reason("DISPUTE")).isEqualTo(Voice.HandoffReason.COMPLAINT_OR_DISPUTE);
         assertThat(CallerSignals.reason("human")).isEqualTo(Voice.HandoffReason.CALLER_REQUEST);
@@ -466,6 +515,12 @@ class AiBrainIntegrationTest {
             // Records only that the caller is not interested; the CRM should run the opt-out.
             answer(ex, "tool".equals(lastMsg.get("role")) ? "Understood. Goodbye."
                     : "<tool_call>\n{\"name\": \"log_call_outcome\", \"arguments\": {\"outcome_code\": \"NOT_INTERESTED\"}}\n</tool_call>");
+            return;
+        }
+        if (lastCaller.contains("call me back at 4 PM")) {
+            // Records ACKNOWLEDGED and forgets the call-back; the CRM should book it.
+            answer(ex, "tool".equals(lastMsg.get("role")) ? "Thank you, goodbye."
+                    : "<tool_call>\n{\"name\": \"log_call_outcome\", \"arguments\": {\"outcome_code\": \"ACKNOWLEDGED\"}}\n</tool_call>");
             return;
         }
         if (lastCaller.contains("Hello? Hello?")) {

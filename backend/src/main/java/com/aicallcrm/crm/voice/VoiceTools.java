@@ -403,12 +403,24 @@ public class VoiceTools {
         boolean settled = call.getOutcome() == Outcome.OPTED_OUT || call.getOutcome() == Outcome.VERIFICATION_FAILED
                 || call.getOutcome() == Outcome.HANDED_OFF;
         // "A call-back was requested" with none booked would leave the caller waiting for a call nobody knows about
-        // (8B retest call #36, 1 Nov): the call-back is booked here. A booked one has already set this outcome.
+        // (8B retest call #36, 1 Nov): the call-back is booked here. So it is when the caller asked for one, or for a
+        // new date, and the model logged something else (CallerSignals.CALLBACK_ASKED; retest calls #17 and #41,
+        // 2 Nov); the model's outcome is kept. A booked one has already set this outcome, and booking twice in one call
+        // makes one task (HandoffService.callback).
         Map<String, Object> data = new LinkedHashMap<>(Map.of("recorded", true));
         String hint = null;
-        if (outcome == Outcome.CALLBACK_REQUESTED && !settled && call.getOutcome() != Outcome.CALLBACK_REQUESTED) {
+        String asked = text(args, CallerSignals.CALLBACK_ASKED);
+        if ((outcome == Outcome.CALLBACK_REQUESTED || asked != null) && !settled
+                && call.getOutcome() != Outcome.CALLBACK_REQUESTED) {
             String note = text(args, "note");
-            ToolResult booked = scheduleCallback(call, note == null ? Map.of() : Map.of("reason", note));
+            Map<String, Object> wanted = new LinkedHashMap<>();
+            if (asked != null) {
+                wanted.put("preferred_time_text", "Caller said: " + asked);
+            }
+            if (note != null) {
+                wanted.put("reason", note);
+            }
+            ToolResult booked = scheduleCallback(call, wanted);
             data.putAll(booked.data());
             hint = booked.speakHint();
         }

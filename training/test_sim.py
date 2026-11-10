@@ -228,6 +228,23 @@ class SimTest(unittest.TestCase):
         said = [m["content"] for m in rec["messages"] if m["role"] == "assistant"]
         self.assertEqual(said.count("Sorry, could you say that again?"), 2)
 
+    def test_a_call_back_the_model_forgot_is_booked_anyway(self):
+        # As AiBrainIntegrationTest.aCallBackTheModelForgotIsBookedAnyway.
+        def agent(msgs, reminded):
+            if msgs[-1]["role"] == "tool":
+                return say("Thank you, goodbye.")
+            return tool("log_call_outcome", outcome_code="ACKNOWLEDGED")
+        rec, why = self.run_call(FakeModel(lambda m: "I'm busy now. Can you call me back at 4 PM?", agent), "Enquiry follow-up", "busy",
+                                 coach=False)
+        self.assertEqual(why, "")
+        res = [m for m in rec["messages"] if m["role"] == "tool"][-1]
+        self.assertIn('"callback_id"', res["content"])
+        self.assertEqual(rec["meta"]["crm_upgrades"], [{"from": "log_call_outcome", "tool": "schedule_callback"}])
+        # The model's own call, as it wrote it, stays in the transcript.
+        self.assertNotIn(callkit.CALLBACK_ASKED, rec["messages"][-3]["tool_calls"][0]["function"]["arguments"])
+        self.assertFalse([p for p in check(rec, crm_net=True) if "schedule_callback" in p])
+        self.assertTrue([p for p in check(rec) if "schedule_callback" in p])
+
     def test_a_recorded_call_back_counts_as_booked_with_the_crm(self):
         def agent(msgs, reminded):
             if msgs[-1]["role"] == "tool":

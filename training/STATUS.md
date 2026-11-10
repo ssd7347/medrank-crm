@@ -14,6 +14,19 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 10 November 2026, later: NO MONEY FOR THE CLAUDE API — FREE ROUTE STARTED; CALL-BACK NET BUILT (CRM VERSION 6)
+
+The user: "i dont have money right now". A Claude key, if ever used, must be the client's own (like Plivo). Free
+route agreed ("Yes, start it"): (1) CRM net for ignored call-backs, (2) round 5 training on free Colab aimed at the
+"not listening" failures, (3) retest on a fresh seed (seed 11 has now been read too).
+**(1) done:** when the caller asked for a call-back or a new date ("call me back at 4", "can we change it to Tuesday")
+and the model logs another outcome without booking one, the CRM books it and keeps the model's outcome
+(`CallerSignals.CALLBACK` / `NO_CALLBACK`, `VoiceTools.logOutcome`; the kit the same, CRM version 6). One call never gets two
+call-back tasks (`HandoffService.callback`). Word lists checked on all 273 saved test attempts: fires on exactly 2, both
+right (seed 11 #17 #41); a first draft also fired on "I don't need a callback", fixed. Small effect on the score
+(about 1 call in 60); it matters for real callers. Tests: backend 88/88, kit 77/77, engine OK, fake-model run of 60
+calls.
+
 # 10 November 2026: RETEST UNDER CRM VERSION 5 — NEW CALLERS 46/59 (78%), SAME TEST 50/59 (85%): NOT A PASS
 
 Run on Colab on 2 Nov evening, read on 10 Nov (`Downloads\retest-results (1).zip`,

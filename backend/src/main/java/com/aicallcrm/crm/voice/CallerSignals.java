@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.aicallcrm.crm.voice.LlmClient.ToolCall;
@@ -35,7 +36,20 @@ final class CallerSignals {
             + "wrong amount|incorrect amount|overcharged|lawyer|consumer court|i want to complain|file a complaint";
     static final String OPT_OUT = "stop calling|stop these calls|(don'?t|do not|never) (ever )?call (me |this number )?(again|any ?more)|"
             + "no more calls|remove my (number|name)|take (me|my number) off|unsubscribe|don'?t want (these|any|your) calls";
+    /** A call-back or a new date asked for, and the same said in the negative ("I don't need a callback"). */
+    static final String CALLBACK = "call (me )?back|call me (again )?(later|tomorrow|after|in an? |next|this evening|tonight|some ?time)|"
+            + "ring me (back|later)|call-?back|re-?schedule|postpone|"
+            + "(change|move|shift) (it|the (date|time|day|appointment|visit|slot)|my (appointment|visit|slot|booking))|"
+            + "(another|some other|a different) (day|date|time|slot)";
+    static final String NO_CALLBACK = "(don'?t|do not|never|no need to|not) (need |want )?(to )?(a |an |any )?"
+            + "(call (me )?back|call-?back|re-?schedule|postpone|(change|move|shift) (it|the|my))|"
+            + "no call-? ?back|no need (to|for) (a |any )?call";
+    /** The argument the CRM adds to log_call_outcome: the caller's sentence asking for a call-back. */
+    static final String CALLBACK_ASKED = "caller_asked_for_callback";
     private static final Pattern OPT_OUT_WORDS = Pattern.compile(OPT_OUT);
+    private static final Pattern CALLBACK_WORDS = Pattern.compile(CALLBACK);
+    private static final Pattern NO_CALLBACK_WORDS = Pattern.compile(NO_CALLBACK);
+    private static final Pattern SENTENCE = Pattern.compile("[^.?!]+[.?!]?");
     private static final Pattern DISTRESS_WORDS = Pattern.compile(DISTRESS);
     private static final Pattern DISPUTE_WORDS = Pattern.compile(DISPUTE);
 
@@ -68,17 +82,40 @@ final class CallerSignals {
         return DISPUTE_WORDS.matcher(s).find() ? HandoffReason.COMPLAINT_OR_DISPUTE : null;
     }
 
+    /** The caller's last sentence asking for a call-back or a new date (lower case), or null when there is none. */
+    static String callbackAsked(String callerWords) {
+        String asked = null;
+        Matcher m = SENTENCE.matcher(callerWords == null ? "" : callerWords.toLowerCase(Locale.ROOT));
+        while (m.find()) {
+            String s = m.group().trim();
+            if (CALLBACK_WORDS.matcher(s).find() && !NO_CALLBACK_WORDS.matcher(s).find()) {
+                asked = s;
+            }
+        }
+        return asked;
+    }
+
     /**
      * The tool call the CRM actually runs: a call-back or hand-over becomes an urgent DISTRESS / COMPLAINT_OR_DISPUTE
      * hand-over when the caller's words show it. A VERIFICATION_FAILED hand-over is left alone (the caller's identity
      * is not known), and distress is never downgraded to a dispute. Logging an outcome for a caller who asked not to be
-     * called again becomes the opt-out, whatever the model meant to log (8B retest call #31, 1 Nov). Any other call is
-     * returned unchanged.
+     * called again becomes the opt-out, whatever the model meant to log (8B retest call #31, 1 Nov). Logging an outcome
+     * for a caller who asked for a call-back or a new date carries their words, so the call-back gets booked
+     * (VoiceTools.logOutcome; 8B retest calls #17 and #41, 2 Nov). Any other call is returned unchanged.
      */
     static ToolCall upgrade(ToolCall c, String callerWords) {
-        if ("log_call_outcome".equals(c.name()) && callerWords != null
-                && OPT_OUT_WORDS.matcher(callerWords.toLowerCase(Locale.ROOT)).find()) {
-            return new ToolCall(c.id(), "opt_out", Map.of("scope", "AI_CALLS"));
+        if ("log_call_outcome".equals(c.name())) {
+            if (callerWords != null && OPT_OUT_WORDS.matcher(callerWords.toLowerCase(Locale.ROOT)).find()) {
+                return new ToolCall(c.id(), "opt_out", Map.of("scope", "AI_CALLS"));
+            }
+            String asked = callbackAsked(callerWords);
+            if (asked == null || c.arguments().containsKey(CALLBACK_ASKED)
+                    || "CALLBACK_REQUESTED".equalsIgnoreCase(String.valueOf(c.arguments().get("outcome_code")))) {
+                return c;     // nothing asked, or the outcome itself books it
+            }
+            Map<String, Object> args = new LinkedHashMap<>(c.arguments());
+            args.put(CALLBACK_ASKED, asked);
+            return new ToolCall(c.id(), c.name(), args);
         }
         boolean handoff = "request_human_handoff".equals(c.name());
         if (!handoff && !"schedule_callback".equals(c.name())) {
