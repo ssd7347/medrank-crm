@@ -14,6 +14,19 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 10 November 2026, 10:50 pm: PREPARING THE FIRST REAL CALL (user: "Prepare the real call") — `docs/first-real-call.md`
+
+Round 4 is the brain. Four things stand between us and the first call to the user's phone:
+(1) **Plivo account, the client's** (India region, KYC, number; ask Plivo about DLT / 160-series for outbound).
+(2) **A GPU for the brain, paid, the client's decision**: the laptop is 6.5–21 s per reply; free Colab may not be
+used as a web service. By the hour for the first call, in India if possible.
+(3) **The CRM is not yet safe to put online**: `OTP_SHOW_ON_SCREEN=true` locally (no SMS/WhatsApp codes yet), so a public
+address would let anyone with a staff number sign in. Fix first: real OTP delivery, or expose only `/api/voice/hooks/plivo/*`.
+(4) **Indian English on an 8 kHz line is untested** (Whisper `base.en`, US Piper voice): the biggest open risk, and
+free to check now with recordings passed through `phone.py`'s 8 kHz mu-law path.
+Layout for the first call: CRM + engine on the laptop behind HTTPS tunnels; Ollama only on the GPU machine, reached
+by an SSH tunnel (never public). Expected reply time about 2.6–3 s against the ~2 s target.
+
 # 10 November 2026, 10:30 pm: ROUND 5 IS WORSE — ROUND 4 ON FRESH CALLERS (SEED 23) = FAIR 54/59 (92%); KEEP ROUND 4
 
 Both models on the same 60 calls with callers nobody had read (seed 23), CRM version 6, on Colab T4. Rescored

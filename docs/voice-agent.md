@@ -38,7 +38,8 @@ own account is for demos and test calls to your team.
 5. For incoming calls, create a Plivo application and attach it to the number, with answer URL
    `https://your-crm/api/voice/hooks/plivo/answer` and hangup URL `https://your-crm/api/voice/hooks/plivo/hangup`
    (both POST). Outgoing calls set these URLs themselves.
-6. Make one test call to your own phone and read its transcript before anything else.
+6. Make one test call to your own phone and read its transcript before anything else (the plan for it, with what
+   is still missing: `docs/first-real-call.md`).
 
 Known limits: Plivo's recording is not switched on, so calls keep a transcript but no recording, although the
 starter scripts say the call may be recorded (adjust the opening line, or add recording, before going live). A
