@@ -22,8 +22,7 @@ numbered like the lines of a test-sentences file: names, IDs as digits, dates, r
 it (resample to 8 kHz, `ulaw_encode` → `ulaw_decode`, `resample(audio, RATE, STT_RATE) / 32768`, then `stt_pcm`'s
 settings: language en, beam 1, no VAD). Word error rate per sentence and overall, `base.en` against `small.en`, with
 what was heard against what was said. First a baseline with Piper's own voice; then the user and a few others record.
-`small.en` download was started at 10:45 pm (may not have finished before the 11 pm cut; rerun
-`faster_whisper.download_model('small.en')`).
+`small.en` is downloaded (10:46 pm, in the Hugging Face cache next to `base.en`).
 
 # 10 November 2026, night: ITEM (3) DONE — ONLY PLIVO'S DOORS ARE PUBLIC (`voice-engine/gateway.py`)
 
