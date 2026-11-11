@@ -14,6 +14,29 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 11 November 2026, late night: NAME HINTS WIRED INTO LIVE CALLS (user: "Yes, wire it in")
+
+The CRM's live `open` reply (`/api/voice/hooks/live/open`) now carries `"hint"`: the called contact's registered name
+(`LiveCallService.hint`: trimmed, at most 100 characters; absent for an unknown caller and on `turn` replies; never
+said to the caller). The engine keeps it for the call (`phone.Call.hint`) and gives it to Whisper on every turn.
+**Guard added before committing:** engine setting `NAME_HINTS` (on / off / auto, default auto) uses the hint only with
+small.en and larger, not tiny/base, because base.en wrote the expected name over the one said (above: "Rajesh" for
+Ramesh). The engine's default ear is still base.en, so with no settings changed nothing is hinted; the GPU machine
+should run `STT_MODEL=small.en`.
+Tests: backend 90/90 (`VoiceAgentIntegrationTest`: open has the hint and does not say it, turn has none, unknown
+caller has none); engine 43/43 (hint on every turn, none for an unknown caller, the CRM client trims and cuts it,
+the endpoint passes it with small.en, not with base.en unless `NAME_HINTS=on`, which model names count; the base.en
+test was checked to fail with the guard removed). **End to end** (test CRM on the in-memory database, real engine,
+the developer's recording of sentence 2 streamed as phone audio): 6/6 with base.en before the guard and again 6/6 with
+small.en and `NAME_HINTS=auto`; the transcript read "My full name is Lakshmi Narayanan", from an unknown number the
+same audio gave "Laxmina Rainan".
+**Slip, recorded honestly:** the first end-to-end try was started with `-Dspring-boot.run.profiles=test`, which did
+not switch the database, so that CRM ran on the developer's dev database `ai_call_crm`. It was stopped at once; a
+read-only check found it had written only 2 `LOGIN_FAILED` audit rows (21:44:00 and 21:44:18, the script's sign-in
+attempts) and nothing else; they were left as they are. Since then the CRM is started with
+`SPRING_CONFIG_ADDITIONAL_LOCATION=<test properties>` and the script refuses to run unless the log shows
+`jdbc:h2:mem`. Not wired: the test console's `/stt` (no contact there).
+
 # 11 November 2026, night: NAME HINTS — SMALL.EN TOLD THE CONTACT'S NAME GETS EVERY NAME RIGHT (user: "Yes, try name hints")
 
 On an outbound call the CRM knows whose number it rang, so Whisper can be told that name (faster-whisper `hotwords`;
@@ -40,7 +63,7 @@ Narayanan, Priya, Irfan all stayed). **base.en did: "Yes, this is Rajesh Kumar s
 paths**, plus Sudesh: 2 of 5. So hints are safe enough with small.en, not with base.en; and the identity answer must
 still be exact, so a decoy name alone verifies nobody. Small sample: 2 voices, 5 names.
 Times (clean this run): base.en ~1.0 s, small.en ~3.0 s per sentence on this CPU; the hint costs nothing measurable.
-NEXT if wanted: send the contact's name from the CRM's live `open` reply to the engine and use it as the hint on
+DONE (see the section above): the CRM's live `open` reply sends the contact's name and the engine uses it as the hint on
 every turn of that call (inbound calls from a known number too); `ear_check` stays the way to re-measure.
 
 # 11 November 2026, evening: THE FIRST INDIAN VOICE (the user's) — SMALL.EN HEARS IT FAR BETTER ON THE LINE

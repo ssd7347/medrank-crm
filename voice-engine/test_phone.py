@@ -116,7 +116,7 @@ class FakeCrm:
 
 class CallTest(unittest.TestCase):
 
-    def run_call(self, crm, script):
+    def run_call(self, crm, script, stt=None):
         """Plays ``script`` (Plivo messages, or "wait" for a pause) into a call; returns what was sent to Plivo."""
         sent, closed = [], []
 
@@ -127,7 +127,7 @@ class CallTest(unittest.TestCase):
             closed.append(True)
 
         async def go():
-            call = phone.Call("c1", send, crm, lambda audio: "I want to pay on Friday",
+            call = phone.Call("c1", send, crm, stt or (lambda audio: "I want to pay on Friday"),
                               lambda text: (tone(0.5, 440, 4000, rate=22050), 22050), close)
             for step in script:
                 if step == "wait":
@@ -159,6 +159,29 @@ class CallTest(unittest.TestCase):
         self.assertEqual(crm.ended, 1)
         self.assertEqual(closed, [True])
         self.assertTrue(call.done)
+
+    def test_the_contact_name_from_the_crm_is_the_ears_hint_on_every_turn(self):
+        class Named(FakeCrm):
+            def open(self, call_id):
+                return phone.Reply("Hello, am I speaking with Lakshmi?", False, "Lakshmi Narayanan")
+
+        hints = []
+
+        def ear(audio, *hint):
+            hints.append(hint)
+            return "This is Lakshmi Narayanan"
+
+        speech = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        crm = Named([phone.Reply("Thank you.", False), phone.Reply("Noted.", False)])
+        self.run_call(crm, [{"event": "start", "start": {"streamId": "s1"}}, "wait", speech, "wait", speech, "wait"],
+                      stt=ear)
+        self.assertEqual(hints, [("Lakshmi Narayanan",), ("Lakshmi Narayanan",)])
+        self.assertEqual(crm.heard, ["This is Lakshmi Narayanan"] * 2)
+
+        hints.clear()                               # an unknown caller: no name, so no hint
+        self.run_call(FakeCrm([phone.Reply("Noted.", False)]),
+                      [{"event": "start", "start": {"streamId": "s1"}}, "wait", speech, "wait"], stt=ear)
+        self.assertEqual(hints, [()])
 
     def test_the_caller_can_talk_over_the_agent(self):
         crm = FakeCrm([phone.Reply("Okay.", False)])
@@ -210,6 +233,22 @@ class CrmTest(unittest.TestCase):
         ts = seen["headers"]["X-Voice-Timestamp"]
         self.assertEqual(seen["headers"]["X-Voice-Signature"], phone.sign("s" * 40, ts, body))
 
+    def test_the_opening_reply_brings_the_contacts_name(self):
+        answers = [{"say": "Hello", "over": False, "hint": "  Mohammed Irfan "}, {"say": "Hello", "over": False},
+                   {"say": "Hi", "over": False, "hint": "x" * 300}]
+
+        class Res:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return answers.pop(0)
+
+        crm = phone.Crm("http://crm.local:8082", "s" * 40, post=lambda url, data, timeout, headers: Res())
+        self.assertEqual(crm.open("c1"), phone.Reply("Hello", False, "Mohammed Irfan"))
+        self.assertEqual(crm.open("c2"), phone.Reply("Hello", False, ""))
+        self.assertEqual(len(crm.open("c3").hint), 100)
+
     def test_the_stream_token_matches_the_crm(self):
         # The same value is asserted for PlivoHooksController.streamToken in PlivoSignatureTest (Java).
         self.assertEqual(phone.stream_token("test-only-voice-secret-0123456789-abcdefgh", "6f1c2b8e-0000-4000-8000-000000000001"),
@@ -225,14 +264,16 @@ class EndpointTest(unittest.TestCase):
         import engine
         self.engine = engine
         self.crm = FakeCrm([phone.Reply("Thank you. Goodbye.", True)])
-        saved = (engine.VOICE_HMAC_SECRET, engine.stt_pcm, engine.tts_pcm, phone.Crm)
+        saved = (engine.VOICE_HMAC_SECRET, engine.stt_pcm, engine.tts_pcm, phone.Crm, engine.STT_MODEL, engine.NAME_HINTS)
         engine.VOICE_HMAC_SECRET = self.SECRET
+        engine.STT_MODEL, engine.NAME_HINTS = "small.en", "auto"
         engine.stt_pcm = lambda audio: "I will pay on Friday"
         engine.tts_pcm = lambda text: (tone(0.5, 440, 4000, rate=22050), 22050)
         phone.Crm = lambda url, secret: self.crm
 
         def restore():
-            engine.VOICE_HMAC_SECRET, engine.stt_pcm, engine.tts_pcm, phone.Crm = saved
+            (engine.VOICE_HMAC_SECRET, engine.stt_pcm, engine.tts_pcm, phone.Crm, engine.STT_MODEL,
+             engine.NAME_HINTS) = saved
         self.addCleanup(restore)
 
     def refused(self, url):
@@ -277,6 +318,44 @@ class EndpointTest(unittest.TestCase):
             self.assertEqual(ws.receive()["type"], "websocket.close")
         self.assertEqual(self.crm.heard, ["I will pay on Friday"])
         self.assertEqual(self.crm.ended, 1)
+
+    def test_the_engine_gives_whisper_the_contacts_name(self):
+        heard_with = []
+
+        def stt(audio, hint=""):
+            heard_with.append(hint)
+            return "I will pay on Friday"
+        self.engine.stt_pcm = stt
+        self.crm.open = lambda call_id: phone.Reply("Hello, am I speaking with Irfan?", False, "Mohammed Irfan")
+        self.test_a_whole_call_over_the_socket()
+        self.assertEqual(heard_with, ["Mohammed Irfan"])
+
+    def test_base_en_is_not_given_the_name_unless_asked(self):
+        heard_with = []
+
+        def stt(audio, hint=""):
+            heard_with.append(hint)
+            return "I will pay on Friday"
+        self.engine.stt_pcm = stt
+        self.crm.open = lambda call_id: phone.Reply("Hello, am I speaking with Irfan?", False, "Mohammed Irfan")
+        self.engine.STT_MODEL = "base.en"
+        self.test_a_whole_call_over_the_socket()
+        self.engine.NAME_HINTS = "on"
+        self.crm.heard.clear()
+        self.crm.ended = 0
+        self.crm.replies = [phone.Reply("Thank you. Goodbye.", True)]
+        self.test_a_whole_call_over_the_socket()
+        self.assertEqual(heard_with, ["", "Mohammed Irfan"])
+
+    def test_which_ears_are_given_the_name(self):
+        on = self.engine.hints_on
+        for model in ("small.en", "medium.en", "large-v3", r"C:\models\faster-whisper-small.en", "models/small.en/"):
+            self.assertTrue(on(model, "auto"), model)
+            self.assertFalse(on(model, "off"), model)
+        for model in ("base.en", "tiny.en", "base", r"C:\models\faster-whisper-base.en", "models/base.en/"):
+            self.assertFalse(on(model, "auto"), model)
+            self.assertTrue(on(model, " ON "), model)
+        self.assertFalse(on("base.en", "something else"))
 
 
 if __name__ == "__main__":

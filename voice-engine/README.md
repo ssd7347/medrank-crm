@@ -75,6 +75,14 @@ Whisper to text, the CRM's brain decides the reply (`POST /api/voice/hooks/live/
 The engine needs two more settings: `VOICE_HMAC_SECRET` (the CRM's, it checks each call's stream token and signs the
 CRM requests; blank refuses every call) and `CRM_URL`.
 
+**Name hints.** When the call is to (or from) a contact the CRM knows, its `open` reply carries `"hint"`, the contact's
+registered name (unknown callers get none). The engine gives that name to Whisper on every turn of the call
+(faster-whisper `hotwords`), so it writes "Lakshmi Narayanan" instead of "Laxmina Rainan". `NAME_HINTS` decides
+when: `auto` (default) uses it with `small.en` and larger and **not** with `tiny`/`base`, because in the ear check
+`base.en` sometimes wrote the expected name over the one actually said (told to expect Rajesh, it wrote "Rajesh Kumar"
+for a speaker who said Ramesh Kumar: 2 of 5 names); `on` or `off` force it. The name is only a spelling help: the CRM's identity
+check still needs the identity answer.
+
 **Never put the CRM or the engine on the internet directly.** Point the one public tunnel at the gateway instead
 (`uvicorn gateway:app --host 127.0.0.1 --port 8099`, settings `CRM_URL` and `ENGINE_URL`): it passes on only Plivo's
 three callbacks (`/api/voice/hooks/plivo/answer|hangup|desk`, unchanged, so Plivo's signature is still checked by the

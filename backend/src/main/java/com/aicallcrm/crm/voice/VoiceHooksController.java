@@ -101,7 +101,8 @@ public class VoiceHooksController {
     /**
      * {@code open}: {@code {"call_id"}} when the call connects; {@code turn}: {@code {"call_id", "said"}} for each
      * thing the caller says; {@code end}: {@code {"call_id"}} after the goodbye was heard, to hang up. Replies
-     * {@code {"say": "...", "over": false}} ({@code end}: {@code {"hung_up": true}}).
+     * {@code {"say": "...", "over": false}} ({@code end}: {@code {"hung_up": true}}); {@code open} adds
+     * {@code "hint"}, the called contact's name for the engine's ear, when the contact is known.
      */
     @PostMapping("/live/{step}")
     public Map<String, Object> live(@PathVariable String step, @RequestBody(required = false) String raw,
@@ -118,6 +119,9 @@ public class VoiceHooksController {
                 LiveCallService.Reply r = "open".equals(step) ? live.open(callId) : live.turn(callId, string(body.get("said")));
                 out.put("say", r.say());
                 out.put("over", r.over());
+                if (r.hint() != null) {
+                    out.put("hint", r.hint());
+                }
             }
             case "end" -> out.put("hung_up", live.end(callId));
             default -> throw ApiException.notFound("Step");

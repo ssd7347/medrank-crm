@@ -45,8 +45,11 @@ until that call and a pilot (20–50 consenting contacts, every transcript read)
    slow on the laptop's CPU: **the speech engine should run on the GPU machine with the brain** (part of the client's
    GPU decision). More voices still to record before deciding. **Name hints (11 Nov, night):** told the contact's name
    (Whisper `hotwords`), small.en got every name right for both voices (36 and 37 of 37 key words); told a similar
-   other person's name, it never turned a caller's own name into it (base.en did: "Rajesh" for Ramesh). Not yet wired
-   into live calls (the CRM must send the name to the engine).
+   other person's name, it never turned a caller's own name into it (base.en did: "Rajesh" for Ramesh). **Wired into
+   live calls (11 Nov, late):** the CRM's `open` reply carries the contact's name as `hint` and the engine gives it to
+   Whisper on every turn; engine setting `NAME_HINTS=auto` uses it with small.en and up, not with base.en (README,
+   "Name hints"). Checked end to end (test CRM, real engine with small.en, the developer's recording on the phone
+   path): with the hint "My full name is Lakshmi Narayanan", without it "Laxmina Rainan".
 
 ## The layout for the first call
 

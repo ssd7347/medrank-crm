@@ -19,6 +19,9 @@ Settings (environment variables):
   CRM_URL           The CRM backend, for real calls. Default http://127.0.0.1:8082.
   VOICE_HMAC_SECRET The CRM's VOICE_HMAC_SECRET: checks each call's stream token and signs the CRM requests.
                     Blank: /call refuses every connection.
+  NAME_HINTS     on / off / auto (default). On a call to a known contact, tell Whisper the contact's name so it spells
+                 it as registered. auto: on for small.en and larger, off for tiny and base, which in the ear check
+                 (11 Nov 2026) sometimes wrote the expected name over the one said (told Rajesh, heard Ramesh: "Rajesh").
 
 Run:  uvicorn engine:app --host 127.0.0.1 --port 8090
 """
@@ -46,6 +49,7 @@ SPEECH_TOKEN = os.environ.get("SPEECH_TOKEN", "")
 CPU_THREADS = int(os.environ.get("CPU_THREADS", "0"))
 CRM_URL = os.environ.get("CRM_URL", "http://127.0.0.1:8082")
 VOICE_HMAC_SECRET = os.environ.get("VOICE_HMAC_SECRET", "")
+NAME_HINTS = os.environ.get("NAME_HINTS", "auto")
 MAX_AUDIO_BYTES = 5 * 1024 * 1024
 
 app = FastAPI(title="AI Call CRM speech engine", docs_url=None, redoc_url=None)
@@ -148,6 +152,17 @@ def stt_pcm(audio: np.ndarray, model=None, hint: str = "") -> str:
     return " ".join(s.text.strip() for s in segments).strip()
 
 
+def hints_on(model: str, setting: str) -> bool:
+    """Whether a call's ear is told the contact's name (NAME_HINTS). A setting other than on/off counts as auto."""
+    setting = setting.strip().lower()
+    if setting in ("on", "1", "true", "yes"):
+        return True
+    if setting in ("off", "0", "false", "no"):
+        return False
+    name = Path(model.rstrip("/\\")).name.lower().removeprefix("faster-whisper-")   # a model name or its folder
+    return not name.startswith(("tiny", "base"))
+
+
 def tts_pcm(text: str) -> tuple[np.ndarray, int]:
     with wave.open(io.BytesIO(speak_wav(text[:800])), "rb") as w:
         return np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16), w.getframerate()
@@ -168,7 +183,10 @@ async def call(ws: WebSocket, call_id: str = "", token: str = ""):
     async def close() -> None:
         await ws.close()
 
-    session = phone.Call(call_id, send, phone.Crm(CRM_URL, VOICE_HMAC_SECRET), stt_pcm, tts_pcm, close)
+    def hear(audio: np.ndarray, hint: str = "") -> str:
+        return stt_pcm(audio, hint=hint) if hint and hints_on(STT_MODEL, NAME_HINTS) else stt_pcm(audio)
+
+    session = phone.Call(call_id, send, phone.Crm(CRM_URL, VOICE_HMAC_SECRET), hear, tts_pcm, close)
     try:
         while not session.done:
             await session.handle(json.loads(await ws.receive_text()))

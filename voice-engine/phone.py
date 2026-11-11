@@ -148,6 +148,7 @@ class Utterances:
 class Reply:
     say: str
     over: bool
+    hint: str = ""              # on opening: the called contact's name, given to Whisper on every turn (never said)
 
 
 def stream_token(secret: str, call_id: str) -> str:
@@ -180,7 +181,7 @@ class Crm:
 
     def open(self, call_id: str) -> Reply:
         d = self._call("open", {"call_id": call_id})
-        return Reply(d.get("say") or "", bool(d.get("over")))
+        return Reply(d.get("say") or "", bool(d.get("over")), str(d.get("hint") or "").strip()[:100])
 
     def turn(self, call_id: str, said: str) -> Reply:
         d = self._call("turn", {"call_id": call_id, "said": said})
@@ -197,8 +198,9 @@ TROUBLE = "Sorry, I am having trouble on this line. A member of our team will ca
 
 class Call:
     """One Plivo stream. ``send`` sends a JSON message to Plivo; ``stt`` takes 16 kHz float32 audio and returns
-    text; ``tts`` takes text and returns (int16 samples, sample rate). All three are passed in, so the call logic
-    is tested with fakes."""
+    text, and once the CRM has given the called contact's name, takes that name as a second argument (the hint that
+    makes Whisper spell it as registered); ``tts`` takes text and returns (int16 samples, sample rate). All three
+    are passed in, so the call logic is tested with fakes."""
 
     def __init__(self, call_id: str, send: Callable[[dict], Awaitable[None]], crm: Crm,
                  stt: Callable[[np.ndarray], str], tts: Callable[[str], tuple[np.ndarray, int]],
@@ -211,6 +213,7 @@ class Call:
         self.speaking = ""          # the checkpoint of the audio being played, "" when quiet
         self.marks = 0
         self.ending = ""            # the goodbye's checkpoint once the agent has finished
+        self.hint = ""              # the called contact's name, from the CRM's opening reply
         self.done = False
 
     async def handle(self, msg: dict) -> None:
@@ -243,8 +246,11 @@ class Call:
             try:
                 if kind == "open":
                     reply = await asyncio.to_thread(self.crm.open, self.call_id)
+                    self.hint = reply.hint
                 else:
-                    text = (await asyncio.to_thread(self.stt, resample(audio, RATE, STT_RATE) / 32768.0)).strip()
+                    pcm = resample(audio, RATE, STT_RATE) / 32768.0
+                    hint = (self.hint,) if self.hint else ()
+                    text = (await asyncio.to_thread(self.stt, pcm, *hint)).strip()
                     if not text:
                         continue
                     reply = await asyncio.to_thread(self.crm.turn, self.call_id, text)

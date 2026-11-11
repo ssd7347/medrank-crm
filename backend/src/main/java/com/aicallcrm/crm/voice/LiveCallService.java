@@ -26,8 +26,21 @@ public class LiveCallService {
 
     private static final Logger log = LoggerFactory.getLogger(LiveCallService.class);
 
-    /** What the agent says next; {@code over} once it has wrapped the call up (the engine then hangs up). */
-    public record Reply(String say, boolean over) {
+    /**
+     * What the agent says next; {@code over} once it has wrapped the call up (the engine then hangs up). {@code hint},
+     * on opening only: the registered name of the person called, which the engine gives Whisper so it spells that
+     * name as registered (ear check, 11 Nov 2026: every name right with small.en). Never said to the caller.
+     */
+    public record Reply(String say, boolean over, String hint) {
+        Reply(String say, boolean over) {
+            this(say, over, null);
+        }
+    }
+
+    /** Longest name sent as a hint: a name, not a paragraph (Whisper keeps at most half its context for hints). */
+    static final int MAX_HINT = 100;
+
+    private record Opening(String line, String name) {
     }
 
     private final VoiceCallRepository calls;
@@ -54,12 +67,14 @@ public class LiveCallService {
 
     /** The call connected: the brain reads the context and says the script's opening line. */
     public Reply open(UUID callId) {
-        String opening = tx.execute(s -> {
+        Opening opened = tx.execute(s -> {
             VoiceCall call = live(callId);
             Contact contact = call.getContactId() == null ? null : contacts.findById(call.getContactId()).orElse(null);
             VoiceScript script = call.getScriptId() == null ? null : scriptRepo.findById(call.getScriptId()).orElse(null);
-            return script == null ? "" : VoiceScriptService.render(script.getOpeningLine(), callService.variables(contact));
+            return new Opening(script == null ? "" : VoiceScriptService.render(script.getOpeningLine(),
+                    callService.variables(contact)), hint(contact));
         });
+        String opening = opened.line();
         List<Line> added;
         try {
             added = brains.begin(callId, null).open(callId, opening);
@@ -75,7 +90,16 @@ public class LiveCallService {
             return new Reply(said(added), true);
         }
         append(callId, added);
-        return new Reply(said(added), brains.of(callId).over(callId));
+        return new Reply(said(added), brains.of(callId).over(callId), opened.name());
+    }
+
+    /** The contact's registered name for the engine's ear, or null for an unknown caller. */
+    static String hint(Contact contact) {
+        String name = contact == null || contact.getFullName() == null ? "" : contact.getFullName().strip();
+        if (name.isEmpty()) {
+            return null;
+        }
+        return name.length() > MAX_HINT ? name.substring(0, MAX_HINT).strip() : name;
     }
 
     /** One turn: the caller said {@code said}. */

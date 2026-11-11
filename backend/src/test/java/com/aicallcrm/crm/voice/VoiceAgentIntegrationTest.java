@@ -404,13 +404,23 @@ class VoiceAgentIntegrationTest {
                 .andReturn().getResponse().getContentAsString(), "$.call_id");
         String id = "{\"call_id\":\"" + call + "\"";
 
+        // The contact's name goes to the engine once, as the hint for its ear; it is never part of what is said.
         hook("/live/open", id + "}").andExpect(status().isOk())
                 .andExpect(jsonPath("$.say").value(Matchers.containsString("AI assistant")))
-                .andExpect(jsonPath("$.over").value(false));
+                .andExpect(jsonPath("$.say").value(Matchers.not(Matchers.containsString("Iyer"))))
+                .andExpect(jsonPath("$.over").value(false))
+                .andExpect(jsonPath("$.hint").value("Lakshmi Iyer"));
         // The same brains and tools as the test console: asking for a person is a hand-over, and the call ends.
         hook("/live/turn", id + ",\"said\":\"I want to speak to a real person please\"}").andExpect(status().isOk())
                 .andExpect(jsonPath("$.say").value(Matchers.containsString("Goodbye")))
-                .andExpect(jsonPath("$.over").value(true));
+                .andExpect(jsonPath("$.over").value(true))
+                .andExpect(jsonPath("$.hint").doesNotExist());
+        // A caller the CRM does not know: no name, so no hint.
+        String stranger = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone() + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        hook("/live/open", "{\"call_id\":\"" + stranger + "\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.say").isNotEmpty())
+                .andExpect(jsonPath("$.hint").doesNotExist());
         mvc.perform(auth(get("/api/voice/calls/" + call), admin))
                 .andExpect(jsonPath("$.call.outcome").value("HANDED_OFF"))
                 .andExpect(jsonPath("$.transcript[?(@.role == 'caller')].text").value(Matchers.hasItem("I want to speak to a real person please")))
