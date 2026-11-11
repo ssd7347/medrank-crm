@@ -1,0 +1,29 @@
+# Test sentences for ear_check.py: things callers really say to the AI agent.
+# Read each line aloud as written (numbers as words, the way you would say them on the phone).
+# Recording N is the Nth sentence below: 01.m4a, 02.m4a ... (comment lines and blank lines do not count).
+# After " | " come the key words: what the CRM must hear exactly (a name, an ID, a time). Not read aloud.
+
+Yes, this is Ramesh Kumar speaking. | ramesh kumar
+My full name is Lakshmi Narayanan. | lakshmi narayanan
+Speaking, this is Priya Venkatesh. | priya venkatesh
+My customer ID is AC four five one two. | 4512
+The last four digits are nine three zero seven. | 9307
+My date of birth is fifteenth August nineteen ninety two. | 15 august; 1992
+I already paid five thousand rupees last week. | 5000 rupees
+Can you call me back at four in the evening? | call me back; 4
+Please call me back tomorrow after six PM. | tomorrow; 6 pm
+I am driving right now, call me later. | driving; later
+Stop calling me, I am not interested. | stop calling me
+Don't call this number again. | dont call
+Sorry, wrong number. There is no Suresh here. | wrong number; suresh
+Who is this? Is this a real person or a machine? | real person; machine
+I want to speak to a manager. | manager
+My EMI was due on the tenth, I will pay by Friday. | EMI; 10; friday
+Can we change my appointment to Tuesday morning? | appointment; tuesday
+My mobile number is nine eight four zero one double two three five six. | 9840122356
+I have a complaint, nobody has called me for two weeks. | complaint; 2 weeks
+Yes, I can hear you. Please go ahead. | go ahead
+My name is Mohammed Irfan and my ID is seven seven one eight. | mohammed irfan; 7718
+Is the clinic open on Sunday? | clinic; sunday
+What is the fee for the check-up? | fee; check up
+Okay, thank you, bye. | thank you

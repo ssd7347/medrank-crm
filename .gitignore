@@ -8,6 +8,7 @@ frontend/tsconfig.tsbuildinfo
 voice-engine/.venv/
 voice-engine/voices/
 voice-engine/__pycache__/
+voice-engine/recordings/
 frontend/public/palettes.html
 
 # Training kit: generated data and trained models stay local

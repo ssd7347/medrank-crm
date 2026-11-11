@@ -14,15 +14,32 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
-# NEXT (stopped 10 Nov, 10:50 pm): ITEM (4) — INDIAN ENGLISH ON THE PHONE LINE ("Yes, build it")
+# 11 November 2026: ITEM (4) — THE EAR CHECK IS BUILT; BASELINE SAYS INDIAN NAMES ARE THE RISK
 
-Not started in code. Plan: `voice-engine/ear_check.py` takes recordings (any format; folder per speaker, files
-numbered like the lines of a test-sentences file: names, IDs as digits, dates, rupee amounts, "call me back at 4",
-"stop calling me", "wrong number") and for each runs: plain → Whisper; and the phone path exactly as `phone.py` does
-it (resample to 8 kHz, `ulaw_encode` → `ulaw_decode`, `resample(audio, RATE, STT_RATE) / 32768`, then `stt_pcm`'s
-settings: language en, beam 1, no VAD). Word error rate per sentence and overall, `base.en` against `small.en`, with
-what was heard against what was said. First a baseline with Piper's own voice; then the user and a few others record.
-`small.en` is downloaded (10:46 pm, in the Hugging Face cache next to `base.en`).
+`voice-engine/ear_check.py` + `ear_sentences.txt` (24 sentences callers really say, each with the key words the CRM
+must hear exactly). Each recording is heard three ways: plain (straight to Whisper), line (8 kHz mu-law and the
+call's own end-of-speech cutting, exactly as `phone.py`; `engine.stt_pcm` now takes the model to use, so the check
+runs the live call's own transcription code) and mobile (the same after AMR-NB 12.2 kbit/s). Recordings: one file
+per sentence or one `all.m4a` with 2 s pauses (cut at the pauses; checked on Piper's 24 sentences: 24 pieces with
+gaps of 2.0, 1.5 and 1.2 s). `voice-engine/recordings/` is in `.gitignore` (people's voices). Tests:
+`test_ear_check` 13/13 with no model (scoring, the line, the cutting, the report).
+
+**Baseline, Piper's US voice reading the 24 sentences (words wrong / key words heard / Whisper time per sentence on
+the laptop CPU, median):**
+| Ear | plain | line | mobile |
+|---|---|---|---|
+| base.en | 2.4%, 33/37, 1053 ms | 3.3%, 33/37, 987 ms | 2.4%, 34/37, 952 ms |
+| small.en | 0.5%, 36/37, 3101 ms | 2.4%, 34/37, 2862 ms | 2.4%, 34/37, 3011 ms |
+
+Read: ordinary words, numbers, times and opt-outs are fine, and the phone line hardly matters. Nearly every miss is
+an Indian name: Suresh -> "surish" / "Sirish" / "syringe" / "Sir Ashir", Irfan -> "Erfan" / "Erfin", Lakshmi
+Narayanan -> "Laxminarayanan", Priya Venkatesh -> "pre-eventkadish" (base.en). Two digit slips with base.en: "double
+two" lost a 2 (plain and line), "seven seven one eight" heard as 77718 (line and mobile). `VoiceTools.nameMatches` needs
+every word of the registered name exactly, so these callers would fail the identity check (one try used each time).
+small.en is clearly better on plain audio but ~3 s per sentence on this CPU: too slow here.
+NEXT: (a) the user and a few others record the sentences (`recordings/<name>/all.m4a`) and the check is rerun: the
+baseline is a US voice, not an Indian caller; (b) decide how names are matched (spelling-tolerant matching in the CRM,
+and/or telling Whisper the expected name on outbound calls).
 
 # 10 November 2026, night: ITEM (3) DONE — ONLY PLIVO'S DOORS ARE PUBLIC (`voice-engine/gateway.py`)
 

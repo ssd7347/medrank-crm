@@ -139,10 +139,11 @@ def tts(body: SpeakBody):
 # ---------------------------------------------------------------------------------------------- real phone calls
 
 
-def stt_pcm(audio: np.ndarray) -> str:
-    """16 kHz mono float32 -> text (the phone path; the console's /stt takes encoded files)."""
-    segments, _info = whisper().transcribe(audio, language="en", beam_size=1, vad_filter=False,
-                                           condition_on_previous_text=False)
+def stt_pcm(audio: np.ndarray, model=None) -> str:
+    """16 kHz mono float32 -> text (the phone path; the console's /stt takes encoded files). ``model``: another
+    loaded Whisper model, for ear_check.py's comparisons; a real call uses STT_MODEL."""
+    segments, _info = (model or whisper()).transcribe(audio, language="en", beam_size=1, vad_filter=False,
+                                                      condition_on_previous_text=False)
     return " ".join(s.text.strip() for s in segments).strip()
 
 

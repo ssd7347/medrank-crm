@@ -30,10 +30,15 @@ until that call and a pilot (20–50 consenting contacts, every transcript read)
    against the real CRM and engine: a correctly signed Plivo callback is accepted through it, a wrongly signed one is
    refused, a wrong stream token is refused. Staff keep using the CRM on `localhost`. Before the CRM itself goes on a
    public address (hosting), real OTP delivery and `OTP_SHOW_ON_SCREEN=false`, `COOKIE_SECURE=true` are required.
-4. **Indian English on an 8 kHz phone line (free; can be checked now).** The ear is Whisper `base.en` and the voice is
-   Piper's US `en_US-lessac-medium`; neither has heard an Indian caller on a phone line yet. This is the biggest open
-   risk. Check before paying for anything: record the developer and a few others reading test sentences, pass the
-   audio through the same 8 kHz mu-law path as `phone.py`, and compare `base.en` with `small.en`.
+4. **Indian English on an 8 kHz phone line (free; being checked).** The ear is Whisper `base.en` and the voice is
+   Piper's US `en_US-lessac-medium`. The tool is built: `voice-engine/ear_check.py` (README: "Checking the ears").
+   **Baseline (11 Nov, Piper's own voice reading the 24 test sentences):** ordinary words and numbers are fine, about
+   2–3% of words wrong, and the phone line (8 kHz mu-law, and a mobile's AMR codec) barely changes that. **Indian
+   names are the weak spot for both ears:** Suresh became "surish", "Sirish" or "syringe", Irfan "Erfan", Lakshmi
+   Narayanan "Laxminarayanan", Priya Venkatesh "pre-eventkadish". The CRM's identity check needs the name word for
+   word (`VoiceTools.nameMatches`), so such callers would fail it. Speed on the laptop's CPU, per sentence: `base.en`
+   about 1.0 s, `small.en` about 3.0 s (too slow on this CPU). Next: the developer and a few others record the
+   sentences (real Indian voices; the baseline is a US voice), then decide how names are matched.
 
 ## The layout for the first call
 
@@ -51,8 +56,9 @@ Developer's phone ── Plivo ── HTTPS + WSS ──> gateway (laptop, :8099
   `python make_modelfile.py <gguf> --base qwen3:4b-instruct --name ourvoice8b-r4 --create` (the training kit's own
   script, exactly as on Colab), and send one warm-up message so the model is loaded before the call.
 
-Expected reply time: 0.7 s end-of-speech wait + ~0.9 s ear and voice + ~1.0 s brain + the network. **About 2.6–3 s**,
-above the ~2 s target; the first call measures it.
+Expected reply time: 0.7 s end-of-speech wait + ~1.0 s ear (`base.en` on the laptop's CPU, measured 11 Nov for a
+2–4 s sentence) + the voice + ~1.0 s brain + the network. **About 3 s**, above the ~2 s target; running the engine on
+the GPU machine too would cut the ear's part. The first call measures it.
 
 ## Settings (`backend/.env`, never committed)
 
