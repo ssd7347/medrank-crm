@@ -173,16 +173,17 @@ public class VoiceTools {
             data.put("attempts_left", 0);
             return ToolResult.ok(data, "I could not verify the details, so a member of our team will help you.");
         }
+        boolean nameOk = nameMatches(text(args, "full_name"), c.getFullName());
         // A first name alone can never match a registered full name: ask for the whole name instead of spending one
         // of the caller's three attempts (the trained models sent "Priya" and locked out the real customer, 30 Oct).
-        if (words(text(args, "full_name")).size() < words(c.getFullName()).size()) {
+        // Fewer words that do match are the whole name heard as one word ("Laxminarayanan"), not a first name.
+        if (!nameOk && words(text(args, "full_name")).size() < words(c.getFullName()).size()) {
             if (call.nameAsked() <= MAX_NAME_ASKS) {
                 return ToolResult.error(ToolResult.INVALID_ARGUMENT,
                         "Could I have your full name, please, your first name and surname?");
             }
             return askedEnough(call, data, "the caller's full name was not given");
         }
-        boolean nameOk = nameMatches(text(args, "full_name"), c.getFullName());
         Map<String, String> answers = answers(args);
         Map<String, String> values = facts.values(c);
         List<FieldDefinition> checks = facts.verificationFields().stream()
@@ -260,10 +261,9 @@ public class VoiceTools {
         return ToolResult.ok(data, clean(hint));
     }
 
+    /** Every word of the registered name, allowing for how the ear spells Indian names (see {@link NameMatch}). */
     static boolean nameMatches(String given, String registered) {
-        Set<String> said = words(given);
-        Set<String> expected = words(registered);
-        return !expected.isEmpty() && said.containsAll(expected);
+        return NameMatch.matches(given, registered);
     }
 
     /** Exact match ignoring case and spaces, or the last four characters of a longer value (an account number). */

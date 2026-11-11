@@ -36,9 +36,11 @@ until that call and a pilot (20–50 consenting contacts, every transcript read)
    2–3% of words wrong, and the phone line (8 kHz mu-law, and a mobile's AMR codec) barely changes that. **Indian
    names are the weak spot for both ears:** Suresh became "surish", "Sirish" or "syringe", Irfan "Erfan", Lakshmi
    Narayanan "Laxminarayanan", Priya Venkatesh "pre-eventkadish". The CRM's identity check needs the name word for
-   word (`VoiceTools.nameMatches`), so such callers would fail it. Speed on the laptop's CPU, per sentence: `base.en`
-   about 1.0 s, `small.en` about 3.0 s (too slow on this CPU). Next: the developer and a few others record the
-   sentences (real Indian voices; the baseline is a US voice), then decide how names are matched.
+   word, so such callers would have failed it. **Fixed the same day:** names are now matched the way the ear spells
+   them (`NameMatch`, see `docs/voice-agent.md`); names the ear garbles completely ("syringe" for Suresh) still fail
+   and use a try. Speed on the laptop's CPU, per sentence: `base.en` about 1.0 s, `small.en` about 3.0 s (too slow on
+   this CPU). Next: the developer and a few others record the sentences (real Indian voices; the baseline is a US
+   voice).
 
 ## The layout for the first call
 

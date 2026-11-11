@@ -120,7 +120,7 @@ minutes is refused.
 | Tool | What it does |
 |---|---|
 | get_call_context | Why the call is happening, the first name, and which identity questions to ask |
-| verify_identity | Checks the full name plus a field marked "Ask to confirm" (e.g. customer ID; the number part or last four characters are enough). Three failures lock the call and hand it to a person. A check with only a first name, or the right name with no answer to the identity question, is answered by asking for it without using a try, twice; the third locks the call the same way |
+| verify_identity | Checks the full name plus a field marked "Ask to confirm" (e.g. customer ID; the number part or last four characters are enough). The name is matched the way a phone ear spells it (`NameMatch`): Surish or Sirish for Suresh, Erfan for Irfan, Laxminarayanan for Lakshmi Narayanan pass; a different consonant (Rajesh for Ramesh), another ending (Kumari for Kumar) or a short name spelled differently (Mona for Meena) does not. A few different names still pass as one (Karan and Kiran, Sunil and Sonal, Kamal and Komal), so the identity answer must always be right too. Three failures lock the call and hand it to a person. A check with only a first name, or the right name with no answer to the identity question, is answered by asking for it without using a try, twice; the third locks the call the same way |
 | get_contact_details | The fields the AI may say: "To anyone" fields at once, "Only after verified" fields after the check, "Never" fields never |
 | search_faq | Answers from the AI knowledge base only |
 | schedule_callback | Books a call-back for staff; an unknown caller becomes a contact |

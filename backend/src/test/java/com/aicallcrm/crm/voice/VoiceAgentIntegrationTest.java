@@ -221,6 +221,32 @@ class VoiceAgentIntegrationTest {
     }
 
     @Test
+    void aNameTheEarSpelledDifferentlyPassesButADifferentNameUsesATry() throws Exception {
+        approve("Incoming calls");
+        String phone = phone();
+        contact(admin, "Lakshmi Narayanan", phone, "\"customer_ref\":\"CR-77011\",\"balance_due\":\"900\"");
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        // Heard as one word: the whole name, not a first name, so it is not asked for again.
+        tool(call, "verify_identity", "{\"full_name\":\"Laxminarayanan\",\"answers\":{\"customer_ref\":\"CR-77011\"}}")
+                .andExpect(jsonPath("$.data.verified").value(true))
+                .andExpect(jsonPath("$.data.attempts_left").value(3));
+
+        String other = phone();
+        contact(admin, "Suresh Kumar", other, "\"customer_ref\":\"CR-77012\",\"balance_due\":\"900\"");
+        String second = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + other + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        tool(second, "verify_identity", "{\"full_name\":\"Sudesh Kumar\",\"answers\":{\"customer_ref\":\"CR-77012\"}}")
+                .andExpect(jsonPath("$.data.verified").value(false))
+                .andExpect(jsonPath("$.data.attempts_left").value(2));
+        tool(second, "verify_identity", "{\"full_name\":\"Sirish Kumar\",\"answers\":{\"customer_ref\":\"0000\"}}")
+                .andExpect(jsonPath("$.data.verified").value(false))
+                .andExpect(jsonPath("$.data.attempts_left").value(1));
+        tool(second, "verify_identity", "{\"full_name\":\"Sirish Kumar\",\"answers\":{\"customer_ref\":\"CR-77012\"}}")
+                .andExpect(jsonPath("$.data.verified").value(true));
+    }
+
+    @Test
     void aMissingIdentityAnswerIsAskedForWithoutUsingATry() throws Exception {
         approve("Incoming calls");
         String phone = phone();

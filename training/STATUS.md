@@ -14,6 +14,24 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 11 November 2026: NAMES ARE MATCHED THE WAY THE EAR SPELLS THEM (user: "Yes, fix names")
+
+`VoiceTools.nameMatches` now uses `NameMatch`: same-sounding spellings are equal (ksh/x, ph/f, bh/dh/th/gh/kh/jh,
+sh/s, w/v, ee/i, oo/u, an h after the first letter, double letters); after that vowels may differ if every consonant
+is the same and in order, the ending agrees (vowel or consonant) and the name has 3+ consonants (short names exact); a
+name heard joined up or split differently must cut back into the registered words, each piece by the same rules.
+Passes: Surish/Sirish Kumar, Mohammed Erfan, Muhammad Erfin, Laxminarayanan, Laxmina Rianan, Dipak, Pavan, Karthick
+Ragavan, Meenaiyer. Still refused: Rajesh for Ramesh, Sudesh for Suresh, Mahesh/Mukesh, Divya/Priya, Mona or Mani for
+Meena, Kumari for Kumar, Kamala for Kamal, Kumaridevi, Monaiyer, a first name alone, "syringe", "pre-eventkadish".
+Also: a name that matches with fewer words (heard as one word) is no longer asked for again as "a first name only".
+Over 123 common first names, 7 pairs now count as one: 4 are one name spelled two ways (Geeta/Gita, Seema/Sima,
+Pavan/Pawan, Arvind/Aravind), 3 are different people (Karan/Kiran, Sunil/Sonal, Kamal/Komal): accepted because the
+identity answer (customer ID, date of birth) must still be exact. Two earlier drafts were caught by the tests (joined-up
+names skipped the short-name and ending rules: "Monaiyer", "Kumaridevi") before the cut-into-words version.
+Tests: backend 90/90 (`VoiceRulesTest` names case; `VoiceAgentIntegrationTest`: "Laxminarayanan" verifies at once,
+"Sudesh Kumar" uses a try, "Sirish Kumar" with the right ID verifies). The training kit's simulator (`callkit.py`)
+still matches names exactly: its callers type names, so the 60-call scores are unaffected.
+
 # 11 November 2026: ITEM (4) — THE EAR CHECK IS BUILT; BASELINE SAYS INDIAN NAMES ARE THE RISK
 
 `voice-engine/ear_check.py` + `ear_sentences.txt` (24 sentences callers really say, each with the key words the CRM

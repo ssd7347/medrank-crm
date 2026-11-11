@@ -126,6 +126,40 @@ class VoiceRulesTest {
     }
 
     @Test
+    void nameCheckForgivesHowTheEarSpellsIndianNamesButNotADifferentName() {
+        // What Whisper actually wrote on the phone line (ear check, 11 Nov), and common spellings of the same name.
+        assertThat(VoiceTools.nameMatches("Surish Kumar", "Suresh Kumar")).isTrue();
+        assertThat(VoiceTools.nameMatches("Sirish Kumar", "Suresh Kumar")).isTrue();
+        assertThat(VoiceTools.nameMatches("Mohammed Erfan", "Mohammed Irfan")).isTrue();
+        assertThat(VoiceTools.nameMatches("Muhammad Erfin", "Mohammed Irfan")).isTrue();
+        assertThat(VoiceTools.nameMatches("Laxminarayanan", "Lakshmi Narayanan")).isTrue();
+        assertThat(VoiceTools.nameMatches("Laxmina Rianan", "Lakshmi Narayanan")).isTrue();
+        assertThat(VoiceTools.nameMatches("Laxmi Narayanan", "Lakshmi Narayanan")).isTrue();
+        assertThat(VoiceTools.nameMatches("Dipak Sharma", "Deepak Sharma")).isTrue();
+        assertThat(VoiceTools.nameMatches("Pavan Kumar", "Pawan Kumar")).isTrue();
+        assertThat(VoiceTools.nameMatches("Karthick Ragavan", "Karthik Raghavan")).isTrue();
+        assertThat(VoiceTools.nameMatches("Venkatesh Prasad", "Venkatesh Prasad")).isTrue();
+        assertThat(VoiceTools.nameMatches("Meenaiyer", "Meena Iyer")).isTrue();
+
+        // A different name, a missing surname, or what the ear made of a name it did not catch: still no.
+        assertThat(VoiceTools.nameMatches("Rajesh Kumar", "Ramesh Kumar")).isFalse();
+        assertThat(VoiceTools.nameMatches("Sudesh Kumar", "Suresh Kumar")).isFalse();
+        assertThat(VoiceTools.nameMatches("Mahesh Kumar", "Mukesh Kumar")).isFalse();
+        assertThat(VoiceTools.nameMatches("Divya Shankar", "Priya Shankar")).isFalse();
+        assertThat(VoiceTools.nameMatches("Mona Iyer", "Meena Iyer")).isFalse();     // short names match exactly
+        assertThat(VoiceTools.nameMatches("Mani Iyer", "Meena Iyer")).isFalse();
+        assertThat(VoiceTools.nameMatches("Kumari Devi", "Kumar Devi")).isFalse();     // a final vowel: another person
+        assertThat(VoiceTools.nameMatches("Kamala Rao", "Kamal Rao")).isFalse();
+        assertThat(VoiceTools.nameMatches("Kumaridevi", "Kumar Devi")).isFalse();      // joined up, same rules
+        assertThat(VoiceTools.nameMatches("Monaiyer", "Meena Iyer")).isFalse();
+        assertThat(VoiceTools.nameMatches("Suresh", "Suresh Kumar")).isFalse();
+        assertThat(VoiceTools.nameMatches("Kumar Suresh", "Suresh Kumar Reddy")).isFalse();
+        assertThat(VoiceTools.nameMatches("there is no syringe here", "Suresh Kumar")).isFalse();
+        assertThat(VoiceTools.nameMatches("pre-eventkadish", "Priya Venkatesh")).isFalse();
+        assertThat(VoiceTools.nameMatches("Lakshmi", "Lakshmi Narayanan")).isFalse();
+    }
+
+    @Test
     void scriptPlaceholdersAreFilledAndUnknownOnesDropped() {
         assertThat(VoiceScriptService.render("Hello {{first_name}} from {{company_name}}. {{something_else}}",
                 Map.of("first_name", "Priya", "company_name", "Acme"))).isEqualTo("Hello Priya from Acme.");
