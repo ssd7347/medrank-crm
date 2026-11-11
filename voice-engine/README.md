@@ -111,5 +111,7 @@ Then:
 
 The report is `recordings/ear-report.md` (every misheard sentence, said against heard) and `ear-report.json`.
 `python ear_check.py --piper recordings/piper-lessac` makes a baseline "speaker" from Piper's own voice.
+`--hints none right decoy` also hears each sentence with Whisper told the name the CRM expects (right) or a similar other
+person's name (decoy), and counts how often the decoy ends up in the transcript.
 What it cannot copy: the caller's own phone, VoLTE's wider-band audio and whatever the networks and Plivo do
 between them; the first real call is still the real test.

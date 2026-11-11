@@ -14,6 +14,35 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 11 November 2026, night: NAME HINTS — SMALL.EN TOLD THE CONTACT'S NAME GETS EVERY NAME RIGHT (user: "Yes, try name hints")
+
+On an outbound call the CRM knows whose number it rang, so Whisper can be told that name (faster-whisper `hotwords`;
+`engine.stt_pcm(audio, model, hint)`, blank by default, so live calls are unchanged until the CRM sends a name).
+`ear_check.py --hints none right decoy`: right = the name the CRM expects (`ear_sentences.txt` now has
+"name / decoy" on the 5 name sentences; other sentences get the contact's name, as every turn of a call would);
+decoy = a similar other person's name (Rajesh for Ramesh, Narasimhan for Narayanan, Divya for Priya, Sudesh for Suresh,
+Imran for Irfan), as when someone else answers the contact's phone; "decoy heard" = the transcript took that name.
+A first try compared hotwords with an initial_prompt ("The caller's name is ..."): the same results, so hotwords.
+
+**Key words heard out of 37 (decoy heard out of 5), phone line / mobile codec:**
+| Ear, voice | no hint | right hint | decoy hint |
+|---|---|---|---|
+| base.en, Siva | 27 / 25 | 31 / 29 | 28 (2) / 26 (2) |
+| small.en, Siva | 34 / 34 | **36 / 35** | 34 (1) / 33 (1) |
+| base.en, Piper | 33 / 34 | 36 / 36 | 35 (0) / 35 (0) |
+| small.en, Piper | 34 / 34 | **37 / 37** | 37 (0) / 37 (0) |
+With the right hint **small.en got all 5 names right for both voices on both paths** (Lakshmi Narayanan, Priya
+Venkatesh, Suresh, Mohammed Irfan; without: "Laxmina Rainan", "Mohamad Ithwan"). What is left for Siva is the
+check-up sentence ("shakap", "shut up"), which no name hint touches. Unrelated sentences were not harmed (the contact's name was
+inserted 0 times in 304 hinted sentences without a name). **The decoy:** small.en took it once in 10 (Siva: "There is no Sudesh here" for
+Suresh, a sentence about someone absent); it never turned a caller's own name into the decoy (Ramesh, Lakshmi
+Narayanan, Priya, Irfan all stayed). **base.en did: "Yes, this is Rajesh Kumar speaking" (said Ramesh) on both
+paths**, plus Sudesh: 2 of 5. So hints are safe enough with small.en, not with base.en; and the identity answer must
+still be exact, so a decoy name alone verifies nobody. Small sample: 2 voices, 5 names.
+Times (clean this run): base.en ~1.0 s, small.en ~3.0 s per sentence on this CPU; the hint costs nothing measurable.
+NEXT if wanted: send the contact's name from the CRM's live `open` reply to the engine and use it as the hint on
+every turn of that call (inbound calls from a known number too); `ear_check` stays the way to re-measure.
+
 # 11 November 2026, evening: THE FIRST INDIAN VOICE (the user's) — SMALL.EN HEARS IT FAR BETTER ON THE LINE
 
 The user read the 24 sentences into their phone (`recordings/siva/all.mp4`, 112 s, peak -11 dBFS; not committed).

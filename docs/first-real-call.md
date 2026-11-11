@@ -43,7 +43,10 @@ until that call and a pilot (20–50 consenting contacts, every transcript read)
    `base.en` 27 (25 after a mobile codec), `small.en` 34.** base.en on the line also missed clinic, Sunday, fee,
    appointment and a digit; small.en missed only names and the sentence about the check-up fee. So the ear should be `small.en`, which is too
    slow on the laptop's CPU: **the speech engine should run on the GPU machine with the brain** (part of the client's
-   GPU decision). More voices still to record before deciding; names (Irfan, Venkatesh) are still misheard.
+   GPU decision). More voices still to record before deciding. **Name hints (11 Nov, night):** told the contact's name
+   (Whisper `hotwords`), small.en got every name right for both voices (36 and 37 of 37 key words); told a similar
+   other person's name, it never turned a caller's own name into it (base.en did: "Rajesh" for Ramesh). Not yet wired
+   into live calls (the CRM must send the name to the engine).
 
 ## The layout for the first call
 

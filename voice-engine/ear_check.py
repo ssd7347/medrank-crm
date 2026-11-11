@@ -51,17 +51,23 @@ PATHS = ("plain", "line", "mobile")
 class Sentence:
     text: str
     keys: list[str] = field(default_factory=list)
+    name: str = ""              # the name the CRM would expect on this call (the hint)
+    decoy: str = ""             # a similar other person's name
 
 
 def load_sentences(path: Path) -> list[Sentence]:
-    """One sentence per line, `text | key; key`. Lines starting with # and blank lines do not count."""
+    """One sentence per line, `text | key; key | name / decoy`. Lines starting with # and blank lines do not
+    count."""
     out = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        text, _, keys = line.partition("|")
-        out.append(Sentence(text.strip(), [k.strip() for k in keys.split(";") if k.strip()]))
+        text, _, rest = line.partition("|")
+        keys, _, names = rest.partition("|")
+        name, _, decoy = names.partition("/")
+        out.append(Sentence(text.strip(), [k.strip() for k in keys.split(";") if k.strip()], name.strip(),
+                            decoy.strip()))
     return out
 
 
@@ -208,14 +214,15 @@ def utterances(line8: np.ndarray) -> list[np.ndarray]:
     return pieces
 
 
-def hear(stt, x16: np.ndarray, path: str) -> tuple[str, int, int]:
-    """(text, utterances, milliseconds in Whisper). ``stt`` takes 16 kHz float audio, like engine.stt_pcm."""
+def hear(stt, x16: np.ndarray, path: str, hint: str = "") -> tuple[str, int, int]:
+    """(text, utterances, milliseconds in Whisper). ``stt`` takes 16 kHz float audio, like engine.stt_pcm, and with
+    ``hint`` the name to expect as a second argument."""
     if path == "plain":
         pieces = [x16.astype(np.float32)]
     else:
         pieces = [phone.resample(u, RATE, STT_RATE) / 32768.0 for u in utterances(line_audio(x16, path == "mobile"))]
     t0 = time.perf_counter()
-    text = " ".join(t for t in (stt(p).strip() for p in pieces) if t)
+    text = " ".join(t for t in ((stt(p, hint) if hint else stt(p)).strip() for p in pieces) if t)
     return text, len(pieces), int((time.perf_counter() - t0) * 1000)
 
 
@@ -344,30 +351,54 @@ def make_piper(out: Path, sentences: list[Sentence], voice_path: str | None) -> 
 # ---------------------------------------------------------------------------------------------- the check
 
 
-def check(speakers, sentences, models: dict, paths) -> list[dict]:
+CONTACT = "Ramesh Kumar"        # the hint for sentences without a name: a call always has one contact's name
+
+
+def hint_for(s: Sentence, mode: str) -> str:
+    """none: no hint. right: the name the CRM expects (on a real outbound call, the contact's). decoy: a similar
+    other person's name, as when someone else answers the contact's phone."""
+    if mode == "none":
+        return ""
+    return (s.name if mode == "right" else s.decoy) or CONTACT
+
+
+def decoy_heard(s: Sentence, hyp: list[str]) -> bool:
+    """Did the transcript take a word of the decoy's name that the speaker did not say (Rajesh for Ramesh)?"""
+    said = set(normalise(s.text)) | set(normalise(s.name))
+    return any(w in hyp and w not in said for w in normalise(s.decoy))
+
+
+def check(speakers, sentences, models: dict, paths, hints=("none",)) -> list[dict]:
     results = []
     for speaker, audio in speakers.items():
         for name, stt in models.items():
             for path in paths:
-                items = []
-                for i, x16 in sorted(audio.items()):
-                    s = sentences[i - 1]
-                    text, pieces, ms = hear(stt, x16, path)
-                    ref, hyp = normalise(s.text), normalise(text)
-                    items.append({"n": i, "said": s.text, "heard": text, "words": len(ref), "errors": edits(ref, hyp),
-                                  "keys": len(s.keys), "keys_missed": [k for k in s.keys if not heard_key(k, hyp)],
-                                  "pieces": pieces, "ms": ms})
-                words = sum(it["words"] for it in items)
-                errors = sum(it["errors"] for it in items)
-                keys = sum(it["keys"] for it in items)
-                results.append({"speaker": speaker, "model": name, "path": path, "sentences": len(items),
-                                "words": words, "errors": errors, "wer": errors / words if words else 0.0,
-                                "keys": keys, "keys_heard": keys - sum(len(it["keys_missed"]) for it in items),
-                                "median_ms": int(statistics.median(it["ms"] for it in items)) if items else 0,
-                                "items": items})
-                r = results[-1]
-                print(f"{speaker:>16} {name:>9} {path:>6}: words wrong {r['wer']:6.1%}  "
-                      f"keys {r['keys_heard']}/{r['keys']}  {r['median_ms']} ms", flush=True)
+                for mode in hints:
+                    items = []
+                    for i, x16 in sorted(audio.items()):
+                        s = sentences[i - 1]
+                        text, pieces, ms = hear(stt, x16, path, hint_for(s, mode))
+                        ref, hyp = normalise(s.text), normalise(text)
+                        items.append({"n": i, "said": s.text, "heard": text, "words": len(ref),
+                                      "errors": edits(ref, hyp), "keys": len(s.keys),
+                                      "keys_missed": [k for k in s.keys if not heard_key(k, hyp)],
+                                      "decoy_heard": mode == "decoy" and bool(s.decoy) and decoy_heard(s, hyp),
+                                      "pieces": pieces, "ms": ms})
+                    words = sum(it["words"] for it in items)
+                    errors = sum(it["errors"] for it in items)
+                    keys = sum(it["keys"] for it in items)
+                    results.append({"speaker": speaker, "model": name, "path": path, "hint": mode,
+                                    "sentences": len(items), "words": words, "errors": errors,
+                                    "wer": errors / words if words else 0.0, "keys": keys,
+                                    "keys_heard": keys - sum(len(it["keys_missed"]) for it in items),
+                                    "decoys": sum(1 for i in audio if sentences[i - 1].decoy) if mode == "decoy" else 0,
+                                    "decoys_heard": sum(it["decoy_heard"] for it in items),
+                                    "median_ms": int(statistics.median(it["ms"] for it in items)) if items else 0,
+                                    "items": items})
+                    r = results[-1]
+                    decoys = f"  decoy heard {r['decoys_heard']}/{r['decoys']}" if mode == "decoy" else ""
+                    print(f"{speaker:>16} {name:>9} {path:>6} {mode:>5}: words wrong {r['wer']:6.1%}  "
+                          f"keys {r['keys_heard']}/{r['keys']}{decoys}  {r['median_ms']} ms", flush=True)
     return results
 
 
@@ -375,11 +406,14 @@ def report(results: list[dict], problems: list[str], levels: dict[str, float]) -
     out = [f"# Ear check, {datetime.now():%d %b %Y %H:%M}", "",
            "plain = straight to Whisper; line = Plivo's 8 kHz mu-law line and the call's end-of-speech cutting, as "
            "phone.py hears it; mobile = the same after a mobile phone's AMR-NB codec. Time = Whisper on this "
-           "computer per sentence (median).", "",
-           "| Speaker | Ear | Path | Words wrong | Key words heard | Time |", "|---|---|---|---|---|---|"]
+           "computer per sentence (median). Hint: none; right = Whisper told the name the CRM expects; decoy = told "
+           "a similar other person's name (decoy heard = the transcript took that other name).", "",
+           "| Speaker | Ear | Path | Hint | Words wrong | Key words heard | Decoy heard | Time |",
+           "|---|---|---|---|---|---|---|---|"]
     for r in results:
-        out.append(f"| {r['speaker']} | {r['model']} | {r['path']} | {r['wer']:.1%} ({r['errors']}/{r['words']}) | "
-                   f"{r['keys_heard']}/{r['keys']} | {r['median_ms']} ms |")
+        decoys = f"{r['decoys_heard']}/{r['decoys']}" if r.get("hint") == "decoy" else ""
+        out.append(f"| {r['speaker']} | {r['model']} | {r['path']} | {r.get('hint', 'none')} | {r['wer']:.1%} "
+                   f"({r['errors']}/{r['words']}) | {r['keys_heard']}/{r['keys']} | {decoys} | {r['median_ms']} ms |")
     if problems:
         out += ["", "## Problems with the recordings", ""] + [f"- {p}" for p in problems]
     if levels:
@@ -387,12 +421,15 @@ def report(results: list[dict], problems: list[str], levels: dict[str, float]) -
                 ", ".join(f"{s} {round(db)} dBFS" for s, db in levels.items()) +
                 ". Much below -20 dBFS and the call's end-of-speech rule may miss quiet words."]
     for r in results:
-        bad = [it for it in r["items"] if it["errors"] or it["keys_missed"] or it["pieces"] != 1]
+        bad = [it for it in r["items"] if it["errors"] or it["keys_missed"] or it["pieces"] != 1
+               or it.get("decoy_heard")]
         if not bad:
             continue
-        out += ["", f"## {r['speaker']}, {r['model']}, {r['path']}", ""]
+        out += ["", f"## {r['speaker']}, {r['model']}, {r['path']}, hint {r.get('hint', 'none')}", ""]
         for it in bad:
             notes = []
+            if it.get("decoy_heard"):
+                notes.append("DECOY HEARD")
             if it["keys_missed"]:
                 notes.append("missed: " + ", ".join(it["keys_missed"]))
             if it["pieces"] == 0:
@@ -410,6 +447,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--sentences", default=str(HERE / "ear_sentences.txt"))
     ap.add_argument("--models", nargs="+", default=["base.en", "small.en"])
     ap.add_argument("--paths", nargs="+", default=list(PATHS), choices=PATHS)
+    ap.add_argument("--hints", nargs="+", default=["none"], choices=("none", "right", "decoy"),
+                    help="also hear each sentence with the expected name (right) or a similar other name (decoy) "
+                         "given to Whisper")
     ap.add_argument("--piper", metavar="FOLDER", help="write Piper's reading of every sentence to FOLDER, then stop")
     ap.add_argument("--voice", help="the Piper .onnx voice for --piper (default: the engine's)")
     args = ap.parse_args(argv)
@@ -430,7 +470,7 @@ def main(argv: list[str] | None = None) -> int:
     models = {}
     for name in args.models:
         model = WhisperModel(name, device="cpu", compute_type="int8", cpu_threads=engine.CPU_THREADS)
-        models[name] = lambda audio, m=model: engine.stt_pcm(audio, m)
+        models[name] = lambda audio, hint="", m=model: engine.stt_pcm(audio, m, hint)
     align = models.get("small.en") or next(iter(models.values()))
     speakers, problems = find_recordings(folder, sentences, align)
     for p in problems:
@@ -439,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     levels = {s: statistics.median(20 * np.log10(np.max(np.abs(x)) + 1e-9) for x in a.values())
               for s, a in speakers.items()}
-    results = check(speakers, sentences, models, args.paths)
+    results = check(speakers, sentences, models, args.paths, args.hints)
     text = report(results, problems, levels)
     (folder / "ear-report.md").write_text(text, encoding="utf-8")
     (folder / "ear-report.json").write_text(json.dumps(results, indent=1), encoding="utf-8")

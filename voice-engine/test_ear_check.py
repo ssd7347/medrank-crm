@@ -83,6 +83,13 @@ class ScoringTest(unittest.TestCase):
         sentences = ec.load_sentences(ec.HERE / "ear_sentences.txt")
         self.assertEqual(len(sentences), 24)
         self.assertEqual(sentences[0].keys, ["ramesh kumar"])
+        self.assertEqual((sentences[0].name, sentences[0].decoy), ("Ramesh Kumar", "Rajesh Kumar"))
+        self.assertEqual(sum(1 for s in sentences if s.decoy), 5)
+        self.assertEqual((sentences[3].name, sentences[3].decoy), ("", ""))
+        for s in sentences:
+            if s.decoy:                           # a decoy is another person: something the speaker did not say
+                self.assertFalse(ec.decoy_heard(s, ec.normalise(s.text)), s.text)
+                self.assertTrue(ec.decoy_heard(s, ec.normalise(s.text + " " + s.decoy)), s.text)
         for s in sentences:                       # every key word is in its own sentence, as the scorer reads it
             self.assertTrue(s.keys, s.text)
             for k in s.keys:
@@ -200,10 +207,33 @@ class CheckTest(unittest.TestCase):
         self.assertEqual((r["words"], r["errors"], r["keys"], r["keys_heard"]), (9, 1, 2, 1))
         self.assertEqual(r["items"][1]["keys_missed"], ["ramesh kumar"])
         text = ec.report(results, ["x: no recording for sentence(s) 3 (left out)"], {"tone": -12.0})
-        self.assertIn("| tone | fake | plain | 11.1% (1/9) | 1/2 |", text)
+        self.assertIn("| tone | fake | plain | none | 11.1% (1/9) | 1/2 |  |", text)
         self.assertIn('heard "This is Rajesh Kumar." (missed: ramesh kumar)', text)
         self.assertIn("no recording for sentence(s) 3", text)
         json.dumps(results)                        # the JSON report can be written
+
+    def test_hints_reach_the_ear_and_a_decoy_taken_is_counted(self):
+        sentences = [ec.Sentence("This is Ramesh Kumar.", ["ramesh kumar"], "Ramesh Kumar", "Rajesh Kumar"),
+                     ec.Sentence("Call me later.", ["later"])]
+        speakers = {"tone": {1: burst(0.8), 2: burst(0.8, hz=400)}}
+        given = []
+
+        def ear(audio, hint=""):
+            given.append(hint)
+            if "Kumar" in hint and len(given) % 2:     # the name sentence: an ear that writes whatever it is told
+                return f"This is {hint}."
+            return "Call me later." if not len(given) % 2 else "This is Ramish Kumar."
+
+        results = ec.check(speakers, sentences, {"fake": ear}, ["plain"], ["none", "right", "decoy"])
+        self.assertEqual(given, ["", "", "Ramesh Kumar", ec.CONTACT, "Rajesh Kumar", ec.CONTACT])
+        none, right, decoy = results
+        self.assertEqual((none["keys_heard"], right["keys_heard"], decoy["keys_heard"]), (1, 2, 1))
+        self.assertEqual((decoy["decoys"], decoy["decoys_heard"]), (1, 1))
+        self.assertEqual(right["decoys_heard"], 0)
+        text = ec.report(results, [], {})
+        self.assertIn("| tone | fake | plain | decoy |", text)
+        self.assertIn("| 1/1 |", text)
+        self.assertIn("DECOY HEARD", text)
 
 
 if __name__ == "__main__":
