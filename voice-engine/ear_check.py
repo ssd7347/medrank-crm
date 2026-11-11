@@ -222,8 +222,9 @@ def hear(stt, x16: np.ndarray, path: str) -> tuple[str, int, int]:
 # ---------------------------------------------------------------------------------------------- recordings
 
 
-def split_reading(x16: np.ndarray, gap_s: float = 1.0) -> list[np.ndarray]:
-    """One long reading -> one piece per sentence, cut at pauses of at least ``gap_s`` seconds."""
+def reading_spans(x16: np.ndarray, gap_s: float = 1.0) -> list[tuple[int, int]]:
+    """One long reading -> (start, end) sample positions of each stretch of speech between pauses of at least
+    ``gap_s`` seconds, with 0.2 s of margin."""
     n = 320                                                                  # 20 ms frames
     frames = len(x16) // n
     if frames == 0:
@@ -232,7 +233,7 @@ def split_reading(x16: np.ndarray, gap_s: float = 1.0) -> list[np.ndarray]:
     db = 20 * np.log10(rms + 1e-9)
     floor, top = np.percentile(db, 10), np.percentile(db, 90)
     loud = db > floor + 0.35 * (top - floor)
-    pieces, start, quiet = [], None, 0
+    spans, start, quiet = [], None, 0
     for i, is_loud in enumerate(list(loud) + [False] * int(gap_s * 50 + 1)):
         if is_loud:
             start = i if start is None else start
@@ -242,9 +243,45 @@ def split_reading(x16: np.ndarray, gap_s: float = 1.0) -> list[np.ndarray]:
             if quiet >= gap_s * 50:
                 end = i - quiet + 1
                 if np.sum(loud[start:end]) >= 15:                            # 0.3 s of speech, not a click
-                    pieces.append(x16[max(0, (start - 10) * n):min(len(x16), (end + 10) * n)])
+                    spans.append((max(0, (start - 10) * n), min(len(x16), (end + 10) * n)))
                 start, quiet = None, 0
-    return pieces
+    return spans
+
+
+def split_reading(x16: np.ndarray, gap_s: float = 1.0) -> list[np.ndarray]:
+    """One long reading -> one piece per stretch of speech, cut at pauses of at least ``gap_s`` seconds."""
+    return [x16[a:b] for a, b in reading_spans(x16, gap_s)]
+
+
+def group_pieces(texts: list[str], sentences: list[Sentence], most: int = 3) -> list[list[int]] | None:
+    """More pieces than sentences (the reader paused inside a sentence, or coughed): which neighbouring pieces make up
+    each sentence, chosen so that what was heard matches the sentences best. Each sentence gets 1 to ``most`` pieces
+    in order. None if the pieces cannot cover the sentences."""
+    m, k = len(texts), len(sentences)
+    if not k <= m <= most * k:
+        return None
+    refs = [normalise(s.text) for s in sentences]
+    inf = float("inf")
+    cost = [[inf] * (k + 1) for _ in range(m + 1)]
+    back = [[0] * (k + 1) for _ in range(m + 1)]
+    cost[0][0] = 0
+    for i in range(1, m + 1):
+        for j in range(1, k + 1):
+            for take in range(1, min(most, i) + 1):
+                before = cost[i - take][j - 1]
+                if before == inf:
+                    continue
+                c = before + edits(refs[j - 1], normalise(" ".join(texts[i - take:i])))
+                if c < cost[i][j]:
+                    cost[i][j], back[i][j] = c, take
+    if cost[m][k] == inf:
+        return None
+    groups, i = [], m
+    for j in range(k, 0, -1):
+        take = back[i][j]
+        groups.append(list(range(i - take, i)))
+        i -= take
+    return groups[::-1]
 
 
 def load_audio(path: Path) -> np.ndarray:
@@ -253,19 +290,31 @@ def load_audio(path: Path) -> np.ndarray:
     return decode_audio(str(path), sampling_rate=STT_RATE)
 
 
-def find_recordings(folder: Path, count: int) -> tuple[dict[str, dict[int, np.ndarray]], list[str]]:
-    """{speaker: {sentence number: 16 kHz audio}} and problems found."""
+def find_recordings(folder: Path, sentences: list[Sentence], align=None) -> tuple[dict[str, dict[int, np.ndarray]],
+                                                                                 list[str]]:
+    """{speaker: {sentence number: 16 kHz audio}} and problems found. ``align`` (16 kHz audio -> text) is used only
+    when a whole reading has more pieces than sentences, to find which pieces belong together."""
+    count = len(sentences)
     speakers, problems = {}, []
     for d in sorted(p for p in folder.iterdir() if p.is_dir()):
         files = [f for f in sorted(d.iterdir()) if f.is_file()]
         whole = [f for f in files if f.stem.lower() == "all"]
         if whole:
-            pieces = split_reading(load_audio(whole[0]))
-            if len(pieces) != count:
-                problems.append(f"{d.name}: {whole[0].name} has {len(pieces)} sentences by its pauses, not {count}; "
+            audio = load_audio(whole[0])
+            spans = reading_spans(audio)
+            groups = [[i] for i in range(len(spans))] if len(spans) == count else None
+            if groups is None and len(spans) > count and align is not None:
+                groups = group_pieces([align(audio[a:b]) for a, b in spans], sentences)
+                if groups is not None:
+                    joined = [f"sentence {j + 1} = pieces {'+'.join(str(i + 1) for i in g)}"
+                              for j, g in enumerate(groups) if len(g) > 1]
+                    problems.append(f"{d.name}: {whole[0].name} had {len(spans)} pieces by its pauses, not {count}; "
+                                    f"joined by matching them to the sentences: {', '.join(joined)}")
+            if groups is None:
+                problems.append(f"{d.name}: {whole[0].name} has {len(spans)} sentences by its pauses, not {count}; "
                                 "record it again with a 2-second pause between sentences, or one file per sentence")
                 continue
-            speakers[d.name] = {i + 1: p for i, p in enumerate(pieces)}
+            speakers[d.name] = {j + 1: audio[spans[g[0]][0]:spans[g[-1]][1]] for j, g in enumerate(groups)}
             continue
         found = {}
         for f in files:
@@ -375,14 +424,6 @@ def main(argv: list[str] | None = None) -> int:
     if not folder.is_dir():
         print(f"no folder {folder}: put recordings in {folder}/<speaker>/01.m4a ...", file=sys.stderr)
         return 2
-    speakers, problems = find_recordings(folder, len(sentences))
-    for p in problems:
-        print("note:", p)
-    if not speakers:
-        return 2
-    levels = {s: statistics.median(20 * np.log10(np.max(np.abs(x)) + 1e-9) for x in a.values())
-              for s, a in speakers.items()}
-
     import engine
     from faster_whisper import WhisperModel
 
@@ -390,6 +431,14 @@ def main(argv: list[str] | None = None) -> int:
     for name in args.models:
         model = WhisperModel(name, device="cpu", compute_type="int8", cpu_threads=engine.CPU_THREADS)
         models[name] = lambda audio, m=model: engine.stt_pcm(audio, m)
+    align = models.get("small.en") or next(iter(models.values()))
+    speakers, problems = find_recordings(folder, sentences, align)
+    for p in problems:
+        print("note:", p)
+    if not speakers:
+        return 2
+    levels = {s: statistics.median(20 * np.log10(np.max(np.abs(x)) + 1e-9) for x in a.values())
+              for s, a in speakers.items()}
     results = check(speakers, sentences, models, args.paths)
     text = report(results, problems, levels)
     (folder / "ear-report.md").write_text(text, encoding="utf-8")

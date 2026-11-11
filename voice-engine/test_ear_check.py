@@ -143,6 +143,18 @@ class RecordingsTest(unittest.TestCase):
         self.assertAlmostEqual(len(pieces[0]) / SR, 2.0 + 0.4, delta=0.15)  # both parts of sentence 1, with margins
         self.assertEqual(ec.split_reading(np.zeros(10, dtype=np.float32)), [])
 
+    def test_extra_pieces_are_matched_to_the_sentences(self):
+        sentences = [ec.Sentence("Call me later."), ec.Sentence("My date of birth is fifteenth August nineteen ninety"
+                                                                  " two."), ec.Sentence("Okay, thank you, bye.")]
+        # A pause inside sentence 2, and the pause between 1 and 2 is the shorter one: matching, not pause length.
+        self.assertEqual(ec.group_pieces(["Call me later.", "My birth update this", "15th August 1992",
+                                          "Okay, thank you. Bye"], sentences), [[0], [1, 2], [3]])
+        # A cough heard as nothing joins a neighbour; too few pieces, or far too many, cannot be matched.
+        self.assertEqual(ec.group_pieces(["", "Call me later", "my date of birth is 15 August 1992", "OK thank you bye"],
+                                         sentences), [[0, 1], [2], [3]])
+        self.assertIsNone(ec.group_pieces(["Call me later", "OK thank you bye"], sentences))
+        self.assertIsNone(ec.group_pieces(["x"] * 10, sentences))
+
     def test_find_recordings(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -156,11 +168,22 @@ class RecordingsTest(unittest.TestCase):
             (root / "short").mkdir()
             write_wav(root / "short" / "all.wav", np.concatenate([burst(0.8), hush(2.0), burst(0.8)]))
             (root / "empty").mkdir()
-            speakers, problems = ec.find_recordings(root, 3)
-        self.assertEqual(sorted(speakers), ["asha", "ravi"])
+            (root / "uma").mkdir()
+            write_wav(root / "uma" / "all.wav", np.concatenate([burst(0.8), hush(1.1), burst(0.5), hush(1.1), burst(0.5),
+                                                                hush(2.0), burst(0.8)]))
+            heard = iter(["one two", "my date of birth is", "fifteenth August", "four"])
+            sentences = [ec.Sentence("one two"), ec.Sentence("my date of birth is fifteenth August"),
+                         ec.Sentence("four")]
+            speakers, problems = ec.find_recordings(root, sentences, align=lambda audio: next(heard))
+            without, _ = ec.find_recordings(root, sentences)
+        self.assertEqual(sorted(speakers), ["asha", "ravi", "uma"])
         self.assertEqual(sorted(speakers["asha"]), [1, 3])
         self.assertEqual(sorted(speakers["ravi"]), [1, 2, 3])
-        self.assertEqual(len(problems), 3)
+        self.assertEqual(sorted(speakers["uma"]), [1, 2, 3])
+        self.assertAlmostEqual(len(speakers["uma"][2]) / SR, 0.5 + 1.1 + 0.5 + 0.4, delta=0.15)  # both pieces, one sound
+        self.assertEqual(len(problems), 4)
+        self.assertTrue(any("uma" in p and "sentence 2 = pieces 2+3" in p for p in problems))
+        self.assertNotIn("uma", without)                                     # no ear to match with: refused
         self.assertTrue(any("asha" in p and "2" in p for p in problems))
         self.assertTrue(any("short" in p and "2 sentences" in p for p in problems))
         self.assertTrue(any("empty" in p for p in problems))

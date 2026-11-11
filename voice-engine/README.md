@@ -97,8 +97,9 @@ Recording, for each person (about 5 minutes):
 1. Read the 24 sentences in `ear_sentences.txt` aloud as written, in your normal phone voice, holding the phone as
    on a call, in a normal room (not a studio, not a noisy road).
 2. Either one file per sentence named `01.m4a`, `02.m4a` ... `24.m4a`, or **one file `all.m4a`** reading them all
-   in order with a pause of about 2 seconds between sentences (easier; the tool cuts it at the pauses and refuses
-   it if the count is not 24). Any format a phone recorder makes is fine.
+   in order with a pause of about 2 seconds between sentences (easier; the tool cuts it at the pauses; if a pause
+   inside a sentence makes extra pieces, it joins neighbouring pieces to match the sentences and says which; too few
+   pieces are refused). Any format a phone recorder makes is fine.
 3. Put the files in `voice-engine/recordings/<name>/` (for example `recordings/siva/all.m4a`). Recordings are
    people's voices: the folder is in `.gitignore` and must never be committed or shared.
 

@@ -14,6 +14,37 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 11 November 2026, evening: THE FIRST INDIAN VOICE (the user's) — SMALL.EN HEARS IT FAR BETTER ON THE LINE
+
+The user read the 24 sentences into their phone (`recordings/siva/all.mp4`, 112 s, peak -11 dBFS; not committed).
+It gave 25 pieces: a pause of over a second inside sentence 6 ("My date of birth is ... fifteenth August"). Rejoining
+at the shortest pause was tried first and picked the wrong one (13+14; the tests caught it), so `ear_check.py` now
+transcribes the pieces once (small.en) and chooses the neighbour joins that best match the sentences
+(`group_pieces`): "sentence 6 = pieces 6+7", printed in the report. Engine tests 37/37.
+
+**Key words heard out of 37 (words wrong):**
+| Ear | plain | line | mobile |
+|---|---|---|---|
+| base.en, Siva | 31 (8.5%) | 27 (17.5%) | 25 (18.0%) |
+| small.en, Siva | 36 (5.2%) | 34 (9.5%) | 34 (8.1%) |
+| base.en, Piper | 33 (2.4%) | 33 (3.3%) | 34 (2.4%) |
+| small.en, Piper | 36 (0.5%) | 34 (2.4%) | 34 (2.4%) |
+Words wrong overstate it a little: the reader said "I'm", "phone number", "this clinic" (small.en heard those
+consistently). Read the key words. **With an Indian voice the phone line doubles base.en's errors** and it misses
+clinic, Sunday, fee, check-up ("cleaning Copernan sundae", "What did you keep on this?"), appointment ("apartment"),
+Suresh ("storage"), a digit of the mobile number ("double two"), and every name except Ramesh Kumar. **small.en on
+the line misses only names and sentence 23, "What is the fee for the check-up?"** (check-up heard as "shutup" in every small.en path; on the mobile path the whole sentence, fee too). With the new name matching, small.en's
+"Laxmina Rainan" passes as Lakshmi Narayanan; "Mohamad/Mohammed Ithwan" for Irfan does not (a different consonant,
+rightly refused). The line also cut sentence 6 into two turns (the call's 0.7 s end-of-speech rule): a caller who
+pauses mid-sentence gets a reply to half a sentence.
+Speed: this run's times were about twice the morning's for the same Piper files (the laptop was busier), so the
+morning's are the clean measure: base.en ~1.0 s, small.en ~3.0 s per sentence on this CPU. small.en on the laptop is
+too slow for a call; on a GPU it would be a fraction of a second.
+**Decision this points to (with the GPU decision, the client's):** the ear should be small.en, which means the speech
+engine runs on the GPU machine with the brain, not on the laptop. One speaker so far: more voices before deciding.
+Open: names still misheard (Irfan, Venkatesh) — next idea: on outbound calls, tell Whisper the contact's name
+(faster-whisper `hotwords`/`initial_prompt`), and measure it with this check; the 0.7 s end-of-speech rule.
+
 # 11 November 2026: NAMES ARE MATCHED THE WAY THE EAR SPELLS THEM (user: "Yes, fix names")
 
 `VoiceTools.nameMatches` now uses `NameMatch`: same-sounding spellings are equal (ksh/x, ph/f, bh/dh/th/gh/kh/jh,

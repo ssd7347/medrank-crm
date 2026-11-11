@@ -39,8 +39,11 @@ until that call and a pilot (20–50 consenting contacts, every transcript read)
    word, so such callers would have failed it. **Fixed the same day:** names are now matched the way the ear spells
    them (`NameMatch`, see `docs/voice-agent.md`); names the ear garbles completely ("syringe" for Suresh) still fail
    and use a try. Speed on the laptop's CPU, per sentence: `base.en` about 1.0 s, `small.en` about 3.0 s (too slow on
-   this CPU). Next: the developer and a few others record the sentences (real Indian voices; the baseline is a US
-   voice).
+   this CPU). **First Indian voice (the developer's, 11 Nov evening), key words heard out of 37 on the phone line:
+   `base.en` 27 (25 after a mobile codec), `small.en` 34.** base.en on the line also missed clinic, Sunday, fee,
+   appointment and a digit; small.en missed only names and the sentence about the check-up fee. So the ear should be `small.en`, which is too
+   slow on the laptop's CPU: **the speech engine should run on the GPU machine with the brain** (part of the client's
+   GPU decision). More voices still to record before deciding; names (Irfan, Venkatesh) are still misheard.
 
 ## The layout for the first call
 
