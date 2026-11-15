@@ -47,8 +47,9 @@ own account is for demos and test calls to your team.
    is still missing: `docs/first-real-call.md`).
 
 Known limits: Plivo's recording is not switched on, so calls keep a transcript but no recording; the starter
-openings do not say the call may be recorded (add that line if recording is switched on). The models load on
-the first call after the engine starts, so that caller waits several seconds.
+openings do not say the call may be recorded (add that line if recording is switched on). The speech engine loads
+and runs both its models as it starts (`WARM_UP`, on by default), so the first caller does not wait for them; the
+brain is warmed by the CRM while each call's opening line plays.
 
 A transfer to the desk on Plivo waits until the caller has heard "I am connecting you": the hand-over marks the call
 (`transfer_pending`), and when the engine has played the line and asks to end the call, the CRM transfers it instead

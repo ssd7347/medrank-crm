@@ -92,7 +92,8 @@ Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
 ## Order on the day
 
 1. Laptop: start the CRM, the engine and the gateway (`uvicorn gateway:app --host 127.0.0.1 --port 8099`); `/health`
-   on the engine answers on `127.0.0.1:8090`, and through the gateway it must give 404.
+   on the engine answers on `127.0.0.1:8090` and says `"warmed": true` a few seconds after the start (both speech
+   models loaded and run once; `warm_up_error` says why if not), and through the gateway it must give 404.
 2. GPU machine: model loaded and warmed; SSH tunnel up; the CRM's test console with "Our own model" answers in ~1 s.
 3. The tunnel up (to :8099 only); settings filled in; CRM restarted. From mobile data, open
    `https://<tunnel>/api/auth/me`: it must say 404.
@@ -105,5 +106,4 @@ Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
 6. Afterwards: read the transcript and tool trail on `/voice/calls`; write down what Whisper heard against what was
    said, and the reply times. Then take the tunnel down and stop the GPU machine.
 
-Known limits that stay for now: no call recording (the starter openings no longer say "may be recorded"); the model
-loads on the first call after the engine starts.
+Known limit that stays for now: no call recording (the starter openings no longer say "may be recorded").

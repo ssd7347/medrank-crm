@@ -29,7 +29,10 @@ python download_models.py         # Piper voice (~60 MB) + Whisper base.en (~140
 uvicorn engine:app --host 127.0.0.1 --port 8090
 ```
 
-Check it: <http://127.0.0.1:8090/health>. Other voices: `python download_models.py en_GB-alba-medium`, then set
+Check it: <http://127.0.0.1:8090/health>. As it starts, the engine loads both models and runs each once in the
+background (about 4 s on this laptop), so the first caller does not wait for them: `/health` then says
+`"warmed": true`, or gives the reason in `warm_up_error` (the models then load on first use, as with `WARM_UP=off`).
+Other voices: `python download_models.py en_GB-alba-medium`, then set
 `PIPER_VOICE=voices/en_GB-alba-medium.onnx`. A clearer but slower ear: `STT_MODEL=small.en`.
 
 ## 2. Our own brain (optional)

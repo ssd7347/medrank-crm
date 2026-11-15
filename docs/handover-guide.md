@@ -132,8 +132,7 @@ the real person would know (for example a customer ID): the agent uses them to c
 
 **Known limits today**: replies are expected to take about 3 seconds on the line (the target is about 2); the agent
 speaks with a US English voice; Indian names and some words can be misheard (the CRM sends the contact's name to
-the speech engine so it spells it right, which works with the better ear, `small.en`, on the GPU); the first call
-after the speech engine starts waits a few seconds while it loads.
+the speech engine so it spells it right, which works with the better ear, `small.en`, on the GPU).
 
 ## 6. Going live safely, step by step
 

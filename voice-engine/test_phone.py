@@ -528,7 +528,9 @@ class EndpointTest(unittest.TestCase):
         import engine
         self.engine = engine
         self.crm = FakeCrm([phone.Reply("Thank you. Goodbye.", True)])
-        saved = (engine.VOICE_HMAC_SECRET, engine.stt_pcm, engine.tts_pcm, phone.Crm, engine.STT_MODEL, engine.NAME_HINTS)
+        saved = (engine.VOICE_HMAC_SECRET, engine.stt_pcm, engine.tts_pcm, phone.Crm, engine.STT_MODEL, engine.NAME_HINTS,
+                 engine.WARM_UP)
+        engine.WARM_UP = "off"      # no real models in these tests (WarmUpTest covers the warm-up)
         engine.VOICE_HMAC_SECRET = self.SECRET
         engine.STT_MODEL, engine.NAME_HINTS = "small.en", "auto"
         engine.stt_pcm = lambda audio: "I will pay on Friday"
@@ -537,7 +539,7 @@ class EndpointTest(unittest.TestCase):
 
         def restore():
             (engine.VOICE_HMAC_SECRET, engine.stt_pcm, engine.tts_pcm, phone.Crm, engine.STT_MODEL,
-             engine.NAME_HINTS) = saved
+             engine.NAME_HINTS, engine.WARM_UP) = saved
         self.addCleanup(restore)
 
     def refused(self, url):
@@ -638,6 +640,95 @@ class EndpointTest(unittest.TestCase):
             self.assertFalse(on(model, "auto"), model)
             self.assertTrue(on(model, " ON "), model)
         self.assertFalse(on("base.en", "something else"))
+
+
+class WarmUpTest(unittest.TestCase):
+    """engine.py loads and runs both speech models as it starts, so the first caller does not wait in silence."""
+
+    def setUp(self):
+        import engine
+        self.engine = engine
+        saved = (engine.stt_pcm, engine.speak_wav, engine.warm_up, engine.WARM_UP, dict(engine._warm), engine._whisper)
+
+        def restore():
+            (engine.stt_pcm, engine.speak_wav, engine.warm_up, engine.WARM_UP, warm, engine._whisper) = saved
+            engine._warm.clear()
+            engine._warm.update(warm)
+        self.addCleanup(restore)
+        engine._warm.update(warmed=False, error=None)
+
+    def health(self):
+        from starlette.testclient import TestClient
+        return TestClient(self.engine.app).get("/health").json()
+
+    def test_both_models_are_run_once_and_health_says_so(self):
+        ran = []
+        self.engine.stt_pcm = lambda audio: ran.append(("ears", audio.shape, audio.dtype.name)) or ""
+        self.engine.speak_wav = lambda text: ran.append(("voice", text)) or b""
+        self.assertFalse(self.health()["warmed"])
+        self.engine.warm_up()
+        self.assertEqual(ran, [("ears", (16000,), "float32"), ("voice", "Hello.")])
+        self.assertEqual((self.health()["warmed"], self.health()["warm_up_error"]), (True, None))
+
+    def test_a_missing_voice_is_reported_and_does_not_stop_the_engine(self):
+        from fastapi import HTTPException
+
+        def voice(text):
+            raise HTTPException(503, "Piper voice not found at voices/x.onnx. Run download_models.py.")
+        self.engine.stt_pcm = lambda audio: ""
+        self.engine.speak_wav = voice
+        with self.assertLogs("uvicorn.error", "WARNING"):
+            self.engine.warm_up()
+        h = self.health()
+        self.assertFalse(h["warmed"])
+        self.assertEqual(h["warm_up_error"], "HTTPException: Piper voice not found at voices/x.onnx. Run download_models.py.")
+
+    def test_the_warm_up_starts_with_the_engine_unless_switched_off(self):
+        import threading
+        from starlette.testclient import TestClient
+        started = threading.Event()
+        self.engine.warm_up = started.set
+        self.engine.WARM_UP = "on"
+        with TestClient(self.engine.app) as web:
+            self.assertTrue(started.wait(5))
+            self.assertEqual(web.get("/health").status_code, 200)
+        started.clear()
+        self.engine.WARM_UP = " OFF "
+        with TestClient(self.engine.app):
+            self.assertFalse(started.wait(0.5))
+        self.assertTrue(all(self.engine.warm_up_on(s) for s in ("on", "", "yes", "anything")))
+        self.assertFalse(any(self.engine.warm_up_on(s) for s in ("off", "0", "false", "no", " No ")))
+
+    def test_a_call_during_the_warm_up_does_not_load_the_model_a_second_time(self):
+        import sys
+        import threading
+        import time
+        import types
+        loads = []
+
+        class WhisperModel:
+            def __init__(self, *args, **kwargs):
+                loads.append(args)
+                time.sleep(0.3)         # loading takes a while
+        fake = types.ModuleType("faster_whisper")
+        fake.WhisperModel = WhisperModel
+        saved = sys.modules.get("faster_whisper")
+        sys.modules["faster_whisper"] = fake
+        try:
+            self.engine._whisper = None
+            got = []
+            threads = [threading.Thread(target=lambda: got.append(self.engine.whisper())) for _ in range(4)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        finally:
+            if saved is None:
+                sys.modules.pop("faster_whisper", None)
+            else:
+                sys.modules["faster_whisper"] = saved
+        self.assertEqual(len(loads), 1)
+        self.assertEqual(len({id(m) for m in got}), 1)
 
 
 if __name__ == "__main__":

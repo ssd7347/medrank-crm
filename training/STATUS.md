@@ -14,6 +14,26 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 15 November 2026: THE FIRST CALLER NO LONGER WAITS FOR THE SPEECH MODELS (user: "Yes, do it")
+
+The other known limit from the docs. The speech engine loaded Whisper and Piper on first use, so the first call after
+it started had seconds of silence. Now `engine.py` loads both and runs each once (a second of silence through
+Whisper, "Hello." through Piper) in a background thread as it starts (FastAPI lifespan; setting `WARM_UP`, on by
+default). `/health` answers at once and adds `"warmed"` and `warm_up_error`; a failure (say, no voice file) is logged
+and shown there, never fatal, and the models then load on first use as before. Each model's load is behind a lock,
+so a call arriving during the warm-up waits for the one load instead of starting a second. The brain was already
+warmed per call while the opening line plays (`LlmBrain` sends a warm-up as each call opens), so nothing changed there.
+Measured on this laptop (real engine, base.en, CPU, port 8095): warm-up off: first /tts 2.26 s and first /stt 2.37 s,
+against 0.07 s and 0.67 s afterwards; warm-up on: warmed 3.9 s after the start, first /tts 0.10 s and first /stt
+0.69 s; /health was up after 1.1 s both times. Not measured on the GPU machine with small.en (its load is longer, so
+the gain should be larger; check `"warmed": true` before the first call, now in first-real-call step 1).
+Tests (`test_phone.WarmUpTest`, 4, fake models): both models are run once and /health says warmed; a missing voice is
+reported on /health and in the log without stopping the engine; the warm-up starts with the engine and not with
+`WARM_UP=off`; four threads asking for Whisper during its load load it once (fails with the lock swapped for a no-op).
+`EndpointTest` now sets `WARM_UP=off`, since starting the app there began loading the real Piper voice in the
+background; checked that no real model is loaded during the test run. Engine 68/68.
+Docs: first-real-call (limit removed; step 1 checks `"warmed"`), hand-over guide, voice-agent, voice-engine README.
+
 # 15 November 2026: A DESK TRANSFER NO LONGER CUTS OFF "I AM CONNECTING YOU" (user: "do next eask")
 
 The known limit from the docs. Cause: at a hand-over the CRM asked Plivo to transfer the call at once, and Plivo

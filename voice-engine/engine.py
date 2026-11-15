@@ -6,7 +6,7 @@ machine, with no per-minute fees.
   * Voice: Piper (fast open text-to-speech that runs on a CPU). Default voice: en_US-lessac-medium.
 
 The CRM backend calls it; browsers never do. Endpoints:
-  GET  /health -> {"ok": true, "stt_model": ..., "voice": ...}
+  GET  /health -> {"ok": true, "stt_model": ..., "voice": ..., "warmed": true|false, "warm_up_error": null|"..."}
   POST /stt    body: audio bytes (WebM/Opus, WAV, MP3...)        -> {"text": "...", "ms": 412}
   POST /tts    body: {"text": "..."}                               -> audio/wav
   WS   /call?call_id=...&token=...                                  a real phone call streamed by Plivo (phone.py)
@@ -19,6 +19,8 @@ Settings (environment variables):
   CRM_URL           The CRM backend, for real calls. Default http://127.0.0.1:8082.
   VOICE_HMAC_SECRET The CRM's VOICE_HMAC_SECRET: checks each call's stream token and signs the CRM requests.
                     Blank: /call refuses every connection.
+  WARM_UP        on (default) / off. On: both models are loaded and run once in the background as the engine starts,
+                 so the first caller does not wait several seconds in silence. /health says when that is done.
   NAME_HINTS     on / off / auto (default). On a call to a known contact, tell Whisper the contact's name so it spells
                  it as registered. auto: on for small.en and larger, off for tiny and base, which in the ear check
                  (11 Nov 2026) sometimes wrote the expected name over the one said (told Rajesh, heard Ramesh: "Rajesh").
@@ -30,10 +32,13 @@ import asyncio
 import hmac
 import io
 import json
+import logging
 import os
 import tempfile
+import threading
 import time
 import wave
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import numpy as np
@@ -51,33 +56,74 @@ CPU_THREADS = int(os.environ.get("CPU_THREADS", "0"))
 CRM_URL = os.environ.get("CRM_URL", "http://127.0.0.1:8082")
 VOICE_HMAC_SECRET = os.environ.get("VOICE_HMAC_SECRET", "")
 NAME_HINTS = os.environ.get("NAME_HINTS", "auto")
+WARM_UP = os.environ.get("WARM_UP", "on")
 MAX_AUDIO_BYTES = 5 * 1024 * 1024
 
-app = FastAPI(title="AI Call CRM speech engine", docs_url=None, redoc_url=None)
+log = logging.getLogger("uvicorn.error")     # uvicorn's own log, so start-up notes show beside its "Started server"
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    if warm_up_on(WARM_UP):
+        # In the background: the engine answers /health at once, and a call that comes in meanwhile simply waits for
+        # the model being loaded (the locks below), as it would have without the warm-up.
+        threading.Thread(target=warm_up, name="warm-up", daemon=True).start()
+    yield
+
+
+app = FastAPI(title="AI Call CRM speech engine", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 _whisper = None
 _voice = None
+_whisper_lock = threading.Lock()    # one load, even when the warm-up and a first call ask at the same moment
+_voice_lock = threading.Lock()
+_warm = {"warmed": False, "error": None}
 
 
 def whisper():
-    """Loaded on first use: the first request after start-up takes a few seconds longer."""
+    """Loaded by the warm-up at start-up, or else on first use (that request then takes a few seconds longer)."""
     global _whisper
     if _whisper is None:
-        from faster_whisper import WhisperModel
+        with _whisper_lock:
+            if _whisper is None:
+                from faster_whisper import WhisperModel
 
-        _whisper = WhisperModel(STT_MODEL, device="cpu", compute_type="int8", cpu_threads=CPU_THREADS)
+                _whisper = WhisperModel(STT_MODEL, device="cpu", compute_type="int8", cpu_threads=CPU_THREADS)
     return _whisper
 
 
 def voice():
     global _voice
     if _voice is None:
-        from piper import PiperVoice
+        with _voice_lock:
+            if _voice is None:
+                from piper import PiperVoice
 
-        if not Path(PIPER_VOICE).exists():
-            raise HTTPException(503, f"Piper voice not found at {PIPER_VOICE}. Run download_models.py.")
-        _voice = PiperVoice.load(PIPER_VOICE)
+                if not Path(PIPER_VOICE).exists():
+                    raise HTTPException(503, f"Piper voice not found at {PIPER_VOICE}. Run download_models.py.")
+                _voice = PiperVoice.load(PIPER_VOICE)
     return _voice
+
+
+def warm_up_on(setting: str) -> bool:
+    """WARM_UP: only off / 0 / false / no turn it off."""
+    return setting.strip().lower() not in ("off", "0", "false", "no")
+
+
+def warm_up() -> None:
+    """Loads both models and runs each once (the first run of a loaded model is slow too), so the first call after
+    start-up answers as quickly as the rest. A failure is logged and shown on /health, never fatal: the models then
+    load on first use as before."""
+    t0 = time.perf_counter()
+    try:
+        stt_pcm(np.zeros(16000, dtype=np.float32))      # one second of silence
+        speak_wav("Hello.")
+    except Exception as e:      # a missing model or voice file: say so, keep serving
+        _warm["error"] = f"{type(e).__name__}: {getattr(e, 'detail', None) or e}"
+        log.warning("Warm-up failed, the models will load on first use: %s", _warm["error"])
+        return
+    _warm["warmed"] = True
+    log.info("Speech models warmed up in %.1f s", time.perf_counter() - t0)
 
 
 def check_token(x_speech_token: str | None = Header(default=None)):
@@ -87,7 +133,8 @@ def check_token(x_speech_token: str | None = Header(default=None)):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "stt_model": STT_MODEL, "voice": Path(PIPER_VOICE).stem}
+    return {"ok": True, "stt_model": STT_MODEL, "voice": Path(PIPER_VOICE).stem, "warmed": _warm["warmed"],
+            "warm_up_error": _warm["error"]}
 
 
 @app.post("/stt", dependencies=[Depends(check_token)])
