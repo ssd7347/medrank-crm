@@ -495,6 +495,57 @@ class VoiceAgentIntegrationTest {
     }
 
     @Test
+    void aCallerWhoAskedToStopIsOptedOutWhenTheCallEndsEvenIfTheAgentDidNot() throws Exception {
+        approve("Incoming calls");
+        // A live call: the stand-in brain does not catch "take me off your list", and the caller hangs up.
+        String phone = phone();
+        long contact = contact(admin, "Kavya Iyer", phone, "\"customer_ref\":\"CR-3141\"");
+        consent(admin, contact, false);
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        String id = "{\"call_id\":\"" + call + "\"";
+        hook("/live/open", id + "}").andExpect(status().isOk());
+        hook("/live/turn", id + ",\"said\":\"Please take me off your list.\"}").andExpect(status().isOk());
+        mvc.perform(auth(get("/api/contacts/" + contact + "/voice-consent"), admin))
+                .andExpect(jsonPath("$[0].state").value("GRANTED"));
+        hook("/webhooks/call-ended", id + ",\"status\":\"completed\"}").andExpect(jsonPath("$.applied").value(true));
+        mvc.perform(auth(get("/api/contacts/" + contact + "/voice-consent"), admin))
+                .andExpect(jsonPath("$[0].state").value("OPTED_OUT"));
+        mvc.perform(auth(get("/api/voice/calls/" + call), admin))
+                .andExpect(jsonPath("$.call.outcome").value("OPTED_OUT"))
+                .andExpect(jsonPath("$.transcript[?(@.tool == 'opt_out')].status").value(Matchers.contains("OK")));
+        // AI calls only, as when the agent records it: the contact is not marked "Do not call".
+        mvc.perform(auth(get("/api/contacts/" + contact), admin))
+                .andExpect(jsonPath("$.status").value(Matchers.not("DO_NOT_CALL")));
+
+        // A platform's own transcript at the hang-up: "don't call me again" is honoured the same way.
+        String phone2 = phone();
+        long other = contact(admin, "Rahul Nair", phone2, "\"customer_ref\":\"CR-2236\"");
+        consent(admin, other, false);
+        String call2 = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone2 + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        hook("/webhooks/call-ended", "{\"call_id\":\"" + call2 + "\",\"status\":\"completed\",\"transcript\":["
+                + "{\"role\":\"agent\",\"text\":\"Hello, this is an AI assistant.\"},"
+                + "{\"role\":\"user\",\"text\":\"Don't call me again.\"}]}").andExpect(jsonPath("$.applied").value(true));
+        mvc.perform(auth(get("/api/contacts/" + other + "/voice-consent"), admin))
+                .andExpect(jsonPath("$[0].state").value("OPTED_OUT"));
+
+        // Nothing of the sort said: the call ends with no interaction and the consent stays.
+        String phone3 = phone();
+        long quiet = contact(admin, "Sneha Das", phone3, "\"customer_ref\":\"CR-1732\"");
+        consent(admin, quiet, false);
+        String call3 = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone3 + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        hook("/webhooks/call-ended", "{\"call_id\":\"" + call3 + "\",\"status\":\"completed\",\"transcript\":["
+                + "{\"role\":\"user\",\"text\":\"Sorry, who is this? Call me back later.\"}]}");
+        mvc.perform(auth(get("/api/voice/calls/" + call3), admin))
+                .andExpect(jsonPath("$.call.outcome").value("NO_INTERACTION"))
+                .andExpect(jsonPath("$.transcript[?(@.tool == 'opt_out')]").isEmpty());
+        mvc.perform(auth(get("/api/contacts/" + quiet + "/voice-consent"), admin))
+                .andExpect(jsonPath("$[0].state").value("GRANTED"));
+    }
+
+    @Test
     void unknownCallerBecomesAContactOnCallback() throws Exception {
         approve("Incoming calls");
         String phone = phone();

@@ -14,6 +14,52 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 15 November 2026, night: COMPLIANCE CHECKLIST, DEMO COPY AND WALKTHROUGH RUN-SHEET; OPT-OUT AT HANG-UP (user: "do the works froom your side")
+
+**Compliance checklist** (`docs/compliance-checklist.md`, not legal advice): what the CRM enforces (each line checked
+in the code: consent, opt-out, Do not call, DND only BLOCKED and no provider connected, 09:00–20:00 IST that a campaign
+can only narrow, 2 a day 2 h apart, still-needed, AI disclosure, approved scripts, field privacy, identity check,
+hand-over, 365-day transcripts, audit, opt-out spike and cost alerts, Pause all); what it does not do yet; what only
+the company decides (Plivo/DLT/call classification, consent proof, DPDP items incl. hosting and Claude sending data
+to the USA, scripts, a transcript reader, the pilot); sign-off table. **Found while checking: there is no way to erase
+a person's data in the CRM** (no contact delete; only Do not call / opt-out; transcripts go after 365 days). Listed as
+2.1, not built.
+
+**Bug found and fixed: a caller who said "stop calling me" could be rung again.** Opt-out words were acted on only
+when the model logged an outcome (`CallerSignals.upgrade`). If the caller hung up first, or the model asked "are you
+sure?" instead, the call closed as NO_INTERACTION, which the campaign retries. Now `VoiceCallService.close` (every
+completed real call) runs `optOutIfAsked`: caller lines matching `CallerSignals.OPT_OUT` and no successful opt_out yet →
+consent withdrawn (AI calls only, as `upgrade` does), outcome OPTED_OUT if it was none/NO_INTERACTION, `opt_out OK`
+noted in the transcript (so never twice). `LiveCallService.turn` runs it too when the call was closed while the brain
+was answering. New test (live call, "Please take me off your list.", which the stand-in brain does not catch: consent
+still GRANTED after the turn, OPTED_OUT after the hang-up, contact not Do not call; a platform transcript with "Don't
+call me again"; a call with neither stays NO_INTERACTION with consent kept). Backend 93/93. **Still open:** words cut
+off by an instant hang-up never reach the CRM (the engine cancels its work when the stream closes and drops audio not
+yet ended by 0.7 s of quiet). The close-during-turn path is covered by reading only, not by a test.
+
+**Demo copy** (`demo/`): `demo.properties` (in-memory H2 `crmdemo`, port 8094, random JWT/HMAC secrets each start, code
+on screen, platform forced to simulated, no Anthropic/Plivo keys or desk number whatever `backend/.env` says),
+`start-demo-crm.cmd`, `start-demo-website.cmd` (port 3094), `setup_demo.py` (stdlib; refuses unless the codes are shown
+on screen, the platform is simulated and there are no contacts): Sunrise Finance / agent Asha, the finance pack, FAQ
+filled in and on, only "EMI due reminder", "Overdue follow-up" and "Incoming calls" approved (the first run approved
+the generic built-in scripts too; fixed), 10 made-up customers (Neha no consent, Vikram Do not call), campaign "EMI due
+this week" not started. Run twice: second run refused (already has contacts).
+
+**Rehearsed in the browser** on the demo copy (log showed `jdbc:h2:mem:crmdemo`): branding on login and dashboard;
+campaign preview 5 of 6 callable, Neha "No consent recorded", Vikram not listed, DND note; Start + Run now → calls
+"Simulated", call page shows the opening line and "Recording: not allowed"; test console full call (identity asked
+first, verified with SF-LN-20417, ₹8,500 and 17 Nov given, "Promised to act"); via the API: wrong person, stop calling,
+complaint (hand-over with time), prompt injection refused, 3 wrong IDs → hand-over, busy → call-back, FAQ answer; the
+test calls left consent and call-backs untouched; Pause all (confirm dialog) → Paused → Resume calling; the voice
+through the demo CRM (Piper WAV). Learned: simulated campaign calls have no conversation (the test console is the
+demo of a conversation); "Our own model" on the laptop is `qwen2.5:3b`, not `ourvoice8b-r4` (in Drive, needs the
+GPU), so the run-sheet says to use Simulated; at most 5 sign-in codes per 10 minutes per number; idle sign-out at
+3 minutes. Scripts show `claude-sonnet-5-5`: only passed to a hosted platform, our brain ignores it (in the Q&A).
+
+**Run-sheet** (`docs/walkthrough-run-sheet.md`): day before, 30 minutes before, an 8-part 45-minute meeting with the
+exact lines to type and what the agent said in the rehearsal, likely questions with answers taken from the guide and
+the code, afterwards. Links added to `README.md`, `docs/handover-guide.md`; `docs/voice-agent.md` opt_out row updated.
+
 # 15 November 2026, evening: A CALL CUT OFF BY A FAULT NOW BOOKS THE PROMISED CALL-BACK (user: "Yes, do it")
 
 Before: when hearing, the voice or a CRM request failed, the engine said "... A member of our team will call you back.

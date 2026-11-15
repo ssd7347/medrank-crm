@@ -128,7 +128,7 @@ minutes is refused.
 | schedule_callback | Books a call-back for staff; an unknown caller becomes a contact |
 | request_human_handoff | Live transfer, or an urgent call-back for complaints and distress |
 | log_call_outcome | Acknowledged, promised to act, interested, not interested, wrong person... (updates the contact's status). "Call-back requested" with none booked yet books one, so nobody waits for a call the team does not know about. So does any outcome when the caller asked to be called back or for a new date ("call me back at 4", "can we change it to Tuesday") and the model did not book it (`CallerSignals.CALLBACK`); the model's outcome is kept, and the caller's words go on the task. One call never gets two call-back tasks |
-| opt_out | Stops AI calls; "all calls" also marks the contact "Do not call". If the caller said "stop calling", "don't call me again", "remove my number" and the like, the CRM runs this instead of whatever outcome the model records (`CallerSignals.OPT_OUT`) |
+| opt_out | Stops AI calls; "all calls" also marks the contact "Do not call". If the caller said "stop calling", "don't call me again", "remove my number" and the like, the CRM runs this instead of whatever outcome the model records (`CallerSignals.OPT_OUT`). If the call ends without it (the caller hung up first, or the model asked again instead), the CRM records it from the caller's words when the call ends (`VoiceCallService.optOutIfAsked`; words cut off by an instant hang-up, before the engine has heard them, never reach the CRM) |
 
 ## Keeping the reason for the call private
 

@@ -58,7 +58,7 @@ Tick these off with the developer:
    for the first test calls, monthly once live.
 3. **Hosting**: where the CRM server and database run once they leave the developer's laptop.
 4. **SMS or WhatsApp provider** for login codes (see section 2).
-5. **Compliance**, with your adviser: that everyone you call agreed to be called and how (a form, a contract
+5. **Compliance**, with your adviser (the full list, with what the CRM already enforces: `docs/compliance-checklist.md`): that everyone you call agreed to be called and how (a form, a contract
    clause); the legal calling hours (the CRM's default is 09:00–20:00 Indian time); DND; what the opening lines
    say. Nothing in the software assumes these answers.
 6. **Your desk**: the phone number of the staff desk for live transfers, and its hours (default 09:30–18:30,
@@ -195,5 +195,7 @@ automatically after 365 days (`VOICE_RETENTION_DAYS`).
 - `docs/new-customer-setup.md`: installing and branding a copy for a company, loading its data.
 - `docs/voice-agent.md`: the AI agent in depth: rules, tools, settings, privacy.
 - `docs/first-real-call.md`: the plan and checks for the first real phone call.
+- `docs/compliance-checklist.md`: what the CRM enforces, what it does not do yet, and what only you can decide.
+- `docs/walkthrough-run-sheet.md` and `demo/`: the demo copy and the plan for showing the CRM.
 - `voice-engine/README.md`: the speech engine, the gateway, the ear check.
 - `training/STATUS.md`: the full history of how the AI was built and tested.

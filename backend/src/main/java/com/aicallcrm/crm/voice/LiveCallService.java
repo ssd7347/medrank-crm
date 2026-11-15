@@ -116,6 +116,10 @@ public class LiveCallService {
         ConversationBrain brain = brains.of(callId);
         added.addAll(brain.respond(callId, text));
         append(callId, added);
+        // The caller may have hung up while the brain was answering, so the call was closed before these words were
+        // saved: if they asked to stop, record it now ({@link VoiceCallService#optOutIfAsked}, which close() also runs).
+        tx.executeWithoutResult(s -> calls.findById(callId).filter(c -> !c.getStatus().live())
+                .ifPresent(callService::optOutIfAsked));
         return new Reply(said(added), brain.over(callId));
     }
 

@@ -342,6 +342,9 @@ public class VoiceCallService {
         call.setStatus(status);
         call.setEndedAt(Instant.now());
         call.setDisconnectReason(cut(disconnectReason, 40));
+        if (status == CallStatus.COMPLETED) {
+            optOutIfAsked(call);
+        }
         if (status == CallStatus.COMPLETED && call.getOutcome() == null) {
             call.setOutcome(Outcome.NO_INTERACTION);
         }
@@ -360,6 +363,35 @@ public class VoiceCallService {
         if (call.getOutcome() == Outcome.VERIFICATION_FAILED) {
             flagRepeatedFailures(call);
         }
+    }
+
+    /**
+     * The caller asked to stop ("stop calling me", "remove my number") but the call ended without the agent recording
+     * it: they hung up first, or the model asked again instead of opting them out. The CRM records the opt-out itself
+     * (AI calls only, as {@link CallerSignals#upgrade} does), so no campaign rings them again. Real calls only; nothing
+     * happens twice, because the opt-out is noted in the transcript. True if it recorded one.
+     */
+    boolean optOutIfAsked(VoiceCall call) {
+        if (call.isTestCall() || call.getOutcome() == Outcome.OPTED_OUT) {
+            return false;
+        }
+        List<Line> all = lines(call);
+        if (all.stream().anyMatch(l -> "opt_out".equals(l.tool()) && "OK".equals(l.status()))) {
+            return false;
+        }
+        String said = all.stream().filter(l -> "caller".equals(l.role()) && l.text() != null).map(Line::text)
+                .collect(java.util.stream.Collectors.joining(" "));
+        if (!CallerSignals.optOutAsked(said)) {
+            return false;
+        }
+        consent.optOut(call.getPhone(), call.getContactId(), "Asked on an AI call to stop AI calls (recorded when the call ended)");
+        if (call.getOutcome() == null || call.getOutcome() == Outcome.NO_INTERACTION) {
+            call.setOutcome(Outcome.OPTED_OUT);
+        }
+        List<Line> noted = new ArrayList<>(all);
+        noted.add(Line.tool("opt_out", "OK", "The caller asked to stop; recorded by the CRM when the call ended"));
+        call.setTranscript(toJson(noted));
+        return true;
     }
 
     private static String defaultSummary(VoiceCall call) {

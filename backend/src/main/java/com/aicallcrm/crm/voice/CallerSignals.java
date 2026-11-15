@@ -95,6 +95,11 @@ final class CallerSignals {
         return asked;
     }
 
+    /** The caller asked not to be called again ("stop calling", "don't call me again", "remove my number"...). */
+    static boolean optOutAsked(String callerWords) {
+        return callerWords != null && OPT_OUT_WORDS.matcher(callerWords.toLowerCase(Locale.ROOT)).find();
+    }
+
     /**
      * The tool call the CRM actually runs: a call-back or hand-over becomes an urgent DISTRESS / COMPLAINT_OR_DISPUTE
      * hand-over when the caller's words show it. A VERIFICATION_FAILED hand-over is left alone (the caller's identity
@@ -105,7 +110,7 @@ final class CallerSignals {
      */
     static ToolCall upgrade(ToolCall c, String callerWords) {
         if ("log_call_outcome".equals(c.name())) {
-            if (callerWords != null && OPT_OUT_WORDS.matcher(callerWords.toLowerCase(Locale.ROOT)).find()) {
+            if (optOutAsked(callerWords)) {
                 return new ToolCall(c.id(), "opt_out", Map.of("scope", "AI_CALLS"));
             }
             String asked = callbackAsked(callerWords);
