@@ -123,14 +123,23 @@ public class LiveCallService {
         return new Reply(said(added), brain.over(callId));
     }
 
+    /** {@code transferred}: the call went to the desk instead of being hung up. */
+    public record Ended(boolean hungUp, boolean transferred) {
+    }
+
     /**
-     * The agent finished and its goodbye has been heard: hang up through the platform. The call's end is recorded
-     * when the platform reports the hang-up ({@link VoiceCallService#ended}).
+     * The agent finished and its goodbye has been heard: hang up through the platform, or, if the caller was just told
+     * they are being connected, transfer them to the desk now ({@link HandoffService#completeTransfer}). The call's end
+     * is recorded when the platform reports the hang-up ({@link VoiceCallService#ended}).
      */
-    public boolean end(UUID callId) {
-        String providerCallId = tx.execute(s -> calls.findById(callId).map(VoiceCall::getProviderCallId).orElse(null));
+    public Ended end(UUID callId) {
+        boolean transferred = handoffs.completeTransfer(callId);
         brains.finished(callId);
-        return providerCallId != null && platforms.current().hangup(providerCallId);
+        if (transferred) {
+            return new Ended(false, true);
+        }
+        String providerCallId = tx.execute(s -> calls.findById(callId).map(VoiceCall::getProviderCallId).orElse(null));
+        return new Ended(providerCallId != null && platforms.current().hangup(providerCallId), false);
     }
 
     /**
@@ -189,6 +198,7 @@ public class LiveCallService {
         UUID id = callId != null ? callId : providerCallId == null ? null
                 : tx.execute(s -> calls.findByProviderCallId(providerCallId).map(VoiceCall::getId).orElse(null));
         if (id != null) {
+            handoffs.missedTransfer(id);
             brains.finished(id);
         }
     }

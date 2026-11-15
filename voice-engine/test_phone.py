@@ -171,6 +171,45 @@ class CallTest(unittest.TestCase):
         self.assertTrue(call.done)
         self.assertEqual(crm.last, [])          # everything the caller said reached the CRM as a turn
 
+    def test_a_call_the_crm_transferred_to_the_desk_is_left_for_plivo_to_close(self):
+        crm = FakeCrm([phone.Reply("I am connecting you to a member of our team now. Please stay on the line.", True)])
+        crm.end = lambda call_id: setattr(crm, "ended", crm.ended + 1) or True     # the CRM transferred the call
+        played = lambda name: (lambda sent: {"event": "playedStream", "streamId": "s1", "name": name})
+        sent, closed, call = self.run_call(crm, [
+            {"event": "start", "start": {"streamId": "s1", "callId": "plivo-1"}}, "wait",
+            played("say-1"),
+            media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)])), "wait",
+            played("end-2"), "wait"])
+        self.assertEqual([m["name"] for m in sent if m["event"] == "checkpoint"], ["say-1", "end-2"])
+        self.assertEqual((crm.ended, call.done, call.transferred), (1, True, True))
+        self.assertEqual(closed, [])            # closing it could cut the caller off before Plivo moves the call
+
+    def test_after_a_transfer_the_stream_is_read_until_plivo_closes_it(self):
+        messages, closed = iter(['{"event":"media"}', '{"event":"media"}']), []
+
+        async def receive():
+            try:
+                return next(messages)
+            except StopIteration:
+                raise ConnectionError("Plivo closed the stream") from None
+
+        async def close():
+            closed.append(True)
+        with self.assertRaises(ConnectionError):
+            asyncio.run(phone.await_transfer(receive, close, wait=2))
+        self.assertEqual(closed, [])
+
+    def test_after_a_transfer_the_stream_is_closed_if_plivo_never_does(self):
+        closed = []
+
+        async def receive():
+            await asyncio.sleep(60)
+
+        async def close():
+            closed.append(True)
+        asyncio.run(phone.await_transfer(receive, close, wait=0.2))
+        self.assertEqual(closed, [True])
+
     def test_the_contact_name_from_the_crm_is_the_ears_hint_on_every_turn(self):
         class Named(FakeCrm):
             def open(self, call_id):
@@ -439,6 +478,24 @@ class CrmTest(unittest.TestCase):
         self.assertEqual((body["call_id"], len(body["said"])), ("c1", 500))
         raw = json.dumps(body, separators=(",", ":"))
         self.assertEqual(headers["X-Voice-Signature"], phone.sign("s" * 40, headers["X-Voice-Timestamp"], raw))
+
+    def test_the_end_reply_says_whether_the_crm_transferred_the_call(self):
+        answers = [{"hung_up": False, "transferred": True}, {"hung_up": True, "transferred": False}, {"hung_up": True}]
+        seen = []
+
+        class Res:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return answers.pop(0)
+
+        def post(url, data, timeout, headers):
+            seen.append((url, json.loads(data)))
+            return Res()
+        crm = phone.Crm("http://crm.local:8082", "s" * 40, post=post)
+        self.assertEqual([crm.end("c1"), crm.end("c1"), crm.end("c1")], [True, False, False])
+        self.assertEqual(seen[0], ("http://crm.local:8082/api/voice/hooks/live/end", {"call_id": "c1"}))
 
     def test_the_opening_reply_brings_the_contacts_name(self):
         answers = [{"say": "Hello", "over": False, "hint": "  Mohammed Irfan "}, {"say": "Hello", "over": False},

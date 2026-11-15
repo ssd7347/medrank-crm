@@ -191,6 +191,8 @@ async def call(ws: WebSocket, call_id: str = "", token: str = ""):
     try:
         while not session.done:
             await session.handle(json.loads(await ws.receive_text()))
+        if session.transferred:
+            await phone.await_transfer(ws.receive_text, close)     # Plivo closes the stream once the call is at the desk
     except (WebSocketDisconnect, RuntimeError):
         pass                    # the caller hung up, or the call was transferred to the desk
     finally:

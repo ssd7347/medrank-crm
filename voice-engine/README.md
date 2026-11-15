@@ -70,7 +70,9 @@ in a quiet room, then a few hours of training on a GPU (cloud GPUs can be rented
 
 Plivo streams the call's audio both ways over a WebSocket to this engine's `/call` (`phone.py`): 8 kHz mu-law in,
 Whisper to text, the CRM's brain decides the reply (`POST /api/voice/hooks/live/{open,turn,end}`), Piper back to
-8 kHz mu-law. The caller can talk over the agent; after the goodbye has been played the CRM hangs up.
+8 kHz mu-law. The caller can talk over the agent; after the goodbye has been played the CRM hangs up, or, when the
+caller was told they are being connected, transfers the call to the desk (the engine then waits up to 10 seconds
+for Plivo to close the stream, rather than closing it and cutting the caller off).
 
 If hearing, the voice or a request to the CRM fails, the engine says "Sorry, I am having trouble on this line. A
 member of our team will call you back. Goodbye." and ends the call, and tells the CRM (`POST

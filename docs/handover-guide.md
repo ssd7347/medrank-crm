@@ -123,16 +123,17 @@ the real person would know (for example a customer ID): the agent uses them to c
   contact (acknowledged, promised to pay, interested, wrong person...), and stops AI calls when asked ("stop calling
   me"); someone who wants no calls at all is also marked "Do not call".
 - **Hand-over to a person**: a live transfer to your desk during desk hours (once a desk number is set), otherwise a
-  call-back task. If the brain fails or keeps repeating itself, the call is handed to a person the same way.
+  call-back task. The caller first hears "I am connecting you to a member of our team now"; if the transfer then
+  fails, or they hang up before it, an urgent call-back is booked so they still get a person. If the brain fails or
+  keeps repeating itself, the call is handed to a person the same way.
 - **Calling rules**, checked just before every call: consent, not marked "Do not call", within calling hours, at
   most 2 calls a day to the same number and 2 hours apart, and at most the campaign's number of attempts (1 to 5,
   default 3).
 
 **Known limits today**: replies are expected to take about 3 seconds on the line (the target is about 2); the agent
 speaks with a US English voice; Indian names and some words can be misheard (the CRM sends the contact's name to
-the speech engine so it spells it right, which works with the better ear, `small.en`, on the GPU); a desk transfer
-cuts the agent's "I am connecting you"; the first call after the speech engine starts waits a few seconds while it
-loads.
+the speech engine so it spells it right, which works with the better ear, `small.en`, on the GPU); the first call
+after the speech engine starts waits a few seconds while it loads.
 
 ## 6. Going live safely, step by step
 

@@ -43,6 +43,8 @@ public class VoiceCall implements Persistable<UUID> {
     @Enumerated(EnumType.STRING)
     private CallStatus status;
     private boolean testCall;
+    /** The caller was told they are being connected to the desk; the transfer waits until they have heard it. */
+    private boolean transferPending;
     private boolean recordingAllowed;
     private int verificationLevel;
     private int verifyFailures;
@@ -135,6 +137,8 @@ public class VoiceCall implements Persistable<UUID> {
     public void setStatus(CallStatus status) { this.status = status; }
     public boolean isTestCall() { return testCall; }
     public void setTestCall(boolean testCall) { this.testCall = testCall; }
+    public boolean isTransferPending() { return transferPending; }
+    public void setTransferPending(boolean transferPending) { this.transferPending = transferPending; }
     public boolean isRecordingAllowed() { return recordingAllowed; }
     public void setRecordingAllowed(boolean recordingAllowed) { this.recordingAllowed = recordingAllowed; }
     public int getVerificationLevel() { return verificationLevel; }

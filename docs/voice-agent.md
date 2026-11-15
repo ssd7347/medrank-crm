@@ -47,9 +47,13 @@ own account is for demos and test calls to your team.
    is still missing: `docs/first-real-call.md`).
 
 Known limits: Plivo's recording is not switched on, so calls keep a transcript but no recording; the starter
-openings do not say the call may be recorded (add that line if recording is switched on). A
-transfer to the desk happens at once, so the caller does not hear "I am connecting you" first. The models load on
+openings do not say the call may be recorded (add that line if recording is switched on). The models load on
 the first call after the engine starts, so that caller waits several seconds.
+
+A transfer to the desk on Plivo waits until the caller has heard "I am connecting you": the hand-over marks the call
+(`transfer_pending`), and when the engine has played the line and asks to end the call, the CRM transfers it instead
+of hanging up (`end` replies `"transferred": true`). The engine then leaves the stream for Plivo to close, and closes it
+itself only after 10 seconds. If the transfer fails, or the caller hangs up first, an urgent call-back is booked.
 
 ## Connecting a provider: the three steps
 
@@ -75,6 +79,9 @@ class RetellClient implements VoicePlatformClient {
     }
 }
 ```
+
+A platform that streams the call to our own speech engine (as Plivo does) also overrides
+`transfersAfterGoodbye()` to return true, so the transfer waits until the agent's last line has been heard.
 
 If the platform signs or shapes its webhooks differently from ours, the adapter (or a small controller next
 to it) translates them into calls on `VoiceCallService.started / transcript / ended` and

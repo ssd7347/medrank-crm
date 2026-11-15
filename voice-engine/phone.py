@@ -219,8 +219,10 @@ class Crm:
         d = self._call("turn", {"call_id": call_id, "said": said})
         return Reply(d.get("say") or "", bool(d.get("over")))
 
-    def end(self, call_id: str) -> None:
-        self._call("end", {"call_id": call_id})
+    def end(self, call_id: str) -> bool:
+        """The goodbye was heard: the CRM hangs up. True if instead it transferred the call to the desk (the caller was
+        told they are being connected)."""
+        return bool(self._call("end", {"call_id": call_id}).get("transferred"))
 
     def last_words(self, call_id: str, said: str) -> bool:
         """What the caller said that had not been passed on when the stream closed. Nothing is said back; the CRM keeps
@@ -237,6 +239,22 @@ class Crm:
 
 TROUBLE = "Sorry, I am having trouble on this line. A member of our team will call you back. Goodbye."
 _LAST_WORDS: set[asyncio.Task] = set()     # callers' last words still being heard or sent (see Call.stop)
+TRANSFER_WAIT_S = 10.0      # how long Plivo gets to move a transferred call before we close its stream ourselves
+
+
+async def await_transfer(receive: Callable[[], Awaitable[object]], close: Callable[[], Awaitable[None]],
+                         wait: float = TRANSFER_WAIT_S) -> None:
+    """After the CRM transferred the call (Call.transferred): Plivo moves it to the desk and then closes this stream
+    itself. Closing the stream first could make Plivo carry on with what follows it in the call's instructions, a
+    hang-up, and cut the caller off. So the stream is read (and ignored) until Plivo closes it, which ``receive`` raises
+    on, and closed here only if Plivo has not done so after ``wait`` seconds."""
+    async def drain() -> None:
+        while True:
+            await receive()
+    try:
+        await asyncio.wait_for(drain(), wait)
+    except TimeoutError:
+        await close()
 
 
 class Call:
@@ -269,6 +287,7 @@ class Call:
         self.unsent: np.ndarray | None = None   # the turn being heard, until it is on its way to the CRM
         self.late: list[np.ndarray] = []        # what the caller said while the goodbye played
         self.done = False
+        self.transferred = False    # the CRM sent the call to the desk: Plivo closes the stream (await_transfer)
 
     async def handle(self, msg: dict) -> None:
         event = msg.get("event")
@@ -396,10 +415,11 @@ class Call:
             return
         self.done = True
         try:
-            await asyncio.to_thread(self.crm.end, self.call_id)
+            self.transferred = bool(await asyncio.to_thread(self.crm.end, self.call_id))
         except Exception as e:
             log.warning("call %s: hang-up failed: %s", self.call_id, e)
-        await self.close()
+        if not self.transferred:
+            await self.close()
 
     def stop(self) -> asyncio.Task | None:
         """The stream closed (the caller hung up, or the call was transferred). What the caller said that the CRM has

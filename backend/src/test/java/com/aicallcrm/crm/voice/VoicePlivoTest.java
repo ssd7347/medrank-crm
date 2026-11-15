@@ -9,9 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.time.DayOfWeek;
+import java.time.Clock;
 import java.time.Instant;
-import java.time.ZonedDateTime;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,9 +26,13 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -43,7 +47,9 @@ import com.sun.net.httpserver.HttpServer;
 /**
  * Plivo as the phone line, against a fake Plivo API on this machine: calls are placed with the right callback
  * URLs, callbacks must carry Plivo's V3 signature, an answered call streams to our speech engine with a per-call
- * token, a hand-over transfers the answered call to the desk, and the engine's "end" hangs up only that call.
+ * token, a hand-over transfers the answered call to the desk once the caller has heard "I am connecting you" (the
+ * engine's "end"), and otherwise "end" hangs up only that call. A transfer that fails, or a caller who hangs up before
+ * it, gets an urgent call-back.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -77,6 +83,9 @@ class VoicePlivoTest {
             if ("DELETE".equals(ex.getRequestMethod())) {
                 code = 204;
                 reply = null;
+            } else if (path.contains("refuse")) {
+                code = 400;
+                reply = "{\"api_id\":\"a3\",\"error\":\"call not in progress\"}";
             } else if (path.endsWith("/Call/")) {
                 code = 201;
                 reply = "{\"api_id\":\"a1\",\"message\":\"call fired\",\"request_uuid\":\"req-" + PLIVO.size() + "\"}";
@@ -115,10 +124,22 @@ class VoicePlivoTest {
         FAKE.stop(0);
     }
 
+    /** Monday 16 Nov 2026, 11:00 in India: the desk is open whatever day the tests run (it is shut on Sundays). */
+    @TestConfiguration
+    static class Weekday {
+        @Bean
+        @Primary
+        Clock weekdayClock() {
+            return Clock.fixed(Instant.parse("2026-11-16T05:30:00Z"), ZoneOffset.UTC);
+        }
+    }
+
     @Autowired
     MockMvc mvc;
     @Autowired
     PlivoClient plivo;
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Test
     void placingACallSendsOurCallbackUrlsWithBasicAuth() {
@@ -145,13 +166,83 @@ class VoicePlivoTest {
     }
 
     @Test
-    void anIncomingCallStreamsToOurEngineThenTransfersAndHangsUp() throws Exception {
+    void anIncomingCallStreamsToOurEngineAndIsTransferredOnlyAfterHearingSo() throws Exception {
         String admin = login();
+        String callUuid = "cu-" + SEQ.incrementAndGet();
+        UUID call = incomingCallAskingForAPerson(admin, callUuid);
+
+        // Not yet: Plivo would move the call at once and cut off "I am connecting you".
+        assertThat(PLIVO).noneMatch(s -> s.startsWith("POST /v1/Account/" + AUTH_ID + "/Call/" + callUuid + "/ "));
+        plivoHook("/desk", null).andExpect(status().isOk()).andExpect(r -> assertThat(r.getResponse().getContentAsString())
+                .contains("<Dial callerId=\"+918000000001\"><Number>+914400000000</Number></Dial>"));
+
+        // The engine played the line and asks to end: the call goes to the desk instead of being hung up.
+        live("end", call, null).andExpect(jsonPath("$.transferred").value(true)).andExpect(jsonPath("$.hung_up").value(false));
+        assertThat(PLIVO).anyMatch(s -> s.startsWith("POST /v1/Account/" + AUTH_ID + "/Call/" + callUuid + "/ ")
+                && s.contains("\"legs\":\"aleg\"") && s.contains("\"aleg_url\":\"" + PUBLIC + "/api/voice/hooks/plivo/desk\""));
+        assertThat(PLIVO).doesNotContain("DELETE /v1/Account/" + AUTH_ID + "/Call/" + callUuid + "/ ");
+
+        // The desk talks to them; when that call ends nobody needs a call-back.
+        plivoHook("/hangup", null, "CallUUID", callUuid, "CallStatus", "completed", "Duration", "42",
+                "HangupCause", "NORMAL_CLEARING").andExpect(status().isOk());
+        mvc.perform(auth(get("/api/voice/calls/" + call), admin))
+                .andExpect(jsonPath("$.call.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.call.durationSec").value(42))
+                .andExpect(jsonPath("$.call.outcome").value("HANDED_OFF"));
+        assertThat(callbacks(call)).isEmpty();
+    }
+
+    @Test
+    void aTransferThatFailsBooksAnUrgentCallBackAndHangsUp() throws Exception {
+        String admin = login();
+        String callUuid = "cu-refuse-" + SEQ.incrementAndGet();
+        UUID call = incomingCallAskingForAPerson(admin, callUuid);
+
+        live("end", call, null).andExpect(jsonPath("$.transferred").value(false)).andExpect(jsonPath("$.hung_up").value(true));
+        assertThat(PLIVO).anyMatch(s -> s.startsWith("POST /v1/Account/" + AUTH_ID + "/Call/" + callUuid + "/ "));
+        assertThat(PLIVO).contains("DELETE /v1/Account/" + AUTH_ID + "/Call/" + callUuid + "/ ");
+        assertThat(callbacks(call)).containsExactly("CALLER_REQUEST URGENT");
+
+        // Plivo then reports the hang-up: still one call-back.
+        plivoHook("/hangup", null, "CallUUID", callUuid, "CallStatus", "completed", "Duration", "20",
+                "HangupCause", "NORMAL_CLEARING").andExpect(status().isOk());
+        assertThat(callbacks(call)).containsExactly("CALLER_REQUEST URGENT");
+    }
+
+    @Test
+    void aCallerWhoHangsUpBeforeTheTransferGetsAnUrgentCallBack() throws Exception {
+        String admin = login();
+        String callUuid = "cu-" + SEQ.incrementAndGet();
+        UUID call = incomingCallAskingForAPerson(admin, callUuid);
+
+        plivoHook("/hangup", null, "CallUUID", callUuid, "CallStatus", "completed", "Duration", "15",
+                "HangupCause", "NORMAL_CLEARING").andExpect(status().isOk());
+        assertThat(callbacks(call)).containsExactly("CALLER_REQUEST URGENT");
+
+        // An "end" arriving late transfers nothing and books nothing more.
+        live("end", call, null).andExpect(jsonPath("$.transferred").value(false));
+        assertThat(PLIVO).noneMatch(s -> s.startsWith("POST /v1/Account/" + AUTH_ID + "/Call/" + callUuid + "/ "));
+        assertThat(callbacks(call)).containsExactly("CALLER_REQUEST URGENT");
+    }
+
+    @Test
+    void anOutboundAnswerLinksPlivosCallIdAndUnknownCallsAreHungUp() throws Exception {
+        String unknown = plivoHook("/answer", "call_id=" + UUID.randomUUID(), "CallUUID", "cu-x", "Direction", "outbound")
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(unknown).contains("<Response><Hangup/></Response>").doesNotContain("Stream");
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    /**
+     * A known contact rings in, the call streams to our engine (checking the stream URL and its token), and they ask
+     * for a person: the agent says it is connecting them and the call is over for the engine. Returns our call id.
+     */
+    private UUID incomingCallAskingForAPerson(String admin, String callUuid) throws Exception {
         approve(admin, "Incoming calls");
         String phone = "9" + String.format("%09d", SEQ.incrementAndGet());
         mvc.perform(auth(post("/api/contacts"), admin).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"fullName\":\"Nisha Rao\",\"phone\":\"" + phone + "\",\"fields\":{}}")).andExpect(status().isCreated());
-        String callUuid = "cu-" + SEQ.incrementAndGet();
 
         // Unsigned or wrongly signed: refused.
         mvc.perform(post("/api/voice/hooks/plivo/answer").param("From", "+91" + phone).param("CallUUID", callUuid))
@@ -167,37 +258,19 @@ class VoicePlivoTest {
         UUID call = UUID.fromString(m.group(1));
         assertThat(m.group(2)).isEqualTo(PlivoHooksController.streamToken(SECRET, call));
 
-        // The engine holds the conversation through the live hooks; asking for a person transfers the call.
         live("open", call, null).andExpect(jsonPath("$.over").value(false));
-        boolean deskOpen = ZonedDateTime.now(ContactFacts.IST).getDayOfWeek() != DayOfWeek.SUNDAY;
-        live("turn", call, "Can I speak to a real person").andExpect(jsonPath("$.over").value(true));
-        if (deskOpen) {
-            assertThat(PLIVO).anyMatch(s -> s.startsWith("POST /v1/Account/" + AUTH_ID + "/Call/" + callUuid + "/ ")
-                    && s.contains("\"legs\":\"aleg\"") && s.contains("\"aleg_url\":\"" + PUBLIC + "/api/voice/hooks/plivo/desk\""));
-        }
-        plivoHook("/desk", null).andExpect(status().isOk()).andExpect(r -> assertThat(r.getResponse().getContentAsString())
-                .contains("<Dial callerId=\"+918000000001\"><Number>+914400000000</Number></Dial>"));
-
-        // After the goodbye the engine asks to hang up: exactly this call is ended.
-        live("end", call, null).andExpect(jsonPath("$.hung_up").value(true));
-        assertThat(PLIVO).contains("DELETE /v1/Account/" + AUTH_ID + "/Call/" + callUuid + "/ ");
-
-        plivoHook("/hangup", null, "CallUUID", callUuid, "CallStatus", "completed", "Duration", "42",
-                "HangupCause", "NORMAL_CLEARING").andExpect(status().isOk());
-        mvc.perform(auth(get("/api/voice/calls/" + call), admin))
-                .andExpect(jsonPath("$.call.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.call.durationSec").value(42))
-                .andExpect(jsonPath("$.call.outcome").value("HANDED_OFF"));
+        String said = JsonPath.read(live("turn", call, "Can I speak to a real person").andExpect(jsonPath("$.over").value(true))
+                .andReturn().getResponse().getContentAsString(), "$.say");
+        assertThat(said).contains("I am connecting you to a member of our team now");
+        assertThat(callbacks(call)).isEmpty();
+        return call;
     }
 
-    @Test
-    void anOutboundAnswerLinksPlivosCallIdAndUnknownCallsAreHungUp() throws Exception {
-        String unknown = plivoHook("/answer", "call_id=" + UUID.randomUUID(), "CallUUID", "cu-x", "Direction", "outbound")
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        assertThat(unknown).contains("<Response><Hangup/></Response>").doesNotContain("Stream");
+    /** "REASON PRIORITY" of each call-back task booked for the call. */
+    private List<String> callbacks(UUID call) {
+        return jdbc.queryForList("select reason || ' ' || priority from callback_request where voice_call_id = ? order by id",
+                String.class, call);
     }
-
-    // ------------------------------------------------------------------ helpers
 
     /** A callback signed exactly as Plivo signs it: the public URL it called, the form fields and a nonce. */
     private ResultActions plivoHook(String path, String query, String... fields) throws Exception {

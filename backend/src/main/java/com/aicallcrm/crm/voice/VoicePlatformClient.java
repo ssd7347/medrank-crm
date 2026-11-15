@@ -42,6 +42,15 @@ public interface VoicePlatformClient {
     boolean transfer(String providerCallId, String deskNumberE164, String summary);
 
     /**
+     * True when our own speech engine speaks for the agent on this platform: a hand-over's "I am connecting you" is
+     * then played first, and the transfer happens when the engine asks to end the call (the line has been heard).
+     * Platforms that hold the conversation themselves are transferred at once.
+     */
+    default boolean transfersAfterGoodbye() {
+        return false;
+    }
+
+    /**
      * Ends a connected call (our own speech engine asks for this after the agent's goodbye has been heard). False
      * when the platform cannot: platforms that hold the conversation themselves end their own calls.
      */

@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import com.aicallcrm.crm.voice.Voice.CallStatus;
@@ -72,6 +73,14 @@ interface VoiceCampaignTargetRepository extends JpaRepository<VoiceCampaignTarge
 interface VoiceCallRepository extends JpaRepository<VoiceCall, UUID>, JpaSpecificationExecutor<VoiceCall> {
 
     Optional<VoiceCall> findByProviderCallId(String providerCallId);
+
+    /**
+     * Takes the waiting desk transfer of a call: 1 for exactly one caller, even when the engine's {@code end} and the
+     * platform's hang-up report arrive together; 0 if there is none (any more).
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update VoiceCall c set c.transferPending = false where c.id = :id and c.transferPending = true")
+    int claimTransfer(UUID id);
 
     List<VoiceCall> findByContactIdAndTestCallFalseOrderByCreatedAtDesc(Long contactId);
 

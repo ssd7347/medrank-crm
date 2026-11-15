@@ -40,6 +40,12 @@ public class PlivoClient implements VoicePlatformClient {
         return "plivo";
     }
 
+    /** Plivo streams the call to our speech engine, which plays the agent's last line before asking to end. */
+    @Override
+    public boolean transfersAfterGoodbye() {
+        return true;
+    }
+
     @Override
     public Placed createOutboundCall(OutboundCall call) {
         if (!props.configured()) {

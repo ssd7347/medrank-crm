@@ -14,6 +14,37 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 15 November 2026: A DESK TRANSFER NO LONGER CUTS OFF "I AM CONNECTING YOU" (user: "do next eask")
+
+The known limit from the docs. Cause: at a hand-over the CRM asked Plivo to transfer the call at once, and Plivo
+moved it straight away, before the engine had played "I am connecting you to a member of our team now. Please stay
+on the line." Now, on Plivo (`PlivoClient.transfersAfterGoodbye()`), the hand-over only marks the call
+(`voice_call.transfer_pending`, migration `V11__transfer_after_goodbye.sql`). The engine already plays the agent's last
+line and then asks the CRM to `end` the call; `end` now transfers instead of hanging up and replies
+`"transferred": true`. If the transfer fails, the caller is hung up on and an **urgent** call-back is booked (due in
+15 min, "they asked for a person and were told they were being connected"). If the caller hangs up before the
+transfer (Plivo's hang-up report comes first), the same urgent call-back is booked. The pending mark is taken by one
+guarded `update ... where transfer_pending = true`, so `end` and the hang-up report arriving together still book one
+call-back. A cut-off ("a member of our team will call you back") clears the mark. Other platforms (the hosted-tools
+path) still transfer at once: they speak for themselves. The engine (`phone.py`, `engine.py`): when `end` says
+transferred, it no longer closes the stream (closing it could let Plivo run the `<Hangup/>` that follows the stream);
+it reads until Plivo closes it and closes it itself only after 10 s (`await_transfer`). `HandoffService` now reads
+the time from a `Clock` bean, so the tests can pin a weekday (the desk is shut on Sundays; the old test skipped the
+transfer check on Sundays).
+Tests: `VoicePlivoTest` with the clock fixed on Monday 16 Nov 11:00 IST, against the fake Plivo API: no transfer
+request after the hand-over turn (the reply says "I am connecting you"); on `end` the transfer request is sent, no
+hang-up, no call-back; a refused transfer gives a hang-up and one URGENT CALLER_REQUEST call-back (still one after
+Plivo's hang-up report); a caller hanging up before `end` gets that call-back, and a late `end` transfers nothing and
+books nothing more. With Plivo switched back to "transfer at once" all three fail; without the hang-up check the
+third fails. `VoiceLivePlatformTest` (immediate transfer) unchanged and passing. Engine: a transferred call is not
+closed (fails with the old always-close), `await_transfer` waits for Plivo / closes after the wait, and the client
+reads `transferred`. Backend 103/103; engine 64/64. Not run on this laptop end to end: it is Sunday, the desk is shut,
+and the running CRM's clock cannot be pinned without adding a setting just for that. Not checked on real Plivo: that
+Plivo closes the stream within 10 s after a transfer, so check it on the first real call (added to first-real-call
+step 5). V11 run on H2 only; the dev database gets it on its next start.
+Docs: first-real-call (limit removed, step 5 asks for a person), hand-over guide, voice-agent (limit replaced by how
+it works; adapters note `transfersAfterGoodbye`), voice-engine README.
+
 # 15 November 2026: STARTER OPENINGS NO LONGER CLAIM RECORDING OR REVEAL THE REASON (user: "do the works from your side")
 
 Compliance checklist 2.2 and 2.5, the two items the developer could close alone. Every starter opening said "This call

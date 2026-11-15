@@ -99,9 +99,11 @@ Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
 4. In the CRM: one contact (the developer's own number) with AI-call consent recorded, an approved script, a one-contact
    campaign. Start it during the calling window (09:00–20:00 IST).
 5. On the call, try: answering normally, the identity check with the right details, "call me back at 4", a question
-   from the FAQ, "stop calling me". Note any long silences.
+   from the FAQ, "stop calling me". Note any long silences. During desk hours (not Sundays), also ask for a person
+   once: you should hear the whole "I am connecting you to a member of our team now. Please stay on the line." and
+   then the desk phone rings. If the transfer fails, an urgent call-back appears on `/voice/callbacks`.
 6. Afterwards: read the transcript and tool trail on `/voice/calls`; write down what Whisper heard against what was
    said, and the reply times. Then take the tunnel down and stop the GPU machine.
 
-Known limits that stay for now: no call recording (the starter openings no longer say "may be recorded"); a desk
-transfer cuts "I am connecting you"; the model loads on the first call after the engine starts.
+Known limits that stay for now: no call recording (the starter openings no longer say "may be recorded"); the model
+loads on the first call after the engine starts.

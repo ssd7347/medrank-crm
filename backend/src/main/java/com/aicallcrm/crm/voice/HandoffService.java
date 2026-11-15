@@ -1,10 +1,12 @@
 package com.aicallcrm.crm.voice;
 
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,10 @@ import com.aicallcrm.crm.voice.Voice.Outcome;
  * Passing a caller to a person. If the desk is open and the platform can transfer, the call is transferred;
  * otherwise a call-back task is created with a due time, the contact's owner (or the managers) is told at
  * once, and the caller hears when to expect the call. Complaints and distress are urgent.
+ *
+ * <p>On our own speech engine the transfer waits until the caller has heard "I am connecting you" (the engine's
+ * {@code end} step, {@link #completeTransfer}). If it then fails, or the caller hangs up first, an urgent call-back is
+ * booked instead ({@link #missedTransfer}), so nobody who was promised a person is left without one.
  */
 @Service
 public class HandoffService {
@@ -40,19 +46,23 @@ public class HandoffService {
     private final AlertService alerts;
     private final VoicePlatforms platforms;
     private final VoiceProperties props;
+    private final VoiceCallRepository calls;
+    private final Clock clock;
 
     public HandoffService(CallbackRequestRepository callbacks, ContactRepository contacts, AlertService alerts,
-                          VoicePlatforms platforms, VoiceProperties props) {
+                          VoicePlatforms platforms, VoiceProperties props, VoiceCallRepository calls, Clock clock) {
         this.callbacks = callbacks;
         this.contacts = contacts;
         this.alerts = alerts;
         this.platforms = platforms;
         this.props = props;
+        this.calls = calls;
+        this.clock = clock;
     }
 
     @Transactional
     public Handoff handoff(VoiceCall call, HandoffReason reason, String summary) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         if (reason == HandoffReason.VERIFICATION_FAILED) {
             call.setOutcome(Outcome.VERIFICATION_FAILED);
         } else if (call.getOutcome() != Outcome.OPTED_OUT && call.getOutcome() != Outcome.VERIFICATION_FAILED) {
@@ -70,9 +80,15 @@ public class HandoffService {
             return new Handoff(CALLBACK_TASK, callbackMessage(due), null, due);
         }
         Contact contact = contact(call);
-        boolean transferred = platforms.live() && call.getProviderCallId() != null
-                && !props.deskTransferNumber().isBlank() && deskOpen(now)
-                && platforms.current().transfer(call.getProviderCallId(), props.deskTransferNumber(), summary);
+        boolean canTransfer = platforms.live() && call.getProviderCallId() != null
+                && !props.deskTransferNumber().isBlank() && deskOpen(now);
+        VoicePlatformClient platform = platforms.current();
+        boolean afterGoodbye = canTransfer && platform.transfersAfterGoodbye();
+        if (afterGoodbye) {
+            call.setTransferPending(true);      // transferred once the caller has heard the line below (completeTransfer)
+        }
+        boolean transferred = afterGoodbye
+                || canTransfer && platform.transfer(call.getProviderCallId(), props.deskTransferNumber(), summary);
         if (transferred) {
             alerts.notifyOwnerOrManagers(owner(contact), call.getContactId(), "VOICE_CALLBACK",
                     reason.high() ? Priority.URGENT : Priority.NORMAL,
@@ -86,10 +102,44 @@ public class HandoffService {
         return new Handoff(CALLBACK_TASK, callbackMessage(cb.getDueAt()), cb.getId(), cb.getDueAt());
     }
 
+    /**
+     * Our engine has played "I am connecting you" and asks to end the call: transfer it now. True if the platform took
+     * it. False if no transfer was waiting, or if it failed: then an urgent call-back is booked and the caller is hung
+     * up on as usual.
+     */
+    @Transactional
+    public boolean completeTransfer(UUID callId) {
+        if (calls.claimTransfer(callId) == 0) {
+            return false;
+        }
+        VoiceCall call = calls.findById(callId).orElseThrow();
+        if (call.getProviderCallId() != null
+                && platforms.current().transfer(call.getProviderCallId(), props.deskTransferNumber(), null)) {
+            return true;
+        }
+        book(call, "The transfer to the desk did not go through");
+        return false;
+    }
+
+    /** The caller hung up while a transfer was waiting: they still get the person they asked for. */
+    @Transactional
+    public void missedTransfer(UUID callId) {
+        if (calls.claimTransfer(callId) == 1) {
+            book(calls.findById(callId).orElseThrow(), "The caller hung up before the transfer to the desk");
+        }
+    }
+
+    private void book(VoiceCall call, String what) {
+        HandoffReason reason = call.getHandoffReason() == null ? HandoffReason.CALLER_REQUEST : call.getHandoffReason();
+        task(call, contact(call), reason.name(), null, what + ". They asked for a person and were told they were being "
+                + "connected: call them back now. The call's transcript has the details.", Priority.URGENT,
+                Instant.now(clock).plus(Duration.ofMinutes(15)));
+    }
+
     /** The caller simply asked to be called back; not an escalation. */
     @Transactional
     public Handoff callback(VoiceCall call, String preferredTimeText, String reason) {
-        Instant due = dueAt(null, Instant.now());
+        Instant due = dueAt(null, Instant.now(clock));
         if (call.getOutcome() == null) {
             call.setOutcome(Outcome.CALLBACK_REQUESTED);
         }
@@ -115,6 +165,8 @@ public class HandoffService {
      */
     @Transactional
     public CallbackRequest cutOff(VoiceCall call, String summary) {
+        // The caller now hears "a member of our team will call you back": no transfer after that.
+        call.setTransferPending(false);
         Contact contact = contact(call);
         if (call.isTestCall() || call.getOutcome() == Outcome.OPTED_OUT
                 || contact != null && ContactStatus.DO_NOT_CALL.equals(contact.getStatus())
@@ -129,7 +181,7 @@ public class HandoffService {
             call.setHandoffReason(HandoffReason.TOOL_FAILURE);
         }
         return task(call, contact, HandoffReason.TOOL_FAILURE.name(), null, summary, Priority.NORMAL,
-                dueAt(HandoffReason.TOOL_FAILURE, Instant.now()));
+                dueAt(HandoffReason.TOOL_FAILURE, Instant.now(clock)));
     }
 
     /** Tells the contact's owner (or the managers) something they should know about this call. */
