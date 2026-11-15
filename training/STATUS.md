@@ -25,10 +25,14 @@ secrets, key settings, start order, backups); troubleshooting; where the details
 against the code (calling window 09:00–20:00, 2 a day 2 h apart, attempts 1–5 default 3, desk 09:30–18:30
 Mon–Sat, retention 365 days, script versions and approval, brain failure → hand-over, default agent name Asha).
 README: linked, and its "no provider connected" line corrected (Plivo path built, not yet on a real line).
-**Found while checking, not fixed:** (1) login codes are never sent (`OtpService.deliver` is empty), yet the
-"Connected services" page shows login codes as CONNECTED whenever `OTP_SHOW_ON_SCREEN=false`; with that setting
-nobody could sign in. (2) The same page's voice entry still suggests Retell/Vapi/Bland/Bolna, not the Plivo + own
-engine path. (3) When the engine says "trouble on this line ... will call you back" (the CRM or the engine failed),
+**Found while checking:** (1) login codes are never sent (`OtpService.deliver` is empty), yet the
+"Connected services" page showed login codes as CONNECTED whenever `OTP_SHOW_ON_SCREEN=false`; with that setting
+nobody could sign in. (2) The same page's voice entry still suggested Retell/Vapi/Bland/Bolna, not the Plivo + own
+engine path. **Both fixed the same day (user: "Yes, fix it"):** `OtpService.sendsCodes()` (false until `deliver`
+really sends) decides the login-code state, and with codes neither shown nor sent the page says nobody can sign in;
+the voice entry now names the client's Plivo account, the GPU computer and `VOICE_PLATFORM=plivo`. Backend 91/91
+(new `IntegrationControllerTest`; `VoiceAgentIntegrationTest` checks both entries). Seen on the real page (test CRM
+on the in-memory database, port 8093, website on 3093; new launch entry `aicrm-frontend-test`). (3) When the engine says "trouble on this line ... will call you back" (the CRM or the engine failed),
 no call-back task is booked; the guide tells staff to call such people themselves.
 
 # 15 November 2026: A PAUSE INSIDE A SENTENCE NO LONGER SPLITS THE TURN (with small.en) (user: "start our next work")

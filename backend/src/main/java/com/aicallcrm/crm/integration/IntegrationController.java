@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.aicallcrm.crm.security.OtpService;
 import com.aicallcrm.crm.voice.DndService;
 import com.aicallcrm.crm.voice.VoicePlatforms;
 
@@ -29,12 +30,14 @@ public class IntegrationController {
 
     private final VoicePlatforms voice;
     private final DndService dnd;
+    private final OtpService otp;
     private final boolean otpOnScreen;
 
-    public IntegrationController(VoicePlatforms voice, DndService dnd,
+    public IntegrationController(VoicePlatforms voice, DndService dnd, OtpService otp,
                                  @Value("${app.otp.show-on-screen:false}") boolean otpOnScreen) {
         this.voice = voice;
         this.dnd = dnd;
+        this.otp = otp;
         this.otpOnScreen = otpOnScreen;
     }
 
@@ -45,18 +48,27 @@ public class IntegrationController {
                         voice.live() ? State.CONNECTED : State.NOT_CONNECTED,
                         "Consent, campaigns, scripts, the call-back queue and the test console all work, but no "
                                 + "phone rings: campaign calls are recorded as simulated.",
-                        "A voice-AI platform (e.g. Retell, Vapi, Bland, Bolna) with an AI model key, and a telephony "
-                                + "provider (e.g. Exotel, Knowlarity, Twilio, Plivo). In India, DLT registration."),
+                        "This company's own Plivo account (India data region, KYC done, a number; in India, DLT "
+                                + "registration) and a GPU computer for our AI model and speech engine, then "
+                                + "VOICE_PLATFORM=plivo (docs/voice-agent.md). Another voice platform can be "
+                                + "connected through an adapter instead."),
                 new Integration("DND", "Do-not-disturb checks", "AI voice agent",
                         dnd.connected() ? State.CONNECTED : State.NOT_CONNECTED,
                         "Numbers are not checked against the national do-not-disturb register; only people who "
                                 + "gave consent are called.",
                         "The scrubbing service of your telephony provider."),
-                new Integration("LOGIN_CODES", "SMS / WhatsApp for login codes", "Sign-in",
-                        otpOnScreen ? State.NOT_CONNECTED : State.CONNECTED,
-                        otpOnScreen ? "The one-time login code is shown on the login page. Anyone who knows a staff "
-                                + "number can sign in, so do not put the site online like this."
-                                : "Codes are not shown on screen.",
-                        "An SMS or WhatsApp provider (e.g. MSG91, Gupshup) to send the code to the phone."));
+                loginCodes(otp.sendsCodes(), otpOnScreen));
+    }
+
+    /** Connected only when codes really reach the phone; hiding them from the screen alone sends nothing. */
+    static Integration loginCodes(boolean sent, boolean onScreen) {
+        String today = sent ? "Codes are sent to the staff member's phone."
+                : onScreen ? "The one-time login code is shown on the login page. Anyone who knows a staff number can "
+                        + "sign in, so do not put the site online like this."
+                : "Codes are neither shown on the login page nor sent to the phone, so nobody can sign in. Until a "
+                        + "provider is connected, OTP_SHOW_ON_SCREEN=true (only while the site is not on the internet).";
+        return new Integration("LOGIN_CODES", "SMS / WhatsApp for login codes", "Sign-in",
+                sent ? State.CONNECTED : State.NOT_CONNECTED, today,
+                "An SMS or WhatsApp provider (e.g. MSG91, Gupshup) to send the code to the phone.");
     }
 }

@@ -513,7 +513,10 @@ class VoiceAgentIntegrationTest {
         mvc.perform(auth(get("/api/voice/campaigns/" + campaign), admin)).andExpect(jsonPath("$.campaign.status").value("DONE"));
         mvc.perform(auth(get("/api/voice/provider-setup"), admin)).andExpect(jsonPath("$.tools.length()").value(8));
         mvc.perform(auth(get("/api/integrations"), admin))
-                .andExpect(jsonPath("$[?(@.key == 'VOICE_AGENT')].state").value(Matchers.hasItem("NOT_CONNECTED")));
+                .andExpect(jsonPath("$[?(@.key == 'VOICE_AGENT')].state").value(Matchers.hasItem("NOT_CONNECTED")))
+                .andExpect(jsonPath("$[?(@.key == 'VOICE_AGENT')].needs").value(Matchers.hasItem(Matchers.containsString("Plivo account"))))
+                // No SMS/WhatsApp provider: login codes are never shown as connected.
+                .andExpect(jsonPath("$[?(@.key == 'LOGIN_CODES')].state").value(Matchers.hasItem("NOT_CONNECTED")));
     }
 
     @Test

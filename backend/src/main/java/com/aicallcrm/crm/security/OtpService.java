@@ -72,6 +72,11 @@ public class OtpService {
         // Intentionally empty: no provider is connected. See the class comment.
     }
 
+    /** Whether {@link #deliver} really sends the code to the phone. Make it true together with the send. */
+    public boolean sendsCodes() {
+        return false;
+    }
+
     /** Who signed in, if the code is right; otherwise null. Wrong tries are counted against the code. */
     @Transactional(noRollbackFor = ApiException.class)
     public AppUser verify(String phone, String code) {
