@@ -183,6 +183,60 @@ class CallTest(unittest.TestCase):
                       [{"event": "start", "start": {"streamId": "s1"}}, "wait", speech, "wait"], stt=ear)
         self.assertEqual(hints, [()])
 
+    def hold(self, seconds):
+        saved = phone.Call.HOLD_S
+        phone.Call.HOLD_S = seconds
+        self.addCleanup(setattr, phone.Call, "HOLD_S", saved)
+
+    START = {"event": "start", "start": {"streamId": "s1"}}
+
+    def test_a_pause_inside_a_sentence_still_makes_one_turn(self):
+        heard_lengths = []
+
+        def ear(audio):                     # the first part alone, or both parts heard together
+            heard_lengths.append(len(audio) / phone.STT_RATE)
+            return "My date of birth is..." if len(audio) < 3 * phone.STT_RATE else "My date of birth is 15th August."
+
+        crm = FakeCrm([phone.Reply("Thank you.", False)])
+        first = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        rest = media(np.concatenate([tone(1.0), quiet(0.9)]))
+        self.run_call(crm, [self.START, "wait", first, rest, "wait", "wait"], stt=ear)
+        self.assertEqual(crm.heard, ["My date of birth is 15th August."])
+        self.assertEqual(len(heard_lengths), 2)
+        self.assertGreater(heard_lengths[1], heard_lengths[0] + 1.5)    # the second hearing has both parts
+
+    def test_an_unfinished_turn_goes_on_after_the_wait_when_nothing_follows(self):
+        self.hold(0.2)
+        crm = FakeCrm([phone.Reply("Sorry, what is your date of birth?", False)])
+        speech = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        self.run_call(crm, [self.START, "wait", speech, "wait", "wait"], stt=lambda audio: "My date of birth is...")
+        self.assertEqual(crm.heard, ["My date of birth is..."])
+
+    def test_a_finished_sentence_is_not_held_back(self):
+        self.hold(30)
+        speech = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        crm = FakeCrm([phone.Reply("Noted.", False)])
+        self.run_call(crm, [self.START, "wait", speech, "wait"], stt=lambda audio: "I will pay on Friday.")
+        self.assertEqual(crm.heard, ["I will pay on Friday."])
+        crm = FakeCrm([phone.Reply("Noted.", False)])       # the same, unfinished: still waiting when the call ends
+        self.run_call(crm, [self.START, "wait", speech, "wait"], stt=lambda audio: "I will pay on the")
+        self.assertEqual(crm.heard, [])
+
+    def test_a_turn_takes_in_at_most_two_more_parts(self):
+        self.hold(0.2)
+        lengths = []
+
+        def ear(audio):
+            lengths.append(round(len(audio) / phone.STT_RATE, 1))
+            return "and um,"
+        part = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        crm = FakeCrm([phone.Reply("Go on.", False), phone.Reply("Go on.", False)])
+        self.run_call(crm, [self.START, "wait", part, part, part, part, "wait", "wait", "wait"], stt=ear)
+        self.assertEqual(crm.heard, ["and um,", "and um,"])        # parts 1-3 as one turn, then part 4 alone
+        self.assertEqual(len(lengths), 4)
+        self.assertAlmostEqual(lengths[2], 3 * lengths[0], delta=0.2)
+        self.assertEqual(lengths[3], lengths[0])
+
     def test_the_caller_can_talk_over_the_agent(self):
         crm = FakeCrm([phone.Reply("Okay.", False)])
         sent, _, _ = self.run_call(crm, [
@@ -208,6 +262,22 @@ class CallTest(unittest.TestCase):
         self.assertEqual([m["name"] for m in sent if m["event"] == "checkpoint"], ["end-1"])
         self.assertEqual(crm.ended, 1)
         self.assertEqual(closed, [True])
+
+
+class UnfinishedTest(unittest.TestCase):
+
+    def test_cut_off_sentences(self):
+        for text in ("My birth of death is...", "My date of birth is", "My customer ID is, um,", "It is the",
+                     "My name is Ramesh and", "Um.", "uh", "The amount is …", "I will pay on the -",
+                     "My phone number", "It's for my.", "Sending it to"):
+            self.assertTrue(phone.unfinished(text), text)
+
+    def test_finished_sentences(self):
+        for text in ("Yes, it is.", "My date of birth is 15th August 1992.", "I will pay on Friday.", "Yes",
+                     "No, thank you.", "Who is this?", "Ramesh Kumar", "Okay.", "", "...", "It is 4 5 6 7.",
+                     "That is all I wanted", "I paid it on Monday", "My phone number is 9840122356",
+                     "It is 4 5 6 7"):
+            self.assertFalse(phone.unfinished(text), text)
 
 
 class CrmTest(unittest.TestCase):

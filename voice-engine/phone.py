@@ -18,6 +18,7 @@ import hashlib
 import hmac
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from typing import Awaitable, Callable
@@ -141,6 +142,30 @@ class Utterances:
         return None
 
 
+# ---------------------------------------------------------------------------------------------- unfinished turns
+
+# A caller who stops to remember something ("My date of birth is ... fifteenth August") pauses longer than the 700 ms
+# that ends a turn. Whisper's text for the first part shows it: "My birth of death is..." (ear check, 15 Nov 2026).
+# Words nobody ends a sentence on, even with a full stop; "um" and "uh" are a caller thinking:
+NEVER_LAST = frozenset({"my", "your", "our", "the", "an", "and", "or", "but", "of", "to", "for", "from", "with",
+                        "um", "uh", "er", "erm", "because"})
+# Words a sentence seldom ends on, though an answer can ("Yes, it is."): unfinished only without a full stop.
+SELDOM_LAST = NEVER_LAST | {"a", "is", "are", "was", "were", "at", "in", "on", "so", "like", "about", "number", "id",
+                            "its", "it's"}
+
+
+def unfinished(text: str) -> bool:
+    """True when what the caller said looks cut off by a pause: it trails off ("...", a comma, a dash) or stops on a
+    word nobody ends on. Then the call waits a moment longer for the rest before answering."""
+    t = text.strip()
+    words = re.findall(r"[a-z0-9']+", t.lower())             # digits count: "my number is 98400" is finished
+    if not words:
+        return False
+    if t.endswith(("...", "…", ",", "-", "–", "—")):
+        return True
+    return words[-1] in (NEVER_LAST if t[-1] in ".?!" else SELDOM_LAST)
+
+
 # ---------------------------------------------------------------------------------------------- the CRM
 
 
@@ -200,7 +225,14 @@ class Call:
     """One Plivo stream. ``send`` sends a JSON message to Plivo; ``stt`` takes 16 kHz float32 audio and returns
     text, and once the CRM has given the called contact's name, takes that name as a second argument (the hint that
     makes Whisper spell it as registered); ``tts`` takes text and returns (int16 samples, sample rate). All three
-    are passed in, so the call logic is tested with fakes."""
+    are passed in, so the call logic is tested with fakes.
+
+    When a turn looks cut off by a pause (``unfinished``), the call waits up to HOLD_S seconds more: if the caller
+    carries on, both parts are heard again as one, so the CRM gets the whole sentence once. Finished sentences are
+    not delayed."""
+
+    HOLD_S = 1.5                # extra wait after an unfinished-looking turn
+    MOST_JOINS = 2              # a turn takes in at most this many later parts
 
     def __init__(self, call_id: str, send: Callable[[dict], Awaitable[None]], crm: Crm,
                  stt: Callable[[np.ndarray], str], tts: Callable[[str], tuple[np.ndarray, int]],
@@ -248,9 +280,14 @@ class Call:
                     reply = await asyncio.to_thread(self.crm.open, self.call_id)
                     self.hint = reply.hint
                 else:
-                    pcm = resample(audio, RATE, STT_RATE) / 32768.0
-                    hint = (self.hint,) if self.hint else ()
-                    text = (await asyncio.to_thread(self.stt, pcm, *hint)).strip()
+                    text = await self.hear(audio)
+                    joins = 0
+                    while text and unfinished(text) and joins < self.MOST_JOINS:
+                        more = await self._more()
+                        if more is None:
+                            break
+                        audio, joins = np.concatenate([audio, more]), joins + 1
+                        text = await self.hear(audio)
                     if not text:
                         continue
                     reply = await asyncio.to_thread(self.crm.turn, self.call_id, text)
@@ -258,6 +295,30 @@ class Call:
                 log.warning("call %s: %s failed: %s", self.call_id, kind, e)
                 reply = Reply(TROUBLE, True)
             await self.speak(reply)
+
+    async def hear(self, audio: np.ndarray) -> str:
+        pcm = resample(audio, RATE, STT_RATE) / 32768.0
+        hint = (self.hint,) if self.hint else ()
+        return (await asyncio.to_thread(self.stt, pcm, *hint)).strip()
+
+    async def _more(self) -> np.ndarray | None:
+        """After an unfinished-looking turn: the caller's next utterance if it starts within HOLD_S seconds (it is
+        then waited for until it ends), else None."""
+        loop = asyncio.get_running_loop()
+        end = loop.time() + self.HOLD_S
+        while not self.done:
+            left = end - loop.time()
+            if left <= 0:
+                if not self.ears.active:
+                    return None
+                left = 0.1                          # the caller is speaking again: wait for the end of it
+            try:
+                kind, audio = await asyncio.wait_for(self.jobs.get(), left)
+            except asyncio.TimeoutError:
+                continue
+            if kind == "turn":
+                return audio
+        return None
 
     async def speak(self, reply: Reply) -> None:
         self.marks += 1

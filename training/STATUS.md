@@ -14,6 +14,30 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 15 November 2026: A PAUSE INSIDE A SENTENCE NO LONGER SPLITS THE TURN (with small.en) (user: "start our next work")
+
+Problem (seen 11 Nov): a turn ends after 0.7 s of quiet, so a caller who stops to remember something gets a reply to
+half a sentence. **Measured first** (`phone.Utterances` on the phone line, both recorded voices, 48 sentences): only
+1 sentence was cut, the developer's "My date of birth is ... fifteenth August 1992", whose pause lasts 1.2–1.5 s.
+A flat 1.5 s end-of-turn wait would join it but add 0.8 s to every reply (already ~3 s against the ~2 s target), so
+no. What the ear wrote for the first part is the signal: small.en "My birth of death is..." (base.en "My butt top
+does this.").
+**Built** (`voice-engine/phone.py`): `unfinished(text)`: trails off ("...", comma, dash) or stops on a word nobody
+ends on ("my", "the", "of", "and", "um" ... even with a full stop; "is", "a", "number", "on" ... only without one, since
+"Yes, it is." is an answer). Then `Call` waits up to `HOLD_S` = 1.5 s more; if the caller carries on, both parts are
+heard again as one and the CRM gets one turn; if not, the turn goes on unchanged; at most 2 more parts per turn.
+Finished sentences are not delayed.
+Tests: engine 49/49 (6 new: the text rule, including "My phone number is 9840122356" as finished; a paused
+sentence becomes one turn heard as one piece of audio; an unfinished turn goes on after the wait when nothing follows;
+a finished one is not held; at most 2 joins); the paused-sentence test was checked to fail with joining switched off.
+**Real check** (every recorded sentence through the real `phone.Call` on phone-line audio, real Whisper, a stand-in
+CRM; the paused one also at real speed): with **small.en all 48 sentences reached the CRM as one turn each**, the
+paused one as "My birth of death is 15th August 1992." (the date whole; "date of birth" still misheard), and **no
+finished sentence was held back**. The first run of this check held "My phone number is 9840122356" (the rule ignored
+digits and saw "is" last): fixed and added to the tests before committing. With **base.en the paused sentence still
+makes two turns** (its full stop gives no sign), with no wrong holds either. Small sample: 2 voices, 1 real pause;
+more recorded voices would test the rule further.
+
 # 11 November 2026, late night: NAME HINTS WIRED INTO LIVE CALLS (user: "Yes, wire it in")
 
 The CRM's live `open` reply (`/api/voice/hooks/live/open`) now carries `"hint"`: the called contact's registered name
@@ -88,7 +112,7 @@ Suresh ("storage"), a digit of the mobile number ("double two"), and every name 
 the line misses only names and sentence 23, "What is the fee for the check-up?"** (check-up heard as "shutup" in every small.en path; on the mobile path the whole sentence, fee too). With the new name matching, small.en's
 "Laxmina Rainan" passes as Lakshmi Narayanan; "Mohamad/Mohammed Ithwan" for Irfan does not (a different consonant,
 rightly refused). The line also cut sentence 6 into two turns (the call's 0.7 s end-of-speech rule): a caller who
-pauses mid-sentence gets a reply to half a sentence.
+pauses mid-sentence gets a reply to half a sentence. (Fixed for small.en on 15 Nov, see the top.)
 Speed: this run's times were about twice the morning's for the same Piper files (the laptop was busier), so the
 morning's are the clean measure: base.en ~1.0 s, small.en ~3.0 s per sentence on this CPU. small.en on the laptop is
 too slow for a call; on a GPU it would be a fraction of a second.

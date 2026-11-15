@@ -69,7 +69,9 @@ Developer's phone ── Plivo ── HTTPS + WSS ──> gateway (laptop, :8099
 
 Expected reply time: 0.7 s end-of-speech wait + ~1.0 s ear (`base.en` on the laptop's CPU, measured 11 Nov for a
 2–4 s sentence) + the voice + ~1.0 s brain + the network. **About 3 s**, above the ~2 s target; running the engine on
-the GPU machine too would cut the ear's part. The first call measures it.
+the GPU machine too would cut the ear's part. The first call measures it. When what the caller said looks cut off by
+a pause ("My date of birth is..."), the engine waits up to 1.5 s more for the rest before answering (15 Nov;
+`voice-engine/README.md`, "Real phone calls"); finished sentences are not delayed.
 
 ## Settings (`backend/.env`, never committed)
 

@@ -72,6 +72,14 @@ Plivo streams the call's audio both ways over a WebSocket to this engine's `/cal
 Whisper to text, the CRM's brain decides the reply (`POST /api/voice/hooks/live/{open,turn,end}`), Piper back to
 8 kHz mu-law. The caller can talk over the agent; after the goodbye has been played the CRM hangs up.
 
+A turn ends after 0.7 s of quiet. A caller who stops to remember something ("My date of birth is ... fifteenth
+August") pauses longer, so when what was heard looks cut off (it trails off with "...", a comma or a dash, or stops
+on a word nobody ends on, such as "my", "the", "of", "um"; `phone.unfinished`), the call waits up to 1.5 s more
+(`Call.HOLD_S`). If the caller carries on, both parts are heard again as one and the CRM gets the whole sentence
+once; if not, the turn goes on as it was. Finished sentences are not delayed. This relies on the ear's punctuation:
+`small.en` writes "is..." where the caller paused, `base.en` often writes a full stop, so with base.en most such
+pauses still make two turns.
+
 The engine needs two more settings: `VOICE_HMAC_SECRET` (the CRM's, it checks each call's stream token and signs the
 CRM requests; blank refuses every call) and `CRM_URL`.
 
