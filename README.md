@@ -39,8 +39,9 @@ counselling-specific module removed.
 - **Sign-in**: one admin; staff (managers and agents) are created by the admin; mobile number + one-time code;
   signed out after 3 minutes without activity.
 
-No telephony or voice-AI provider is connected yet, so the agent runs in **simulated mode**: everything works,
-but no phone rings. Connecting one is a single adapter class plus settings: see
+Out of the box the agent runs in **simulated mode**: everything works, but no phone rings. A phone line through
+Plivo, with our own model and speech engine (`voice-engine/`), is built and tested on one machine but not yet tried
+on a real line; other providers plug in as one adapter class plus settings: see
 [docs/voice-agent.md](docs/voice-agent.md).
 
 ## Roles
@@ -82,4 +83,6 @@ hand-overs, opt-out, campaigns, the kill switch, scripted and red-team conversat
 
 ## Selling it to a new customer
 
-See [docs/new-customer-setup.md](docs/new-customer-setup.md).
+See [docs/new-customer-setup.md](docs/new-customer-setup.md). For the company taking it over (what it is, what is
+ready, their decisions, daily use, going live, running it, troubleshooting):
+[docs/handover-guide.md](docs/handover-guide.md).

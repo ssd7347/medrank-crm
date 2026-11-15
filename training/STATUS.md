@@ -14,6 +14,23 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 15 November 2026, later: HAND-OVER GUIDE WRITTEN (`docs/handover-guide.md`) (user: "start your work now")
+
+For the client (owner/admin, staff, whoever runs the machines), in plain words: what the parts are; what is ready
+and what is not (real line untried, Plivo account and GPU theirs, no SMS/WhatsApp login codes, no DND scrubbing,
+no recording although the starter openings say "may be recorded"); their decisions before going live; daily use
+by role and menu; what a call is like (identity check, private fields, hand-over, calling rules); going live step
+by step (test console, first call, pilot of 20–50 with every transcript read); running it (only the gateway public,
+secrets, key settings, start order, backups); troubleshooting; where the details are. Every rule in it was checked
+against the code (calling window 09:00–20:00, 2 a day 2 h apart, attempts 1–5 default 3, desk 09:30–18:30
+Mon–Sat, retention 365 days, script versions and approval, brain failure → hand-over, default agent name Asha).
+README: linked, and its "no provider connected" line corrected (Plivo path built, not yet on a real line).
+**Found while checking, not fixed:** (1) login codes are never sent (`OtpService.deliver` is empty), yet the
+"Connected services" page shows login codes as CONNECTED whenever `OTP_SHOW_ON_SCREEN=false`; with that setting
+nobody could sign in. (2) The same page's voice entry still suggests Retell/Vapi/Bland/Bolna, not the Plivo + own
+engine path. (3) When the engine says "trouble on this line ... will call you back" (the CRM or the engine failed),
+no call-back task is booked; the guide tells staff to call such people themselves.
+
 # 15 November 2026: A PAUSE INSIDE A SENTENCE NO LONGER SPLITS THE TURN (with small.en) (user: "start our next work")
 
 Problem (seen 11 Nov): a turn ends after 0.7 s of quiet, so a caller who stops to remember something gets a reply to
