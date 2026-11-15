@@ -159,6 +159,31 @@ public class LiveCallService {
         }));
     }
 
+    /**
+     * The caller's last words: what they said that the engine had not passed on when the stream closed (they hung up
+     * mid-sentence, or before the 0.7 s of quiet that ends a turn), heard afterwards. Nothing is said back. The words
+     * go into the transcript, and if they asked to stop, the opt-out is recorded at once ({@link
+     * VoiceCallService#optOutIfAsked}), whether or not the end of the call has been recorded yet: "Stop calling me"
+     * followed by a hang-up must never be rung again. True if this opted them out.
+     */
+    public boolean lastWords(UUID callId, String said) {
+        String text = said == null ? "" : said.strip();
+        String words = text.length() > 500 ? text.substring(0, 500) : text;
+        return Boolean.TRUE.equals(tx.execute(s -> {
+            VoiceCall call = callId == null ? null : calls.findById(callId).orElse(null);
+            if (call == null || call.isTestCall()) {
+                throw ApiException.notFound("Call");
+            }
+            if (words.isEmpty()) {
+                return false;
+            }
+            List<Line> all = new ArrayList<>(callService.lines(call));
+            all.add(Line.caller(words));
+            call.setTranscript(callService.toJson(all));
+            return callService.optOutIfAsked(call);
+        }));
+    }
+
     /** The platform reported the hang-up (the caller may have hung up first): the brain lets go of the call. */
     public void hungUp(UUID callId, String providerCallId) {
         UUID id = callId != null ? callId : providerCallId == null ? null

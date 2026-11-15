@@ -104,7 +104,9 @@ public class VoiceHooksController {
      * {@code {"say": "...", "over": false}} ({@code end}: {@code {"hung_up": true}}); {@code open} adds
      * {@code "hint"}, the called contact's name for the engine's ear, when the contact is known. {@code trouble}:
      * {@code {"call_id", "what"}} when the engine hit a fault, told the caller someone will call back and is hanging
-     * up; replies {@code {"callback_booked": true|false}}.
+     * up; replies {@code {"callback_booked": true|false}}. {@code last}: {@code {"call_id", "said"}}, what the caller said
+     * that the engine had not passed on when the stream closed (they hung up mid-sentence); nothing is said back;
+     * replies {@code {"opted_out": true|false}}.
      */
     @PostMapping("/live/{step}")
     public Map<String, Object> live(@PathVariable String step, @RequestBody(required = false) String raw,
@@ -127,6 +129,7 @@ public class VoiceHooksController {
             }
             case "end" -> out.put("hung_up", live.end(callId));
             case "trouble" -> out.put("callback_booked", live.trouble(callId, string(body.get("what"))));
+            case "last" -> out.put("opted_out", live.lastWords(callId, string(body.get("said"))));
             default -> throw ApiException.notFound("Step");
         }
         return out;

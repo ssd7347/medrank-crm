@@ -6,6 +6,7 @@ brains, tools and rules as the test console), and Piper speaks it back into the 
 
   * The caller can talk over the agent: the agent's queued audio is cleared and it listens.
   * After the agent's goodbye has been heard (Plivo's "playedStream" for our checkpoint), the CRM hangs up.
+  * When the stream closes, what the caller said that the CRM has not had yet is sent as their last words (live/last).
 
 Pure numpy (no audioop: it is gone from Python 3.13), so it is tested without a phone line: test_phone.py.
 """
@@ -118,6 +119,12 @@ class Utterances:
                 done.append(u)
         return done
 
+    def flush(self) -> np.ndarray | None:
+        """The call ended: the utterance still going (its 700 ms of quiet never came), if it holds enough speech."""
+        frames, speech, active = self.frames, self.speech, self.active
+        self.active, self.frames, self.pre, self.loud, self.quiet, self.speech = False, [], [], 0, 0, 0
+        return np.concatenate(frames) if active and speech >= self.MIN_SPEECH else None
+
     def _frame(self, frame: np.ndarray) -> np.ndarray | None:
         rms = float(np.sqrt(np.mean(frame.astype(np.float32) ** 2)))
         loud = rms > max(3.0 * self.floor, 300.0)
@@ -215,6 +222,11 @@ class Crm:
     def end(self, call_id: str) -> None:
         self._call("end", {"call_id": call_id})
 
+    def last_words(self, call_id: str, said: str) -> bool:
+        """What the caller said that had not been passed on when the stream closed. Nothing is said back; the CRM keeps
+        it, and opts the caller out if they asked to stop. True if it did."""
+        return bool(self._call("last", {"call_id": call_id, "said": said[:500]}).get("opted_out"))
+
     def trouble(self, call_id: str, what: str) -> bool:
         """The call broke on our side and the caller was told someone will call back: the CRM books that call-back.
         True if it booked one (none is needed when one is already arranged or the caller asked not to be called)."""
@@ -224,6 +236,7 @@ class Crm:
 # ---------------------------------------------------------------------------------------------- one call
 
 TROUBLE = "Sorry, I am having trouble on this line. A member of our team will call you back. Goodbye."
+_LAST_WORDS: set[asyncio.Task] = set()     # callers' last words still being heard or sent (see Call.stop)
 
 
 class Call:
@@ -253,6 +266,8 @@ class Call:
         self.hint = ""              # the called contact's name, from the CRM's opening reply
         self.reported = False       # a fault has been reported to the CRM (once per call)
         self.reports: set[asyncio.Task] = set()
+        self.unsent: np.ndarray | None = None   # the turn being heard, until it is on its way to the CRM
+        self.late: list[np.ndarray] = []        # what the caller said while the goodbye played
         self.done = False
 
     async def handle(self, msg: dict) -> None:
@@ -268,6 +283,8 @@ class Call:
             for utterance in self.ears.feed(ulaw_decode(base64.b64decode(media.get("payload") or ""))):
                 if not self.ending:
                     await self.jobs.put(("turn", utterance))
+                else:
+                    self.late.append(utterance)     # said over the goodbye: no reply, but sent as last words
             if self.speaking and not self.ending and self.ears.talking():
                 # The caller talks over the agent: stop speaking and listen.
                 self.speaking = ""
@@ -287,6 +304,7 @@ class Call:
                     reply = await asyncio.to_thread(self.crm.open, self.call_id)
                     self.hint = reply.hint
                 else:
+                    self.unsent = audio
                     text = await self.hear(audio)
                     joins = 0
                     while text and unfinished(text) and joins < self.MOST_JOINS:
@@ -294,7 +312,10 @@ class Call:
                         if more is None:
                             break
                         audio, joins = np.concatenate([audio, more]), joins + 1
+                        self.unsent = audio
                         text = await self.hear(audio)
+                    # From here the words are the CRM's: the request starts before anything can cancel this task.
+                    self.unsent = None
                     if not text:
                         continue
                     reply = await asyncio.to_thread(self.crm.turn, self.call_id, text)
@@ -380,8 +401,38 @@ class Call:
             log.warning("call %s: hang-up failed: %s", self.call_id, e)
         await self.close()
 
-    def stop(self) -> None:
-        """The stream closed (the caller hung up, or the call was transferred)."""
+    def stop(self) -> asyncio.Task | None:
+        """The stream closed (the caller hung up, or the call was transferred). What the caller said that the CRM has
+        not had (the turn being heard, turns waiting their turn, what they said over the goodbye, and speech that the
+        700 ms of quiet never ended) is heard and sent as their last words: "Stop calling me" said just before hanging
+        up must reach the CRM. That runs as its own task, kept until it is done, so it goes on even if whoever closed
+        the stream is cancelled; returned so it can be awaited (None when there is nothing to send)."""
         self.done = True
         if self.worker:
             self.worker.cancel()
+        parts = [] if self.unsent is None else [self.unsent]
+        self.unsent = None
+        while not self.jobs.empty():
+            kind, audio = self.jobs.get_nowait()
+            if kind == "turn":
+                parts.append(audio)
+        parts += self.late
+        self.late = []
+        tail = self.ears.flush()
+        if tail is not None:
+            parts.append(tail)
+        if not parts:
+            return None
+        task = asyncio.get_running_loop().create_task(self._send_last_words(np.concatenate(parts)))
+        _LAST_WORDS.add(task)
+        task.add_done_callback(_LAST_WORDS.discard)
+        return task
+
+    async def _send_last_words(self, audio: np.ndarray) -> None:
+        try:
+            text = await self.hear(audio)
+            if text:
+                opted_out = await asyncio.to_thread(self.crm.last_words, self.call_id, text)
+                log.info("call %s: the caller's last words sent, opted out: %s", self.call_id, opted_out)
+        except Exception as e:
+            log.warning("call %s: could not send the caller's last words: %s", self.call_id, e)

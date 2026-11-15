@@ -101,7 +101,7 @@ class UtterancesTest(unittest.TestCase):
 
 class FakeCrm:
     def __init__(self, replies):
-        self.replies, self.heard, self.ended, self.troubles = list(replies), [], 0, []
+        self.replies, self.heard, self.ended, self.troubles, self.last = list(replies), [], 0, [], []
 
     def open(self, call_id):
         return phone.Reply("Hello, this is Asha.", False)
@@ -116,6 +116,10 @@ class FakeCrm:
     def trouble(self, call_id, what):
         self.troubles.append(what)
         return True
+
+    def last_words(self, call_id, said):
+        self.last.append(said)
+        return "stop" in said.lower()
 
 
 class CallTest(unittest.TestCase):
@@ -139,7 +143,9 @@ class CallTest(unittest.TestCase):
                 else:
                     await call.handle(step(sent) if callable(step) else step)
             await asyncio.sleep(0.3)
-            call.stop()
+            last = call.stop()
+            if last is not None:
+                await last
             return call
         call = asyncio.run(go())
         return sent, closed, call
@@ -163,6 +169,7 @@ class CallTest(unittest.TestCase):
         self.assertEqual(crm.ended, 1)
         self.assertEqual(closed, [True])
         self.assertTrue(call.done)
+        self.assertEqual(crm.last, [])          # everything the caller said reached the CRM as a turn
 
     def test_the_contact_name_from_the_crm_is_the_ears_hint_on_every_turn(self):
         class Named(FakeCrm):
@@ -305,6 +312,53 @@ class CallTest(unittest.TestCase):
         self.assertEqual((crm.troubles, crm.ended, closed), (["opening failed: ConnectionError"], 1, [True]))
 
 
+    # ------------------------------------------------------------------ the caller's last words at the hang-up
+
+    def test_words_cut_off_by_the_hang_up_reach_the_crm_as_last_words(self):
+        # "Stop calling me" and the caller hangs up at once: the 700 ms of quiet that ends a turn never comes.
+        crm = FakeCrm([])
+        self.run_call(crm, [self.START, "wait", media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.2)]))],
+                      stt=lambda audio: "Stop calling me")
+        self.assertEqual((crm.heard, crm.last), ([], ["Stop calling me"]))
+
+    def test_a_turn_still_being_heard_at_the_hang_up_is_sent_as_last_words(self):
+        import time
+        crm = FakeCrm([phone.Reply("Okay.", False)])
+
+        def slow(audio):                    # the ear is still working when the stream closes
+            time.sleep(0.6)
+            return "Remove my number"
+        self.run_call(crm, [self.START, "wait", media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))], stt=slow)
+        self.assertEqual((crm.heard, crm.last), ([], ["Remove my number"]))
+
+    def test_what_the_caller_says_over_the_goodbye_is_sent_as_last_words(self):
+        crm = FakeCrm([phone.Reply("Thank you, noted. Goodbye.", True)])
+        said = iter(["I will pay on Friday", "And do not call me again"])
+        speech = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        sent, _, _ = self.run_call(crm, [self.START, "wait", speech, "wait", speech, "wait"],
+                                   stt=lambda audio: next(said))
+        self.assertEqual([m["name"] for m in sent if m["event"] == "checkpoint"], ["say-1", "end-2"])  # no reply to it
+        self.assertEqual((crm.heard, crm.last), (["I will pay on Friday"], ["And do not call me again"]))
+
+    def test_a_click_at_the_hang_up_or_nothing_at_all_sends_nothing(self):
+        for tail in (tone(0.1), quiet(0.5, level=60)):
+            crm = FakeCrm([])
+            heard = []
+            self.run_call(crm, [self.START, "wait", media(np.concatenate([quiet(0.3), tail]))],
+                          stt=lambda audio: heard.append(audio) or "Hello")
+            self.assertEqual((heard, crm.last), ([], []))
+
+    def test_a_crm_that_is_down_for_the_last_words_does_not_break_the_hang_up(self):
+        class Down(FakeCrm):
+            def last_words(self, call_id, said):
+                self.last.append(said)
+                raise ConnectionError("CRM down")
+        crm = Down([])
+        _, _, call = self.run_call(crm, [self.START, "wait", media(np.concatenate([quiet(0.3), tone(1.0)]))],
+                                   stt=lambda audio: "Stop calling me")
+        self.assertEqual((crm.last, call.done), (["Stop calling me"], True))
+
+
 class UnfinishedTest(unittest.TestCase):
 
     def test_cut_off_sentences(self):
@@ -362,6 +416,27 @@ class CrmTest(unittest.TestCase):
         url, body, headers = seen[0]
         self.assertEqual(url, "http://crm.local:8082/api/voice/hooks/live/trouble")
         self.assertEqual((body["call_id"], len(body["what"])), ("c1", 200))
+        raw = json.dumps(body, separators=(",", ":"))
+        self.assertEqual(headers["X-Voice-Signature"], phone.sign("s" * 40, headers["X-Voice-Timestamp"], raw))
+
+    def test_the_last_words_are_signed_and_say_whether_the_caller_was_opted_out(self):
+        seen = []
+
+        class Res:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"opted_out": True}
+
+        def post(url, data, timeout, headers):
+            seen.append((url, json.loads(data), headers))
+            return Res()
+        crm = phone.Crm("http://crm.local:8082", "s" * 40, post=post)
+        self.assertTrue(crm.last_words("c1", "Stop calling me " + "x" * 600))
+        url, body, headers = seen[0]
+        self.assertEqual(url, "http://crm.local:8082/api/voice/hooks/live/last")
+        self.assertEqual((body["call_id"], len(body["said"])), ("c1", 500))
         raw = json.dumps(body, separators=(",", ":"))
         self.assertEqual(headers["X-Voice-Signature"], phone.sign("s" * 40, headers["X-Voice-Timestamp"], raw))
 
@@ -450,6 +525,24 @@ class EndpointTest(unittest.TestCase):
             self.assertEqual(ws.receive()["type"], "websocket.close")
         self.assertEqual(self.crm.heard, ["I will pay on Friday"])
         self.assertEqual(self.crm.ended, 1)
+
+    def test_the_socket_closing_mid_sentence_sends_the_last_words(self):
+        import time
+        from starlette.testclient import TestClient
+        self.engine.stt_pcm = lambda audio: "Stop calling me"
+        # The test client cancels the handler when the socket closes (uvicorn does not): the last words go on anyway.
+        with TestClient(self.engine.app) as client:
+            with client.websocket_connect(f"/call?call_id=c1&token={phone.stream_token(self.SECRET, 'c1')}") as ws:
+                ws.send_text(json.dumps({"event": "start", "start": {"streamId": "s1", "callId": "p1"}}))
+                while json.loads(ws.receive_text())["event"] != "checkpoint":
+                    pass
+                ws.send_text(json.dumps(media(np.concatenate([quiet(0.3), tone(1.0)]))))
+            # The caller hung up (the socket closed) before 700 ms of quiet: still heard and sent.
+            for _ in range(60):
+                if self.crm.last:
+                    break
+                time.sleep(0.05)
+        self.assertEqual((self.crm.heard, self.crm.last), ([], ["Stop calling me"]))
 
     def test_the_engine_gives_whisper_the_contacts_name(self):
         heard_with = []

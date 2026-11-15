@@ -26,6 +26,7 @@ Settings (environment variables):
 Run:  uvicorn engine:app --host 127.0.0.1 --port 8090
 """
 
+import asyncio
 import hmac
 import io
 import json
@@ -193,4 +194,6 @@ async def call(ws: WebSocket, call_id: str = "", token: str = ""):
     except (WebSocketDisconnect, RuntimeError):
         pass                    # the caller hung up, or the call was transferred to the desk
     finally:
-        session.stop()
+        last = session.stop()   # hears and sends whatever the caller said that the CRM has not had yet
+        if last is not None:
+            await asyncio.shield(last)  # and it goes on even if this handler is cancelled

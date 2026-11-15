@@ -14,6 +14,27 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 15 November 2026, late night: A CALLER'S LAST WORDS AT THE HANG-UP NOW REACH THE CRM (user: "Yes, fix it")
+
+Before: when the stream closed, the engine cancelled its work and dropped whatever the CRM had not had yet: the turn
+still being heard, turns waiting, speech still going because the 0.7 s of quiet never came, and anything said over
+the goodbye (those utterances were thrown away). So "Stop calling me" + click never reached the CRM. Now
+`phone.Call.stop` collects all of that (`self.unsent`, set while a turn is heard and cleared just before its CRM request
+starts; the queue; `self.late`; new `Utterances.flush`, which keeps only an utterance with enough speech), hears it
+once and sends it to a new signed hook `POST /api/voice/hooks/live/last {"call_id","said"}` (cut to 500). The CRM
+(`LiveCallService.lastWords`) adds a caller line and runs `optOutIfAsked` at once, whether or not the hang-up is
+recorded yet, and replies `{"opted_out"}`; unknown and test calls 404. The work runs as its own task held in a module
+set and the endpoint awaits it shielded: the Starlette test client cancels the handler when the socket closes (found
+by the first socket test, which failed: "stop interrupted: CancelledError"); uvicorn 0.32 does not (its own comment),
+but a shutdown could. Tests: backend 94/94 (new: stop before the hang-up is recorded, opted out once; after it,
+still opted out; ordinary words kept and change nothing; blank ignored; already opted out not repeated; unknown/test
+404); engine 60/60 (new: cut off mid-sentence, a turn still being heard, words over the goodbye with no reply, a click
+or silence sends nothing, a CRM that is down, the signed request, and the real `/call` socket closing mid-sentence,
+run 3 times). **End to end** (test CRM on the in-memory database, real engine with base.en and Piper as the caller's
+voice, socket closed right after the sentence): 7/7, "Please stop calling me." reached the CRM, consent OPTED_OUT,
+outcome OPTED_OUT, one opt_out line; "Okay, thank you." kept, consent GRANTED. Docs: `voice-engine/README.md`,
+`docs/voice-agent.md`, `docs/compliance-checklist.md` (the gap removed), run-sheet Q&A.
+
 # 15 November 2026, night: COMPLIANCE CHECKLIST, DEMO COPY AND WALKTHROUGH RUN-SHEET; OPT-OUT AT HANG-UP (user: "do the works froom your side")
 
 **Compliance checklist** (`docs/compliance-checklist.md`, not legal advice): what the CRM enforces (each line checked
@@ -33,9 +54,9 @@ consent withdrawn (AI calls only, as `upgrade` does), outcome OPTED_OUT if it wa
 noted in the transcript (so never twice). `LiveCallService.turn` runs it too when the call was closed while the brain
 was answering. New test (live call, "Please take me off your list.", which the stand-in brain does not catch: consent
 still GRANTED after the turn, OPTED_OUT after the hang-up, contact not Do not call; a platform transcript with "Don't
-call me again"; a call with neither stays NO_INTERACTION with consent kept). Backend 93/93. **Still open:** words cut
-off by an instant hang-up never reach the CRM (the engine cancels its work when the stream closes and drops audio not
-yet ended by 0.7 s of quiet). The close-during-turn path is covered by reading only, not by a test.
+call me again"; a call with neither stays NO_INTERACTION with consent kept). Backend 93/93. (The gap left here, words
+cut off by an instant hang-up, was closed the same night: see the section above.) The close-during-turn path is
+covered by reading only, not by a test.
 
 **Demo copy** (`demo/`): `demo.properties` (in-memory H2 `crmdemo`, port 8094, random JWT/HMAC secrets each start, code
 on screen, platform forced to simulated, no Anthropic/Plivo keys or desk number whatever `backend/.env` says),

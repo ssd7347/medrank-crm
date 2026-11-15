@@ -79,6 +79,13 @@ a call-back) and notes `call_cut_off` in the transcript. The report runs alongsi
 does not keep the caller waiting; then nothing can be booked, and the engine's log says so. If the voice itself
 fails, nothing can be said, so the engine reports the fault and hangs up instead of leaving the caller in silence.
 
+When the stream closes (the caller hung up, or the call went to the desk), whatever the caller said that the CRM has
+not had yet (the turn being heard, turns waiting, what they said over the goodbye, and speech still going because the
+0.7 s of quiet never came) is heard then and sent as their **last words** (`POST /api/voice/hooks/live/last`,
+`Call.stop`). Nothing is said back; the CRM adds them to the transcript and, if they asked to stop, opts them out at
+once: "Stop calling me" followed by a click is never rung again. This runs as its own task, so it finishes even if the
+handler is cancelled.
+
 A turn ends after 0.7 s of quiet. A caller who stops to remember something ("My date of birth is ... fifteenth
 August") pauses longer, so when what was heard looks cut off (it trails off with "...", a comma or a dash, or stops
 on a word nobody ends on, such as "my", "the", "of", "um"; `phone.unfinished`), the call waits up to 1.5 s more

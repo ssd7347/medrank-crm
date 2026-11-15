@@ -546,6 +546,65 @@ class VoiceAgentIntegrationTest {
     }
 
     @Test
+    void theCallersLastWordsAreKeptAndAStopInThemIsHonouredBeforeOrAfterTheHangUp() throws Exception {
+        approve("Incoming calls");
+        // Before the hang-up is recorded: opted out at once, and the end of the call does not do it twice.
+        String phone = phone();
+        long contact = contact(admin, "Asha Kurian", phone, "\"customer_ref\":\"CR-4101\"");
+        consent(admin, contact, false);
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        String id = "{\"call_id\":\"" + call + "\"";
+        hook("/live/open", id + "}").andExpect(status().isOk());
+        hook("/live/last", id + ",\"said\":\"No, please stop calling me.\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.opted_out").value(true));
+        mvc.perform(auth(get("/api/contacts/" + contact + "/voice-consent"), admin))
+                .andExpect(jsonPath("$[0].state").value("OPTED_OUT"));
+        hook("/webhooks/call-ended", id + ",\"status\":\"completed\"}").andExpect(jsonPath("$.applied").value(true));
+        mvc.perform(auth(get("/api/voice/calls/" + call), admin))
+                .andExpect(jsonPath("$.call.outcome").value("OPTED_OUT"))
+                .andExpect(jsonPath("$.transcript[?(@.role == 'caller')].text").value(Matchers.hasItem("No, please stop calling me.")))
+                .andExpect(jsonPath("$.transcript[?(@.tool == 'opt_out')]", Matchers.hasSize(1)));
+
+        // After the hang-up was recorded (the words arrive a moment later): still opted out.
+        String phone2 = phone();
+        long late = contact(admin, "Nikhil Bose", phone2, "\"customer_ref\":\"CR-4102\"");
+        consent(admin, late, false);
+        String call2 = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone2 + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        hook("/webhooks/call-ended", "{\"call_id\":\"" + call2 + "\",\"status\":\"completed\"}");
+        hook("/live/last", "{\"call_id\":\"" + call2 + "\",\"said\":\"Don't call me again.\"}")
+                .andExpect(jsonPath("$.opted_out").value(true));
+        mvc.perform(auth(get("/api/contacts/" + late + "/voice-consent"), admin))
+                .andExpect(jsonPath("$[0].state").value("OPTED_OUT"));
+        mvc.perform(auth(get("/api/voice/calls/" + call2), admin)).andExpect(jsonPath("$.call.outcome").value("OPTED_OUT"));
+
+        // Last words without a stop are kept, and change nothing else; nothing said, or said again: nothing happens.
+        String phone3 = phone();
+        long other = contact(admin, "Ritu Sen", phone3, "\"customer_ref\":\"CR-4103\"");
+        consent(admin, other, false);
+        String call3 = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone3 + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        hook("/live/last", "{\"call_id\":\"" + call3 + "\",\"said\":\"Okay, thank you, bye.\"}")
+                .andExpect(jsonPath("$.opted_out").value(false));
+        hook("/live/last", "{\"call_id\":\"" + call3 + "\",\"said\":\"  \"}").andExpect(jsonPath("$.opted_out").value(false));
+        mvc.perform(auth(get("/api/voice/calls/" + call3), admin))
+                .andExpect(jsonPath("$.transcript[?(@.role == 'caller')].text").value(Matchers.contains("Okay, thank you, bye.")));
+        mvc.perform(auth(get("/api/contacts/" + other + "/voice-consent"), admin))
+                .andExpect(jsonPath("$[0].state").value("GRANTED"));
+        // Already opted out by the agent: not recorded a second time.
+        tool(call3, "opt_out", "{\"scope\":\"AI_CALLS\"}").andExpect(jsonPath("$.data.confirmed").value(true));
+        hook("/live/last", "{\"call_id\":\"" + call3 + "\",\"said\":\"Stop calling me.\"}")
+                .andExpect(jsonPath("$.opted_out").value(false));
+
+        // Unknown calls and test-console calls: refused.
+        hook("/live/last", "{\"call_id\":\"" + java.util.UUID.randomUUID() + "\",\"said\":\"hi\"}").andExpect(status().isNotFound());
+        String test = JsonPath.read(start(contact(admin, "Test Person", phone(), "\"customer_ref\":\"CR-3\""), "Incoming calls")
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        hook("/live/last", "{\"call_id\":\"" + test + "\",\"said\":\"Stop calling me\"}").andExpect(status().isNotFound());
+    }
+
+    @Test
     void unknownCallerBecomesAContactOnCallback() throws Exception {
         approve("Incoming calls");
         String phone = phone();
