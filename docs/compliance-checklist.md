@@ -27,6 +27,7 @@ Every rule below is checked by the code, and tested, before each number is diall
 | Identity check | Before personal details, the caller must give their full name and an identity answer (for example customer ID). Three failures end the AI's part and pass the call to a person. | No. |
 | A person when needed | Complaints, distress, a stuck AI or a fault hand the call to a person: a live transfer when the desk is open, otherwise a call-back task. | No. |
 | Keeping transcripts | Call transcripts are deleted after 365 days (`VOICE_RETENTION_DAYS`); the outcome of each call stays. | Only the server setting can change it. |
+| Erasing a person | When someone asks for their data to be deleted, the admin opens the contact, presses **Erase this person** and types their phone number and a reason. At once and for good: their details, notes, timeline, follow-ups, call log, consent records, call-backs, alerts, campaign places and do-not-disturb results are deleted; their AI calls stay only as numbers for the reports (when, how long, how it ended) with the number, transcript, summary, notes and the phone company's call id removed; upload reports that named them lose the name. Refused while a call with them is live. If they had said no to AI calls (opted out, refused, or "Do not call"), only a one-way hash of the number is kept, so a list imported later cannot make it callable again; only consent recorded by hand on the contact page afterwards counts. The erasure is in the audit log, without their name. | Only the admin can erase. It cannot be undone. |
 | Audit trail | Script approvals, consent changes, every AI tool use and staff actions are recorded with who and when. | No. |
 | Warnings | Admins get an urgent alert when 5 or more people opt out within 24 hours, and when the month's estimated call cost reaches the limit (`VOICE_MONTHLY_CAP_INR`). The cost alert does not stop calls. | Not applicable. |
 | Stop everything | **Pause all** on the AI voice agent page stops all dialling at once. | Any admin. |
@@ -35,12 +36,15 @@ Every rule below is checked by the code, and tested, before each number is diall
 
 Each item here needs a decision, a service or a change before going live.
 
-**2.1 Erasing a person's data.** There is no way in the CRM to delete a contact and everything about them. A contact can
-be marked Do not call and opted out, but their details, notes and call outcomes stay. Transcripts go after 365 days.
-If someone asks for their data to be erased, today it needs a developer working directly on the database. Ask the
-adviser whether this must be in the CRM before launch. *This can be built.*
+**2.1 Erasing a person's data: what the CRM cannot reach.** The CRM erases a person itself (section 1), but not the
+copies kept elsewhere: database backups, server logs, the phone company's own records of the calls (Plivo keeps the
+number, time and length of each call), spreadsheets exported earlier, and anything staff wrote about the person on
+another contact. An upload report keeps a name only if it was spelled differently from the contact's name at the time
+of the erasure. There is no one-click copy of everything about one person for an access request; staff read it from
+the contact page.
 
-- [ ] Decided: erasure needed in the CRM before launch (yes / no / by when)
+- [ ] Decided with the adviser: how long backups and server logs are kept, and how an erasure request also reaches
+  Plivo and anyone holding exported spreadsheets
 
 **2.2 Call recording.** Calls are not recorded; only the transcript is kept. All starter opening lines still say "This
 call may be recorded."

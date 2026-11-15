@@ -3,7 +3,6 @@ package com.aicallcrm.crm.voice;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +12,7 @@ import com.aicallcrm.crm.common.ApiException;
 import com.aicallcrm.crm.contact.Contact;
 import com.aicallcrm.crm.contact.ContactService;
 import com.aicallcrm.crm.contact.ImportService;
+import com.aicallcrm.crm.privacy.ErasedNumberRepository;
 import com.aicallcrm.crm.security.CurrentUser;
 import com.aicallcrm.crm.voice.Voice.ConsentSource;
 
@@ -22,6 +22,9 @@ import jakarta.validation.constraints.Size;
 /**
  * Consent to AI calls and to recording, per phone number. Nobody is ever dialled by the AI without a current
  * "yes" for that exact number, and "stop calling me" takes effect at once for every campaign.
+ *
+ * <p>A number whose owner was erased after saying no (see {@code privacy.ErasureService}) stays opted out: a
+ * consent from an imported list does not count for it, only one recorded by hand on the contact page afterwards.
  */
 @Service
 public class ConsentService implements ImportService.ConsentRecorder {
@@ -44,11 +47,17 @@ public class ConsentService implements ImportService.ConsentRecorder {
     private final ContactConsentRepository consents;
     private final ContactService contacts;
     private final AuditService audit;
+    private final ErasedNumberRepository erased;
 
-    public ConsentService(ContactConsentRepository consents, ContactService contacts, AuditService audit) {
+    static final String ERASED_NOTE = "This number belonged to a person whose data was erased after they said no to "
+            + "AI calls. Consent from an imported list does not count for it; only consent recorded here by hand.";
+
+    public ConsentService(ContactConsentRepository consents, ContactService contacts, AuditService audit,
+                          ErasedNumberRepository erased) {
         this.consents = consents;
         this.contacts = contacts;
         this.audit = audit;
+        this.erased = erased;
     }
 
     // ------------------------------------------------------------------ staff
@@ -98,9 +107,12 @@ public class ConsentService implements ImportService.ConsentRecorder {
     }
 
     private PhoneConsent view(boolean alternate, String label, String phone) {
-        ContactConsent c = latest(phone).orElse(null);
+        Decision d = decide(phone);
+        ContactConsent c = d.consent();
         if (c == null) {
-            return new PhoneConsent(alternate, label, phone, State.NONE, false, false, null, null, null, null, null);
+            return d.erased()
+                    ? new PhoneConsent(alternate, label, phone, State.OPTED_OUT, false, false, null, null, null, null, ERASED_NOTE)
+                    : new PhoneConsent(alternate, label, phone, State.NONE, false, false, null, null, null, null, null);
         }
         return new PhoneConsent(alternate, label, phone, stateOf(c), c.allowsAiCalls(), c.allowsRecording(),
                 c.getSource(), c.getEvidenceRef(), c.getCapturedAt(), c.getRevokedAt(), c.getRevokeNote());
@@ -110,12 +122,17 @@ public class ConsentService implements ImportService.ConsentRecorder {
 
     @Transactional(readOnly = true)
     public State state(String phone) {
-        return latest(phone).map(ConsentService::stateOf).orElse(State.NONE);
+        Decision d = decide(phone);
+        if (d.consent() != null) {
+            return stateOf(d.consent());
+        }
+        return d.erased() ? State.OPTED_OUT : State.NONE;
     }
 
     @Transactional(readOnly = true)
     public boolean allowsRecording(String phone) {
-        return latest(phone).map(ContactConsent::allowsRecording).orElse(false);
+        ContactConsent c = decide(phone).consent();
+        return c != null && c.allowsRecording();
     }
 
     /**
@@ -134,11 +151,19 @@ public class ConsentService implements ImportService.ConsentRecorder {
         }
     }
 
-    private Optional<ContactConsent> latest(String phone) {
+    /** {@code consent}: the record that decides for the number, or null. {@code erased}: see the class comment. */
+    private record Decision(ContactConsent consent, boolean erased) {
+    }
+
+    private Decision decide(String phone) {
         if (phone == null || phone.isBlank()) {
-            return Optional.empty();
+            return new Decision(null, false);
         }
-        return consents.findByPhoneOrderByCapturedAtDescIdDesc(phone).stream().findFirst();
+        boolean wasErased = erased.forPhone(phone).isPresent();
+        ContactConsent c = consents.findByPhoneOrderByCapturedAtDescIdDesc(phone).stream()
+                .filter(x -> !wasErased || x.getSource() != ConsentSource.IMPORTED_LIST)
+                .findFirst().orElse(null);
+        return new Decision(c, wasErased);
     }
 
     private static State stateOf(ContactConsent c) {

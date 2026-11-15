@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ContactStatusBadge } from "@/components/badges";
 import { CallButton, CallHistory } from "@/components/call-button";
 import { ContactForm } from "@/components/contact-form";
 import { TagEditor } from "@/components/tags";
-import { Alert, Badge, Button, Card, DescList, EmptyState, Input, Loading, PageHeader, Select, Textarea, cx } from "@/components/ui";
+import { Alert, Badge, Button, Card, DescList, EmptyState, Field, Input, Loading, Modal, PageHeader, Select, Textarea, cx } from "@/components/ui";
 import { ConsentCard, VoiceCallList } from "@/components/voice";
 import { api, errorMessage } from "@/lib/api";
 import { MANAGER_ROLES, useAuth } from "@/lib/auth";
@@ -32,6 +32,7 @@ export default function ContactPage() {
   const { plural, has } = useBranding();
   const { stages } = useStages();
   const manager = hasRole(...MANAGER_ROLES);
+  const admin = hasRole("SUPER_ADMIN");
   const { data: c, error, loading, setData } = useApi<Contact>(`/api/contacts/${id}`);
   const fields = useApi<FieldDef[]>("/api/fields");
   const activities = useApi<Activity[]>(`/api/contacts/${id}/activities`);
@@ -177,6 +178,7 @@ export default function ContactPage() {
                 <VoiceCallList path={`/api/contacts/${c.id}/voice-calls`} />
               </>
             )}
+            {admin && <EraseCard contact={c} />}
           </div>
         </div>
       )}
@@ -320,6 +322,105 @@ function FollowUpCard({ contactId, followUps, loading, onChanged }: { contactId:
           ))}
         </ul>
       )}
+    </Card>
+  );
+}
+
+/** What the server removed; see ErasureService on the backend. */
+type Erased = {
+  timelineEntries: number;
+  followUps: number;
+  callLogs: number;
+  aiCallsAnonymised: number;
+  consentRecords: number;
+  callbacks: number;
+  alerts: number;
+  campaignPlaces: number;
+  importReportsCleaned: number;
+  numbersKeptAsHash: number;
+};
+
+const count = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+const digits = (s: string) => s.replace(/\D/g, "");
+
+/** Admin only: erase a person who asked for their data to be deleted. */
+function EraseCard({ contact }: { contact: Contact }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<Erased | null>(null);
+  const typed = digits(phone);
+  const matches = typed.length >= 8 && typed.endsWith(digits(contact.phone));
+
+  async function erase() {
+    setBusy(true);
+    setError(null);
+    try {
+      setDone(await api<Erased>(`/api/contacts/${contact.id}/erase`, { body: { confirmPhone: phone, reason } }));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const close = () => (done ? router.push("/contacts") : (setOpen(false), setPhone(""), setReason(""), setError(null)));
+
+  return (
+    <Card title="Erase this person">
+      <p className="text-sm text-ink-soft">If they ask for their data to be deleted. Everything about them goes, for good.</p>
+      <div className="mt-3">
+        <Button variant="danger" size="sm" onClick={() => setOpen(true)}>
+          Erase this person&hellip;
+        </Button>
+      </div>
+      <Modal open={open} onClose={close} title={done ? "Erased" : `Erase ${contact.fullName}?`}>
+        {done ? (
+          <div className="space-y-4 text-sm">
+            <Alert tone="green">The person has been erased. The erasure is in the audit log, without their name.</Alert>
+            <ul className="list-disc space-y-1 pl-5 text-ink-soft">
+              <li>
+                Deleted: {count(done.timelineEntries, "timeline entry", "timeline entries")}, {count(done.followUps, "follow-up")}, {count(done.callLogs, "call log entry", "call log entries")},{" "}
+                {count(done.consentRecords, "consent record")}, {count(done.callbacks, "call-back")}, {count(done.alerts, "alert")}, {count(done.campaignPlaces, "campaign place")}.
+              </li>
+              <li>AI calls kept only as numbers for the reports: {done.aiCallsAnonymised}.</li>
+              {done.importReportsCleaned > 0 && <li>Upload reports that named them, name removed: {done.importReportsCleaned}.</li>}
+              {done.numbersKeptAsHash > 0 && <li>They had said no to AI calls, so their number stays blocked (kept only as a code that cannot be read back).</li>}
+            </ul>
+            <div className="flex justify-end">
+              <Button onClick={close}>Back to the list</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {error && <Alert>{error}</Alert>}
+            <div className="space-y-2 text-sm text-ink-soft">
+              <p>
+                <strong className="text-ink">This cannot be undone.</strong> Their details, notes, timeline, follow-ups, call log, consent records, call-backs and alerts are deleted. Their AI calls stay only as numbers for the reports (when, how long, how it ended), without their number or anything that was said.
+              </p>
+              <p>If they had said no to AI calls, their number is kept as a code that cannot be read back, so a list uploaded later cannot make it callable again.</p>
+              <p>Not reached from here: backups, server logs, the phone company&rsquo;s own call records, and anything written about them on other contacts.</p>
+            </div>
+            <Field label={`Type their phone number (${contact.phone}) to confirm`} required>
+              {(id) => <Input id={id} value={phone} inputMode="tel" autoComplete="off" onChange={(e) => setPhone(e.target.value)} />}
+            </Field>
+            <Field label="Why" hint="Kept in the audit log. Do not write their name." required>
+              {(id) => <Input id={id} value={reason} maxLength={200} placeholder="Asked by email on 15 Nov" onChange={(e) => setReason(e.target.value)} />}
+            </Field>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={close}>
+                Cancel
+              </Button>
+              <Button variant="danger" loading={busy} disabled={!matches || !reason.trim()} onClick={erase}>
+                Erase for good
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </Card>
   );
 }

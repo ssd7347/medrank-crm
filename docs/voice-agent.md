@@ -10,6 +10,7 @@ history.
 | Piece | Where |
 |---|---|
 | Consent per phone number (AI calls, recording), opt-out | `voice/ConsentService`, contact page, Excel import |
+| Erasing a person on request; an erased number that had said no stays opted out (imported consent ignored) | `privacy/ErasureService`, `voice/ConsentService`, contact page |
 | Do-not-disturb check with a 24 h cache | `voice/DndService` + `DndProvider` interface |
 | Versioned call scripts with admin approval | `voice/VoiceScriptService`, `/voice/scripts` |
 | Campaigns: contacts chosen by status, upload and a custom-field condition, preview with reasons, start / pause / finish, "Pause all" | `voice/CampaignService`, `CampaignDispatcher`, `/voice/campaigns` |

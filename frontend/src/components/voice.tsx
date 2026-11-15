@@ -259,9 +259,13 @@ export function ConsentCard({ path, canEdit }: { path: string; canEdit: boolean 
                   <Badge tone={STATE_TONE[p.state]}>{STATE_TEXT[p.state]}</Badge>
                   {p.state === "GRANTED" && <Badge tone={p.recording ? "teal" : "gray"}>{p.recording ? "Recording allowed" : "No recording"}</Badge>}
                 </div>
-                {(p.capturedAt || p.revokedAt) && (
+                {(p.capturedAt || p.revokedAt || p.revokeNote) && (
                   <p className="mt-1 text-xs text-ink-faint">
-                    {p.revokedAt ? `${p.revokeNote ?? "Withdrawn"} · ${formatDateTime(p.revokedAt)}` : `${label(p.source)} · ${formatDateTime(p.capturedAt)}`}
+                    {p.revokedAt
+                      ? `${p.revokeNote ?? "Withdrawn"} · ${formatDateTime(p.revokedAt)}`
+                      : p.capturedAt
+                        ? `${label(p.source)} · ${formatDateTime(p.capturedAt)}`
+                        : p.revokeNote}
                     {p.evidenceRef && !p.revokedAt && ` · ${p.evidenceRef}`}
                   </p>
                 )}

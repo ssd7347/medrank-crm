@@ -14,6 +14,39 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 15 November 2026: ERASING A PERSON IS BUILT (user: "Yes, build it"; compliance checklist 2.1)
+
+`POST /api/contacts/{id}/erase {"confirmPhone","reason"}`, admin only (`privacy/ErasureService`). The typed number
+must be the contact's phone (normalised, so "+91 98111 00001" works); 409 while a real call with them is live (test
+calls do not block). In one transaction: deletes their notifications (by contact, by `/contacts/{id}` and their call
+links), call-backs, campaign places, consent rows (by contact or by any of their numbers), cached DND results, timeline,
+follow-ups, call log, duplicate dismissals, tags and the contact; their AI calls (by contact, and calls from their
+numbers with no contact) keep only the metrics: contact, phone (''), transcript, summary, outcome/flag notes,
+recording ref and provider call id are cleared, and the webhook idempotency rows for those provider ids deleted;
+earlier CONTACT audit details are nulled; "(Name)" in import reports becomes "([erased])". Audit `CONTACT_ERASED` with
+the reason and counts, no name. If a number had said no (OPTED_OUT, REFUSED, or the contact was DO_NOT_CALL), its
+SHA-256 goes into new table `erased_number` (V9); `ConsentService` then ignores IMPORTED_LIST consent for that number
+and reports OPTED_OUT with a note, until consent is recorded by hand. Others leave no trace. Contact page: admin-only
+"Erase this person" card, dialog with the number and a reason, button enabled only when the number matches, summary
+of what was removed; the consent card now shows the erased note (it had no date to show).
+
+Tests: backend 97/97 (new `ErasureIntegrationTest`, 3: a fully populated person, including an inbound call from
+their alternate number before they were a contact, a call-back, an alert, a campaign place, an import report, is
+erased and then **every text column of every table** is scanned for name, numbers, email and note text: nothing; the
+scan first found the webhook rows still holding the provider call id, now deleted; AI calls kept as numbers, tool
+audit kept, call page still opens without the number; manager 403, wrong or blank number 400, gone afterwards 404.
+Refused / Do-not-call numbers come back in a "consented" import as OPTED_OUT and are skipped by a campaign preview,
+a plain one as GRANTED; a hand-recorded yes counts; hash kept once. Live call 409, then fine after it ends; the twin
+contact untouched). Browser check on the H2 test CRM (8093, log showed jdbc:h2:mem) + website 3093: card shown, button
+stays disabled for the alternate number, erase done, summary shown, re-added number shows "Asked to stop" with the
+note; the only console errors were the website proxy hitting the CRM before it had started. Docs: compliance checklist
+(section 1 row; 2.1 now lists what the CRM cannot reach: backups, logs, Plivo, exports, other contacts' notes),
+run-sheet Q&A, hand-over guide (ready list, admin role, contacts, troubleshooting), voice-agent.md.
+
+**Found, not changed (existing behaviour):** an import with "update existing" and "these people agreed to AI calls"
+ticked records a new GRANTED consent for contacts already in the CRM, and the newest record wins, so a person who had
+opted out becomes callable again by a re-uploaded list. Raised with the user.
+
 # 15 November 2026, late night: A CALLER'S LAST WORDS AT THE HANG-UP NOW REACH THE CRM (user: "Yes, fix it")
 
 Before: when the stream closed, the engine cancelled its work and dropped whatever the CRM had not had yet: the turn
