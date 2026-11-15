@@ -50,11 +50,12 @@ public class LiveCallService {
     private final ToolExecutor executor;
     private final VoicePlatforms platforms;
     private final ContactRepository contacts;
+    private final HandoffService handoffs;
     private final TransactionTemplate tx;
 
     public LiveCallService(VoiceCallRepository calls, VoiceScriptRepository scriptRepo, VoiceCallService callService,
                            Brains brains, ToolExecutor executor, VoicePlatforms platforms, ContactRepository contacts,
-                           TransactionTemplate tx) {
+                           HandoffService handoffs, TransactionTemplate tx) {
         this.calls = calls;
         this.scriptRepo = scriptRepo;
         this.callService = callService;
@@ -62,6 +63,7 @@ public class LiveCallService {
         this.executor = executor;
         this.platforms = platforms;
         this.contacts = contacts;
+        this.handoffs = handoffs;
         this.tx = tx;
     }
 
@@ -125,6 +127,32 @@ public class LiveCallService {
         String providerCallId = tx.execute(s -> calls.findById(callId).map(VoiceCall::getProviderCallId).orElse(null));
         brains.finished(callId);
         return providerCallId != null && platforms.current().hangup(providerCallId);
+    }
+
+    /**
+     * The engine hit a fault it could not get past (hearing, speaking, or a request to this CRM failed), told the caller
+     * "A member of our team will call you back" and is hanging up: book that call-back ({@link HandoffService#cutOff})
+     * and note it in the transcript. True if a task was booked. The call may already have ended by now.
+     */
+    public boolean trouble(UUID callId, String what) {
+        String detail = what == null ? "" : what.strip();
+        if (detail.length() > 200) {
+            detail = detail.substring(0, 200);
+        }
+        String note = detail.isEmpty() ? null : detail;
+        String summary = "The AI call was cut off by a fault on our side" + (note == null ? "" : " (" + note + ")")
+                + ". The caller was told a member of the team would call back.";
+        return Boolean.TRUE.equals(tx.execute(s -> {
+            VoiceCall call = callId == null ? null : calls.findById(callId).orElse(null);
+            if (call == null || call.isTestCall()) {
+                throw ApiException.notFound("Call");
+            }
+            boolean booked = handoffs.cutOff(call, summary) != null;
+            List<Line> all = new ArrayList<>(callService.lines(call));
+            all.add(Line.tool("call_cut_off", booked ? "CALLBACK_BOOKED" : "NO_CALLBACK_NEEDED", note));
+            call.setTranscript(callService.toJson(all));
+            return booked;
+        }));
     }
 
     /** The platform reported the hang-up (the caller may have hung up first): the brain lets go of the call. */

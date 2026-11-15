@@ -13,6 +13,7 @@ import com.aicallcrm.crm.alert.AlertService;
 import com.aicallcrm.crm.alert.Priority;
 import com.aicallcrm.crm.contact.Contact;
 import com.aicallcrm.crm.contact.ContactRepository;
+import com.aicallcrm.crm.contact.ContactStatus;
 import com.aicallcrm.crm.user.AppUser;
 import com.aicallcrm.crm.voice.Voice.HandoffReason;
 import com.aicallcrm.crm.voice.Voice.Outcome;
@@ -105,6 +106,30 @@ public class HandoffService {
         CallbackRequest cb = task(call, contact(call), "CALLBACK_REQUESTED", preferredTimeText, reason, Priority.NORMAL,
                 due);
         return new Handoff(CALLBACK_TASK, callbackMessage(cb.getDueAt()), cb.getId(), cb.getDueAt());
+    }
+
+    /**
+     * The call broke on our side (the speech engine or the CRM failed) and the caller was told a member of the team
+     * will call back: a call-back task, never a transfer, because the engine is hanging up. Nothing (null) for a test
+     * call, a caller who opted out or is marked "Do not call", or a call that already has an open call-back.
+     */
+    @Transactional
+    public CallbackRequest cutOff(VoiceCall call, String summary) {
+        Contact contact = contact(call);
+        if (call.isTestCall() || call.getOutcome() == Outcome.OPTED_OUT
+                || contact != null && ContactStatus.DO_NOT_CALL.equals(contact.getStatus())
+                || callbacks.findByVoiceCallId(call.getId()).stream()
+                        .anyMatch(c -> c.getStatus() != Voice.CallbackStatus.DONE)) {
+            return null;
+        }
+        if (call.getOutcome() == null) {
+            call.setOutcome(Outcome.HANDED_OFF);
+        }
+        if (call.getHandoffReason() == null) {
+            call.setHandoffReason(HandoffReason.TOOL_FAILURE);
+        }
+        return task(call, contact, HandoffReason.TOOL_FAILURE.name(), null, summary, Priority.NORMAL,
+                dueAt(HandoffReason.TOOL_FAILURE, Instant.now()));
     }
 
     /** Tells the contact's owner (or the managers) something they should know about this call. */

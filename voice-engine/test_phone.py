@@ -101,7 +101,7 @@ class UtterancesTest(unittest.TestCase):
 
 class FakeCrm:
     def __init__(self, replies):
-        self.replies, self.heard, self.ended = list(replies), [], 0
+        self.replies, self.heard, self.ended, self.troubles = list(replies), [], 0, []
 
     def open(self, call_id):
         return phone.Reply("Hello, this is Asha.", False)
@@ -113,10 +113,14 @@ class FakeCrm:
     def end(self, call_id):
         self.ended += 1
 
+    def trouble(self, call_id, what):
+        self.troubles.append(what)
+        return True
+
 
 class CallTest(unittest.TestCase):
 
-    def run_call(self, crm, script, stt=None):
+    def run_call(self, crm, script, stt=None, tts=None):
         """Plays ``script`` (Plivo messages, or "wait" for a pause) into a call; returns what was sent to Plivo."""
         sent, closed = [], []
 
@@ -128,7 +132,7 @@ class CallTest(unittest.TestCase):
 
         async def go():
             call = phone.Call("c1", send, crm, stt or (lambda audio: "I want to pay on Friday"),
-                              lambda text: (tone(0.5, 440, 4000, rate=22050), 22050), close)
+                              tts or (lambda text: (tone(0.5, 440, 4000, rate=22050), 22050)), close)
             for step in script:
                 if step == "wait":
                     await asyncio.sleep(0.3)
@@ -262,6 +266,43 @@ class CallTest(unittest.TestCase):
         self.assertEqual([m["name"] for m in sent if m["event"] == "checkpoint"], ["end-1"])
         self.assertEqual(crm.ended, 1)
         self.assertEqual(closed, [True])
+        self.assertEqual(crm.troubles, ["opening failed: ConnectionError"])     # the CRM is asked to book the call-back
+
+    def test_a_failed_turn_books_the_call_back_the_caller_is_promised(self):
+        crm = FakeCrm([])
+
+        def ear(audio):
+            raise RuntimeError("the model crashed")
+        last = lambda sent: {"event": "playedStream", "name": [m for m in sent if m["event"] == "checkpoint"][-1]["name"]}
+        speech = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        sent, closed, _ = self.run_call(crm, [self.START, "wait", last, speech, "wait", last, "wait"], stt=ear)
+        self.assertEqual([m["name"] for m in sent if m["event"] == "checkpoint"], ["say-1", "end-2"])
+        self.assertEqual(crm.troubles, ["turn failed: RuntimeError"])
+        self.assertEqual((crm.ended, closed), (1, [True]))
+
+    def test_when_the_voice_fails_the_fault_is_reported_and_the_call_ends_instead_of_going_silent(self):
+        crm = FakeCrm([])
+
+        def voice(text):
+            raise OSError("voice model missing")
+        sent, closed, call = self.run_call(crm, [self.START, "wait"], tts=voice)
+        self.assertFalse([m for m in sent if m["event"] == "playAudio"])
+        self.assertEqual(crm.troubles, ["speaking failed: OSError"])
+        self.assertEqual((crm.ended, closed, call.done), (1, [True], True))
+
+    def test_a_crm_that_is_down_for_the_report_too_does_not_stop_the_goodbye(self):
+        class Down(FakeCrm):
+            def open(self, call_id):
+                raise ConnectionError("CRM down")
+
+            def trouble(self, call_id, what):
+                self.troubles.append(what)
+                raise ConnectionError("CRM down")
+        crm = Down([])
+        last = lambda sent: {"event": "playedStream", "name": [m for m in sent if m["event"] == "checkpoint"][-1]["name"]}
+        sent, closed, _ = self.run_call(crm, [self.START, "wait", last, "wait"])
+        self.assertEqual([m["name"] for m in sent if m["event"] == "checkpoint"], ["end-1"])
+        self.assertEqual((crm.troubles, crm.ended, closed), (["opening failed: ConnectionError"], 1, [True]))
 
 
 class UnfinishedTest(unittest.TestCase):
@@ -302,6 +343,27 @@ class CrmTest(unittest.TestCase):
         self.assertEqual(json.loads(body), {"call_id": "c1", "said": "hello"})
         ts = seen["headers"]["X-Voice-Timestamp"]
         self.assertEqual(seen["headers"]["X-Voice-Signature"], phone.sign("s" * 40, ts, body))
+
+    def test_a_fault_is_reported_signed_and_says_whether_a_call_back_was_booked(self):
+        seen = []
+
+        class Res:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"callback_booked": True}
+
+        def post(url, data, timeout, headers):
+            seen.append((url, json.loads(data), headers))
+            return Res()
+        crm = phone.Crm("http://crm.local:8082", "s" * 40, post=post)
+        self.assertTrue(crm.trouble("c1", "turn failed: " + "x" * 300))
+        url, body, headers = seen[0]
+        self.assertEqual(url, "http://crm.local:8082/api/voice/hooks/live/trouble")
+        self.assertEqual((body["call_id"], len(body["what"])), ("c1", 200))
+        raw = json.dumps(body, separators=(",", ":"))
+        self.assertEqual(headers["X-Voice-Signature"], phone.sign("s" * 40, headers["X-Voice-Timestamp"], raw))
 
     def test_the_opening_reply_brings_the_contacts_name(self):
         answers = [{"say": "Hello", "over": False, "hint": "  Mohammed Irfan "}, {"say": "Hello", "over": False},

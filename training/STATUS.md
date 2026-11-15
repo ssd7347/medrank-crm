@@ -14,6 +14,27 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 15 November 2026, evening: A CALL CUT OFF BY A FAULT NOW BOOKS THE PROMISED CALL-BACK (user: "Yes, do it")
+
+Before: when hearing, the voice or a CRM request failed, the engine said "... A member of our team will call you back.
+Goodbye." and hung up, but nobody was told, so the promise was never kept. Now the engine reports the fault
+(`phone.Call.report`, once per call, alongside the goodbye so a CRM that is down does not delay it) to a new signed
+hook `POST /api/voice/hooks/live/trouble {"call_id","what"}`; the CRM (`LiveCallService.trouble`,
+`HandoffService.cutOff`) books a TOOL_FAILURE call-back, never a transfer (the engine is hanging up), and notes
+`call_cut_off` in the transcript. No call-back for a test call, a caller who opted out or is "Do not call", or a
+call that already has an open call-back; a report after the hang-up was recorded still books. **Second bug found
+and fixed:** if the voice (Piper) failed, the exception was outside the error handling, so the call went silent until
+the caller hung up; now the fault is reported and the call ends.
+Tests: backend 92/92 (new: booked once with the reason in the summary, a second report books nothing, a late report
+still books, an opted-out caller gets none, unknown and test calls refused); engine 53/53 (new: a CRM failure, a
+failed turn and a failed voice each report once; a CRM that is down for the report too still lets the goodbye play
+and the call end; the request is signed and cut to 200 characters); the voice test was checked to fail without the
+fix. **End to end** (test CRM on the in-memory database, real engine with its ear pointed at an empty folder so hearing
+fails for real, the developer's recording streamed as phone audio): 6/6, the goodbye played and the call ended, one
+TOOL_FAILURE call-back for the contact, `call_cut_off` in the transcript. `docs/handover-guide.md` and
+`voice-engine/README.md` updated. Still true: if the CRM server itself is down, nothing can be booked (the guide says
+to check Call-backs for callers who heard the line).
+
 # 15 November 2026, later: HAND-OVER GUIDE WRITTEN (`docs/handover-guide.md`) (user: "start your work now")
 
 For the client (owner/admin, staff, whoever runs the machines), in plain words: what the parts are; what is ready
@@ -32,7 +53,8 @@ engine path. **Both fixed the same day (user: "Yes, fix it"):** `OtpService.send
 really sends) decides the login-code state, and with codes neither shown nor sent the page says nobody can sign in;
 the voice entry now names the client's Plivo account, the GPU computer and `VOICE_PLATFORM=plivo`. Backend 91/91
 (new `IntegrationControllerTest`; `VoiceAgentIntegrationTest` checks both entries). Seen on the real page (test CRM
-on the in-memory database, port 8093, website on 3093; new launch entry `aicrm-frontend-test`). (3) When the engine says "trouble on this line ... will call you back" (the CRM or the engine failed),
+on the in-memory database, port 8093, website on 3093; new launch entry `aicrm-frontend-test`). (3) (Fixed the
+same day, see the section above.) When the engine says "trouble on this line ... will call you back" (the CRM or the engine failed),
 no call-back task is booked; the guide tells staff to call such people themselves.
 
 # 15 November 2026: A PAUSE INSIDE A SENTENCE NO LONGER SPLITS THE TURN (with small.en) (user: "start our next work")

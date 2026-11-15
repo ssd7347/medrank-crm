@@ -215,6 +215,11 @@ class Crm:
     def end(self, call_id: str) -> None:
         self._call("end", {"call_id": call_id})
 
+    def trouble(self, call_id: str, what: str) -> bool:
+        """The call broke on our side and the caller was told someone will call back: the CRM books that call-back.
+        True if it booked one (none is needed when one is already arranged or the caller asked not to be called)."""
+        return bool(self._call("trouble", {"call_id": call_id, "what": what[:200]}).get("callback_booked"))
+
 
 # ---------------------------------------------------------------------------------------------- one call
 
@@ -246,6 +251,8 @@ class Call:
         self.marks = 0
         self.ending = ""            # the goodbye's checkpoint once the agent has finished
         self.hint = ""              # the called contact's name, from the CRM's opening reply
+        self.reported = False       # a fault has been reported to the CRM (once per call)
+        self.reports: set[asyncio.Task] = set()
         self.done = False
 
     async def handle(self, msg: dict) -> None:
@@ -293,8 +300,31 @@ class Call:
                     reply = await asyncio.to_thread(self.crm.turn, self.call_id, text)
             except Exception as e:     # the CRM or a model failed: say so and end, rather than go silent
                 log.warning("call %s: %s failed: %s", self.call_id, kind, e)
+                self.report(f"{'opening' if kind == 'open' else 'turn'} failed: {type(e).__name__}")
                 reply = Reply(TROUBLE, True)
-            await self.speak(reply)
+            try:
+                await self.speak(reply)
+            except Exception as e:     # the voice failed: nothing can be said, so hang up rather than leave silence
+                log.warning("call %s: speaking failed: %s", self.call_id, e)
+                self.report(f"speaking failed: {type(e).__name__}")
+                await self.hang_up()
+
+    def report(self, what: str) -> None:
+        """Tells the CRM the call broke on our side, so it books the call-back the caller is promised. It runs
+        alongside the goodbye: a CRM that is down (each request waits up to 20 s) must not keep the caller waiting."""
+        if self.reported:
+            return
+        self.reported = True
+
+        async def send() -> None:
+            try:
+                booked = await asyncio.to_thread(self.crm.trouble, self.call_id, what)
+                log.info("call %s: fault reported (%s), call-back booked: %s", self.call_id, what, booked)
+            except Exception as e:
+                log.warning("call %s: could not report the fault (%s): %s", self.call_id, what, e)
+        task = asyncio.create_task(send())
+        self.reports.add(task)
+        task.add_done_callback(self.reports.discard)
 
     async def hear(self, audio: np.ndarray) -> str:
         pcm = resample(audio, RATE, STT_RATE) / 32768.0

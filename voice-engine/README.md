@@ -72,6 +72,13 @@ Plivo streams the call's audio both ways over a WebSocket to this engine's `/cal
 Whisper to text, the CRM's brain decides the reply (`POST /api/voice/hooks/live/{open,turn,end}`), Piper back to
 8 kHz mu-law. The caller can talk over the agent; after the goodbye has been played the CRM hangs up.
 
+If hearing, the voice or a request to the CRM fails, the engine says "Sorry, I am having trouble on this line. A
+member of our team will call you back. Goodbye." and ends the call, and tells the CRM (`POST
+/api/voice/hooks/live/trouble`), which books that call-back (never for a caller who opted out or one who already has
+a call-back) and notes `call_cut_off` in the transcript. The report runs alongside the goodbye, so a CRM that is down
+does not keep the caller waiting; then nothing can be booked, and the engine's log says so. If the voice itself
+fails, nothing can be said, so the engine reports the fault and hangs up instead of leaving the caller in silence.
+
 A turn ends after 0.7 s of quiet. A caller who stops to remember something ("My date of birth is ... fifteenth
 August") pauses longer, so when what was heard looks cut off (it trails off with "...", a comma or a dash, or stops
 on a word nobody ends on, such as "my", "the", "of", "um"; `phone.unfinished`), the call waits up to 1.5 s more

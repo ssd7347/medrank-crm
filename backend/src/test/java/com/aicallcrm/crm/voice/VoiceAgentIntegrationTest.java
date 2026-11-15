@@ -441,6 +441,60 @@ class VoiceAgentIntegrationTest {
     }
 
     @Test
+    void aCallCutOffByAFaultBooksOneCallBackButNotForSomeoneWhoSaidStop() throws Exception {
+        approve("Incoming calls");
+        String phone = phone();
+        long contact = contact(admin, "Meena Pillai", phone, "\"customer_ref\":\"CR-2718\"");
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        String id = "{\"call_id\":\"" + call + "\"";
+        hook("/live/open", id + "}").andExpect(status().isOk());
+
+        // The engine could not go on and told the caller a member of the team will call back: that call-back exists.
+        hook("/live/trouble", id + ",\"what\":\"turn failed: RuntimeError\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.callback_booked").value(true));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin))
+                .andExpect(jsonPath("$[?(@.contactId == " + contact + ")].reason").value(Matchers.contains("TOOL_FAILURE")))
+                .andExpect(jsonPath("$[?(@.contactId == " + contact + ")].voiceCallId").value(Matchers.contains(call)))
+                .andExpect(jsonPath("$[?(@.contactId == " + contact + ")].summary")
+                        .value(Matchers.contains(Matchers.containsString("turn failed: RuntimeError"))));
+        // Reported again (or once a call-back is already arranged): still one task.
+        hook("/live/trouble", id + ",\"what\":\"speaking failed: OSError\"}").andExpect(jsonPath("$.callback_booked").value(false));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin))
+                .andExpect(jsonPath("$[?(@.contactId == " + contact + ")]", Matchers.hasSize(1)));
+        mvc.perform(auth(get("/api/voice/calls/" + call), admin))
+                .andExpect(jsonPath("$.call.outcome").value("HANDED_OFF"))
+                .andExpect(jsonPath("$.transcript[?(@.tool == 'call_cut_off')].status")
+                        .value(Matchers.contains("CALLBACK_BOOKED", "NO_CALLBACK_NEEDED")));
+
+        // The report can arrive after the hang-up was recorded: still booked.
+        String phone2 = phone();
+        long late = contact(admin, "Arjun Menon", phone2, "\"customer_ref\":\"CR-1618\"");
+        String call2 = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone2 + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        hook("/webhooks/call-ended", "{\"call_id\":\"" + call2 + "\",\"status\":\"completed\"}");
+        hook("/live/trouble", "{\"call_id\":\"" + call2 + "\",\"what\":\"\"}").andExpect(jsonPath("$.callback_booked").value(true));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin))
+                .andExpect(jsonPath("$[?(@.contactId == " + late + ")].reason").value(Matchers.contains("TOOL_FAILURE")));
+
+        // Someone who said "never call me again" is not called back, fault or not.
+        String phone3 = phone();
+        long stop = contact(admin, "Divya Rao", phone3, "\"customer_ref\":\"CR-1414\"");
+        String call3 = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone3 + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        tool(call3, "opt_out", "{\"scope\":\"ALL_CALLS\"}").andExpect(jsonPath("$.data.confirmed").value(true));
+        hook("/live/trouble", "{\"call_id\":\"" + call3 + "\",\"what\":\"hearing failed\"}")
+                .andExpect(jsonPath("$.callback_booked").value(false));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin)).andExpect(jsonPath("$[?(@.contactId == " + stop + ")]").isEmpty());
+
+        // Unknown calls and test-console calls: refused.
+        hook("/live/trouble", "{\"call_id\":\"" + java.util.UUID.randomUUID() + "\"}").andExpect(status().isNotFound());
+        String test = JsonPath.read(start(contact(admin, "Test Person", phone(), "\"customer_ref\":\"CR-2\""), "Incoming calls")
+                .andReturn().getResponse().getContentAsString(), "$.callId");
+        hook("/live/trouble", "{\"call_id\":\"" + test + "\"}").andExpect(status().isNotFound());
+    }
+
+    @Test
     void unknownCallerBecomesAContactOnCallback() throws Exception {
         approve("Incoming calls");
         String phone = phone();

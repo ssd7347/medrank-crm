@@ -182,7 +182,7 @@ automatically after 365 days (`VOICE_RETENTION_DAYS`).
 | What you see | What to do |
 |---|---|
 | The agent is saying something wrong, or calls should stop now | **Pause all** on the AI voice agent Overview (admin). Then flag the bad calls and tell the developer |
-| Callers hear "Sorry, I am having trouble on this line. A member of our team will call you back." | A part failed (the CRM server or the speech engine), so **no call-back task was booked**: find the call under Calls and call the person yourself. Check every part is running; the developer can see the reason in the speech engine's log |
+| Callers hear "Sorry, I am having trouble on this line. A member of our team will call you back." | A part failed (the speech engine, or the CRM server). The engine asks the CRM to book that call-back, so it appears under Call-backs, and the call's transcript says "call_cut_off". **If the CRM server itself was down, nothing could be booked**: if a caller who heard this is not under Call-backs, call them yourself. Check every part is running; the developer can see the reason in the speech engine's log |
 | A campaign is running but nobody is called | Check: calling is not Paused; it is within calling hours; the contacts have consent recorded; the script is approved; the campaign preview's reasons |
 | Long silences on calls | The brain or speech engine is slow: is the GPU computer running, and the brain warmed up? |
 | Call-backs pile up as overdue | Someone must call those people; the Overview shows the count in red |
