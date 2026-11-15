@@ -94,8 +94,12 @@ public class ImportService {
 
     /** Lets the voice module record consent for imported contacts without this module depending on it. */
     public interface ConsentRecorder {
-        void recordFromImport(Contact contact, boolean recording, String evidence, Long userId);
+        /** False when the number had said no to AI calls: a list cannot overrule that, so nothing was recorded. */
+        boolean recordFromImport(Contact contact, boolean recording, String evidence, Long userId);
     }
+
+    static final String CONSENT_NOT_RECORDED = "had asked not to get AI calls, so this file's consent was not recorded"
+            + " for them (record it on their page if they agree again)";
 
     /** Lets the voice module start AI calls to an upload without this module depending on it. */
     public interface CallStarter {
@@ -390,8 +394,10 @@ public class ImportService {
                     users.getReferenceById(me.id())));
             if (opts.aiCallConsent()) {
                 for (ConsentRecorder rec : consentRecorders) {
-                    rec.recordFromImport(c, opts.recordingConsent(), "Import " + nz(file.getOriginalFilename()) + ": "
-                            + opts.consentEvidence().trim(), me.id());
+                    if (!rec.recordFromImport(c, opts.recordingConsent(), "Import " + nz(file.getOriginalFilename()) + ": "
+                            + opts.consentEvidence().trim(), me.id())) {
+                        rowProblems.add(CONSENT_NOT_RECORDED);
+                    }
                 }
             }
             for (String p : rowProblems) {

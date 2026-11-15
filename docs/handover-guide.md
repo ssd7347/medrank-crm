@@ -87,7 +87,8 @@ Tick these off with the developer:
 - **My follow-ups**: your reminders; the bell shows one when it falls due.
 - **Import from Excel** (managers and admin): upload your file, check the guessed columns, import. A number already
   in the CRM updates that contact instead of adding it twice; bad rows are listed by row number. You can record
-  consent for a whole list that agreed to AI calls.
+  consent for a whole list that agreed to AI calls; it never overrules someone who had asked to stop or said no
+  (they are listed in the report, and only a consent recorded by hand on their page counts).
 - **AI voice agent**:
   - *Overview*: whether calling is Live, Simulated or Paused, the calling hours, call-backs waiting and overdue,
     and how the calls are going. **Pause all** (admin) stops every campaign at once and sends incoming callers to

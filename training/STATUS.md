@@ -14,6 +14,20 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 15 November 2026: A LIST CAN NO LONGER UNDO SOMEONE'S "STOP" (user: "Yes, fix it")
+
+Before: an import with "update existing" and "these people agreed to AI calls" ticked saved a new GRANTED consent for
+contacts already in the CRM; the newest record decides, so anyone who had opted out or refused became callable again,
+silently. Now `ConsentService.recordFromImport` returns false and saves nothing when the number's state is OPTED_OUT or
+REFUSED (`ImportService.ConsentRecorder` now returns boolean), and the import report gets "Row N: had asked not to get
+AI calls, so this file's consent was not recorded for them (record it on their page if they agree again)". A consent
+recorded by hand on the contact page still counts, as before. The import page says so under the consent tick.
+Test `ImportCallsIntegrationTest.aListCannotOverruleSomeoneWhoSaidNo` (stop said on a call, a staff-recorded no, a
+contact with no record; the re-upload reports rows 2 and 3, states stay OPTED_OUT / REFUSED, the third becomes GRANTED;
+a hand-recorded yes then counts and the next upload reports only row 3). It failed with the check switched off
+(problems size 0, expected 2) and passes with it. Backend 98/98; frontend tsc and eslint clean; the hint checked on the
+import page against the H2 test CRM. Docs: compliance checklist (opt-out row), run-sheet Q&A, hand-over guide.
+
 # 15 November 2026: ERASING A PERSON IS BUILT (user: "Yes, build it"; compliance checklist 2.1)
 
 `POST /api/contacts/{id}/erase {"confirmPhone","reason"}`, admin only (`privacy/ErasureService`). The typed number
@@ -43,9 +57,8 @@ note; the only console errors were the website proxy hitting the CRM before it h
 (section 1 row; 2.1 now lists what the CRM cannot reach: backups, logs, Plivo, exports, other contacts' notes),
 run-sheet Q&A, hand-over guide (ready list, admin role, contacts, troubleshooting), voice-agent.md.
 
-**Found, not changed (existing behaviour):** an import with "update existing" and "these people agreed to AI calls"
-ticked records a new GRANTED consent for contacts already in the CRM, and the newest record wins, so a person who had
-opted out becomes callable again by a re-uploaded list. Raised with the user.
+**Found while building this:** a re-uploaded "everyone agreed" list could make an opted-out person callable again;
+fixed in the next section.
 
 # 15 November 2026, late night: A CALLER'S LAST WORDS AT THE HANG-UP NOW REACH THE CRM (user: "Yes, fix it")
 

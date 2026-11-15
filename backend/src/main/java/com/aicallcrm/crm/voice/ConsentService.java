@@ -90,10 +90,19 @@ public class ConsentService implements ImportService.ConsentRecorder {
         return forContact(contactId);
     }
 
-    /** "These people agreed to AI calls" ticked on a spreadsheet import, with the proof the importer gave. */
+    /**
+     * "These people agreed to AI calls" ticked on a spreadsheet import, with the proof the importer gave. A number
+     * that had said no (opted out or refused) keeps its no: a list cannot overrule what one person asked for, only a
+     * consent recorded by hand on their page can. Returns false then, and nothing is recorded.
+     */
     @Override
-    public void recordFromImport(Contact contact, boolean recording, String evidence, Long userId) {
+    public boolean recordFromImport(Contact contact, boolean recording, String evidence, Long userId) {
+        State now = state(contact.getPhone());
+        if (now == State.OPTED_OUT || now == State.REFUSED) {
+            return false;
+        }
         save(contact.getId(), contact.getPhone(), true, recording, ConsentSource.IMPORTED_LIST, evidence, userId);
+        return true;
     }
 
     private void save(Long contactId, String phone, boolean ai, boolean recording, ConsentSource source,

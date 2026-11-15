@@ -98,7 +98,79 @@ class ImportCallsIntegrationTest {
         upload(manager, csv(p, phone()), true, null).andExpect(status().isOk()).andExpect(jsonPath("$.calls").doesNotExist());
     }
 
+    /** A re-uploaded "everyone agreed" list must not undo a stop or a no that one person gave. */
+    @Test
+    void aListCannotOverruleSomeoneWhoSaidNo() throws Exception {
+        String admin = login("admin@test.local", "AdminPass123!");
+        approve(admin, "Incoming calls");
+        String stopped = phone();
+        String refused = phone();
+        String fresh = phone();
+        long stoppedId = contact(admin, "Asked Stop", stopped);
+        consent(admin, stoppedId, true);
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + stopped + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        hook("/live/last", "{\"call_id\":\"" + call + "\",\"said\":\"Please stop calling me.\"}")
+                .andExpect(jsonPath("$.opted_out").value(true));
+        hook("/webhooks/call-ended", "{\"call_id\":\"" + call + "\",\"status\":\"completed\"}");
+        long refusedId = contact(admin, "Said No", refused);
+        consent(admin, refusedId, false);
+        long freshId = contact(admin, "Never Asked", fresh);
+
+        String csv = "Name,Mobile,Amount due\nAsked Stop," + stopped + ",100\nSaid No," + refused + ",200\nNever Asked,"
+                + fresh + ",300\n";
+        updateWithConsent(admin, csv)
+                .andExpect(jsonPath("$.updated").value(3))
+                .andExpect(jsonPath("$.problems", org.hamcrest.Matchers.hasSize(2)))
+                .andExpect(jsonPath("$.problems[0]").value(org.hamcrest.Matchers.startsWith("Row 2: had asked not to get AI calls")))
+                .andExpect(jsonPath("$.problems[1]").value(org.hamcrest.Matchers.startsWith("Row 3: had asked not to get AI calls")));
+        assertThat(state(admin, stoppedId)).isEqualTo("OPTED_OUT");
+        assertThat(state(admin, refusedId)).isEqualTo("REFUSED");
+        assertThat(state(admin, freshId)).isEqualTo("GRANTED");
+
+        // A yes recorded by hand, by someone who asked the person again, still counts; a list after that is fine.
+        consent(admin, stoppedId, true);
+        assertThat(state(admin, stoppedId)).isEqualTo("GRANTED");
+        updateWithConsent(admin, csv).andExpect(jsonPath("$.problems", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.problems[0]").value(org.hamcrest.Matchers.startsWith("Row 3:")));
+        assertThat(state(admin, stoppedId)).isEqualTo("GRANTED");
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    private static final String SECRET = "test-only-voice-secret-0123456789-abcdefgh";
+
+    private ResultActions updateWithConsent(String token, String csv) throws Exception {
+        String options = "{\"mapping\":" + MAPPING + ",\"updateExisting\":true,\"aiCallConsent\":true,"
+                + "\"recordingConsent\":false,\"consentEvidence\":\"Old signup sheet\"}";
+        return mvc.perform(multipart("/api/contacts/import")
+                .file(new MockMultipartFile("file", "again.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)))
+                .file(new MockMultipartFile("options", "", "application/json", options.getBytes(StandardCharsets.UTF_8)))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)).andExpect(status().isOk());
+    }
+
+    private long contact(String token, String name, String phone) throws Exception {
+        return ((Number) JsonPath.read(mvc.perform(auth(post("/api/contacts"), token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"" + name + "\",\"phone\":\"" + phone + "\",\"fields\":{}}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id")).longValue();
+    }
+
+    private void consent(String token, long contact, boolean yes) throws Exception {
+        mvc.perform(auth(post("/api/contacts/" + contact + "/voice-consent"), token).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"alternate\":false,\"aiCallConsent\":" + yes + ",\"recordingConsent\":false,"
+                        + "\"source\":\"SIGNUP_FORM\"}")).andExpect(status().isOk());
+    }
+
+    private String state(String token, long contact) throws Exception {
+        return JsonPath.read(mvc.perform(auth(get("/api/contacts/" + contact + "/voice-consent"), token))
+                .andReturn().getResponse().getContentAsString(), "$[0].state");
+    }
+
+    private ResultActions hook(String path, String body) throws Exception {
+        String ts = String.valueOf(java.time.Instant.now().getEpochSecond());
+        return mvc.perform(post("/api/voice/hooks" + path).contentType(MediaType.APPLICATION_JSON).content(body)
+                .header("X-Voice-Timestamp", ts).header("X-Voice-Signature", VoiceSignatures.sign(SECRET, ts, body)));
+    }
 
     private ResultActions upload(String token, byte[] csv, boolean consent, String script) throws Exception {
         String options = "{\"mapping\":" + MAPPING + ",\"updateExisting\":false,\"aiCallConsent\":" + consent

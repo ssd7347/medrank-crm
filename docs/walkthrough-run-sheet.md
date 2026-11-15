@@ -169,7 +169,7 @@ call. Nothing goes to their customers before a pilot of 20 to 50 people with eve
 | Where is our data? | On the server and database you host; with our own brain, conversations do not leave your machines. Call audio goes through Plivo (India region). Transcripts are deleted after 365 days. |
 | Can a customer's data be deleted? | Yes. The admin opens the customer, presses **Erase this person** and types their number: everything about them is deleted at once, and their AI calls stay only as numbers for the reports. If they had said stop, their number stays blocked even if a list brings it back. Backups, server logs and Plivo's own call records are outside the CRM (compliance checklist, 2.1). |
 | Are calls recorded? | No, only transcripts. Recording can be added if you decide to. |
-| Will it call someone who said stop? | No. Their consent is withdrawn, even if they say it as they hang up, and no campaign calls them again. |
+| Will it call someone who said stop? | No. Their consent is withdrawn, even if they say it as they hang up, and no campaign calls them again. A list uploaded later saying "everyone agreed" does not change that; only a new consent recorded by hand on their page does. |
 | The scripts say "claude-sonnet-5-5": does it use Claude? | No. That name is only passed to a hosted voice platform if one is ever connected. Our own brain ignores it, and the Claude option stays off unless you add an Anthropic key. |
 | When can we go live? | After your Plivo account and GPU computer, a first test call to our own phones, then a pilot of 20 to 50 contacts. |
 

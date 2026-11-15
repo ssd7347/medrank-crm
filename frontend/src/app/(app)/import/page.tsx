@@ -241,6 +241,7 @@ export default function ImportPage() {
                     <Field label="How did they agree?" required hint="For example: the sign-up form they filled in, with its wording. This is kept as proof.">
                       {(id) => <Input id={id} maxLength={400} value={evidence} onChange={(e) => setEvidence(e.target.value)} />}
                     </Field>
+                    <p className="text-xs text-ink-faint">Anyone who had asked not to get AI calls keeps that: the file cannot overrule it, and they are listed in the report.</p>
                   </div>
                 )}
                 {!consent && <p className="mt-1 pl-6 text-xs text-ink-faint">Without consent the AI agent will not call them. You can record consent later, person by person.</p>}
