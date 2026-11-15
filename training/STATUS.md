@@ -51,7 +51,7 @@ campaign preview 5 of 6 callable, Neha "No consent recorded", Vikram not listed,
 first, verified with SF-LN-20417, ₹8,500 and 17 Nov given, "Promised to act"); via the API: wrong person, stop calling,
 complaint (hand-over with time), prompt injection refused, 3 wrong IDs → hand-over, busy → call-back, FAQ answer; the
 test calls left consent and call-backs untouched; Pause all (confirm dialog) → Paused → Resume calling; the voice
-through the demo CRM (Piper WAV). Learned: simulated campaign calls have no conversation (the test console is the
+through the demo CRM (Piper WAV) and back through its ear (base.en wrote the opening line word for word, 2.8 s). Learned: simulated campaign calls have no conversation (the test console is the
 demo of a conversation); "Our own model" on the laptop is `qwen2.5:3b`, not `ourvoice8b-r4` (in Drive, needs the
 GPU), so the run-sheet says to use Simulated; at most 5 sign-in codes per 10 minutes per number; idle sign-out at
 3 minutes. Scripts show `claude-sonnet-5-5`: only passed to a hosted platform, our brain ignores it (in the Q&A).
