@@ -95,8 +95,9 @@ and no call recording.
 
 - **AI voice agent → Scripts**: *EMI due reminder* is approved, version 1, by Demo Admin. Every edit makes a new
   version, used only once the admin approves it. The opening line says it is an AI assistant.
-- Point out "This call may be recorded" in the opening: calls are not recorded today, so this line must change or
-  recording be added (compliance checklist, 2.2).
+- Point out what the opening does not say: why it is calling (that comes only after the identity check), and that
+  the call may be recorded (calls are not recorded; if they want recording, the line goes back in; compliance
+  checklist, 2.2).
 - **Admin → AI knowledge base**: the only answers the agent gives to questions.
 
 ### 3.5 A campaign (7 min)

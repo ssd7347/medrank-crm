@@ -46,8 +46,8 @@ own account is for demos and test calls to your team.
 6. Make one test call to your own phone and read its transcript before anything else (the plan for it, with what
    is still missing: `docs/first-real-call.md`).
 
-Known limits: Plivo's recording is not switched on, so calls keep a transcript but no recording, although the
-starter scripts say the call may be recorded (adjust the opening line, or add recording, before going live). A
+Known limits: Plivo's recording is not switched on, so calls keep a transcript but no recording; the starter
+openings do not say the call may be recorded (add that line if recording is switched on). A
 transfer to the desk happens at once, so the caller does not hear "I am connecting you" first. The models load on
 the first call after the engine starts, so that caller waits several seconds.
 

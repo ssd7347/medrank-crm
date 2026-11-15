@@ -45,7 +45,7 @@ It is made of these parts:
 | A GPU computer | The brain is too slow on an ordinary computer (6.5–21 s per reply); on a GPU about 1 s | **Yours** (paid, monthly or by the hour) |
 | Login codes by SMS or WhatsApp | Today the sign-in code is shown on the login page, so the CRM website must **never** be put on the internet as it is | Needs a provider (e.g. MSG91, Gupshup) |
 | Do-not-disturb (DND) checks | Numbers are not checked against the national DND register; only people who gave consent are called | Your telephony provider's scrubbing service |
-| Call recording | Off. The starter scripts say the call "may be recorded": change that line, or add recording, before live use | Decide with the developer |
+| Call recording | Off. The starter openings no longer say the call "may be recorded"; if you switch recording on, add that line back (compliance checklist, 2.2) | Decide with the developer |
 
 ## 3. Your decisions before going live
 

@@ -103,5 +103,5 @@ Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
 6. Afterwards: read the transcript and tool trail on `/voice/calls`; write down what Whisper heard against what was
    said, and the reply times. Then take the tunnel down and stop the GPU machine.
 
-Known limits that stay for now: no call recording (the scripts say "may be recorded": adjust before live use); a desk
+Known limits that stay for now: no call recording (the starter openings no longer say "may be recorded"); a desk
 transfer cuts "I am connecting you"; the model loads on the first call after the engine starts.

@@ -143,7 +143,7 @@ function ScriptForm({ initial, onSaved, onCancel }: { initial: Partial<VoiceScri
           {(id) => <Input id={id} value={model} required maxLength={60} onChange={(e) => setModel(e.target.value)} />}
         </Field>
       </div>
-      <Field label="Opening line" required hint="Must say it is an AI assistant and that the call may be recorded. {{first_name}}, {{agent_name}} and {{company_name}} are filled in.">
+      <Field label="Opening line" required hint="Must say it is an AI assistant. Say the call may be recorded only if recording is switched on, and do not say why you are calling until the person is verified. {{first_name}}, {{agent_name}} and {{company_name}} are filled in.">
         {(id) => <Textarea id={id} rows={3} value={opening} required maxLength={1000} onChange={(e) => setOpening(e.target.value)} />}
       </Field>
       <Field label="Instructions to the AI" required>

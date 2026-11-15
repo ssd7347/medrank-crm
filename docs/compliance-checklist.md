@@ -46,11 +46,13 @@ the contact page.
 - [ ] Decided with the adviser: how long backups and server logs are kept, and how an erasure request also reaches
   Plivo and anyone holding exported spreadsheets
 
-**2.2 Call recording.** Calls are not recorded; only the transcript is kept. All starter opening lines still say "This
-call may be recorded."
+**2.2 Call recording.** Calls are not recorded; only the transcript is kept. The starter opening lines no longer say
+"This call may be recorded" (changed on 15 November 2026: new installations get the new wording, and draft scripts in an
+existing CRM were corrected; a script already approved keeps its wording until the admin changes it).
 
-- [ ] Either remove "This call may be recorded" from every opening line, or decide to switch on recording (then: where
-  recordings are kept, for how long, and who may listen)
+- [ ] Any script approved before that date: its opening line checked, and "This call may be recorded" removed
+- [ ] If recording is switched on later: that line added back to every opening, and decided where recordings are
+  kept, for how long, and who may listen
 
 **2.3 Do-not-disturb scrubbing.** No DND service is connected, so the CRM cannot skip numbers on the national
 do-not-disturb register. The code has a place to plug one in (`DndProvider`); the phone provider may offer one.
@@ -63,9 +65,12 @@ built. The CRM must not be put on the internet until codes are really sent (see 
 
 - [ ] SMS or WhatsApp provider for sign-in codes chosen
 
-**2.5 The reason for the call in opening lines.** Some starter openings name the reason before the identity check:
-"your check-up is due", "your upcoming appointment", "your site visit", "your policy renewal", "you recently enquired".
-Anyone who answers the phone hears this.
+**2.5 The reason for the call in opening lines.** The starter openings no longer name the reason (they used to say
+"your check-up is due", "your upcoming appointment", "your site visit", "your policy renewal", "you recently
+enquired"): they say who is calling, that it is an AI assistant, and ask for the person by first name; the reason comes
+after the identity check. Two things remain: the company's own openings can still name a reason, and the check that
+stops our own model naming the reason before the identity check knows loan and payment words only (overdue, EMI, loan,
+fee, dues and similar), not words such as appointment, check-up, renewal or admission.
 
 - [ ] Every opening line reviewed by the adviser for what it reveals to someone who is not the customer
 

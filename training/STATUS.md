@@ -14,6 +14,27 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 15 November 2026: STARTER OPENINGS NO LONGER CLAIM RECORDING OR REVEAL THE REASON (user: "do the works from your side")
+
+Compliance checklist 2.2 and 2.5, the two items the developer could close alone. Every starter opening said "This call
+may be recorded" although nothing is recorded, and five pack openings told whoever answered why we were calling
+("your check-up is due", "your upcoming appointment", "your policy renewal", "you recently enquired about admission /
+a property", "your site visit"). Now every outbound starter is "Hello, this is {{agent_name}}, an AI assistant calling
+from {{company_name}}. Am I speaking with {{first_name}}?" (the feedback survey keeps its question; incoming calls end
+"I am {{agent_name}}, an AI assistant. How can I help you today?"). Packs edited in `packs/*.json`; new migration
+`V10__truthful_openings.sql` rewrites the same phrases in **draft** scripts only (`approved_at IS NULL`), so an approved
+script is never changed behind the admin's back. System prompts unchanged on purpose: the brain was trained on them,
+and the finance openings it was tested with already had no reason in them. The 92% was measured with openings that
+included the recording sentence; dropping it was not re-measured (needs the GPU). The script editor's hint now says
+to add the recording line only if recording is on, and not to give the reason before verification.
+Test `StarterOpeningsIntegrationTest` (3): the five built-ins after V1+V10 are exactly the new text; all 9 pack
+openings are the neutral line with no reason or recording words; V10 run again on an approved and a draft copy of an
+old opening changes only the draft. Backend 101/101; frontend tsc and eslint clean. V10 was run on H2 only (Postgres
+has the same `REPLACE`); the dev database gets it on its next start. Left as is, and said in checklist 2.5: FactGuard's
+reason words are loan/payment words only, so for a clinic or insurer "appointment" or "renewal" before verification is
+not caught; widening it changes what the trained brain may say and should be re-tested on the GPU first.
+Docs: compliance checklist 2.2 and 2.5, hand-over guide, first-real-call, voice-agent, run-sheet 3.4.
+
 # 15 November 2026: A LIST CAN NO LONGER UNDO SOMEONE'S "STOP" (user: "Yes, fix it")
 
 Before: an import with "update existing" and "these people agreed to AI calls" ticked saved a new GRANTED consent for
