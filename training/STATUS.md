@@ -14,6 +14,29 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 16 November 2026: AN OPT-OUT NOW REACHES THE CALLER'S BOOKED CALL-BACKS (user: "continue the next task and list all the works which we done today")
+
+Found while looking at call-backs: opting out never touched open call-back tasks. A caller who said "call me at 4",
+then "don't call this number again", was marked "Do not call", yet "Call back on Monday ... at 4:00 PM" stayed on staff's
+list. Now `HandoffService.optedOut` runs from the opt_out tool and from the CRM's own opt-out at the hang-up
+(`VoiceCallService.optOutIfAsked`), on every open call-back for the contact (this call's or earlier ones; this call's
+only for an unknown caller). **All calls:** each is closed, done note "Cancelled by the CRM: on an AI call the caller
+asked not to be called at all.", and the urgent "Asked not to be called at all" alert adds "Their open call-back was
+cancelled." **AI calls only** (what "stop calling me" records): kept, since the caller may still want the person they
+asked for, but the task now starts "CHECK BEFORE CALLING: on an AI call they then asked to stop AI calls. They did not
+say no to a call from staff, but read the transcript first." (once, however often opt_out runs), and whoever has it,
+else the contact's owner, else the managers, gets "Check before calling back: <name>". Test calls change nothing.
+Tests (`VoicePlivoTest`, 3): all calls → DONE with the note and the alert's line; AI calls only, opt_out twice → OPEN,
+the warning once above the original reason, one alert text; "Please take me off your list." (missed by the stand-in
+brain) → flagged when Plivo reports the hang-up. All 3 fail with the old opt-out code (task OPEN, no note). Backend
+117/117. Not changed: a contact marked "Do not call" by staff on the contact page keeps its open call-backs (the
+call-backs page does not show the contact's status); a caller who says "no need to call me back" after booking keeps
+the task (it needs the order of the lines, not done).
+Also measured today, not changed: Piper on this laptop takes 0.2–0.47 s for a whole reply and splitting it by sentence
+would save about 0.1 s on typical replies; the rest of the 1.5 s before a reply is the 0.7 s wait for quiet and the ear,
+which need real callers' audio to tune safely.
+Docs: voice-agent.md (opt_out), compliance-checklist (opt-out row).
+
 # 16 November 2026: THE REASON GUARD NOW KNOWS CLINIC, EDUCATION, INSURANCE AND PROPERTY CALLS (user: "continue the next task")
 
 Compliance checklist 2.5: before the identity check, `FactGuard.reasonWords` stopped our model naming the reason only

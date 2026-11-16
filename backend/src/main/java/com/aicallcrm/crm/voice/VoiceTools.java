@@ -437,12 +437,16 @@ public class VoiceTools {
         if (!call.isTestCall()) {
             consent.optOut(call.getPhone(), call.getContactId(),
                     "Asked on an AI call to stop " + (allCalls ? "all calls" : "AI calls"));
+            int callbacksTouched = handoffs.optedOut(call, allCalls);
             if (allCalls && call.getContactId() != null) {
                 contactService.statusFromCall(call.getContactId(), ContactStatus.DO_NOT_CALL,
                         "Asked on an AI call not to be called at all");
                 handoffs.inform(call, Priority.URGENT, "Asked not to be called at all",
                         "Said on an AI call that they do not want any more calls. The contact is now marked "
-                                + "\"Do not call\"; please respect this for calls made by staff too.");
+                                + "\"Do not call\"; please respect this for calls made by staff too."
+                                + (callbacksTouched == 0 ? "" : callbacksTouched == 1
+                                        ? " Their open call-back was cancelled."
+                                        : " Their " + callbacksTouched + " open call-backs were cancelled."));
             }
         }
         Map<String, Object> data = new LinkedHashMap<>();

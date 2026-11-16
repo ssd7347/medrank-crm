@@ -277,6 +277,51 @@ class VoicePlivoTest {
     }
 
     @Test
+    void aCallerWhoAsksForNoCallsAtAllHasTheirCallBackCancelled() throws Exception {
+        String admin = login();
+        UUID call = incomingCall(admin, "cu-" + SEQ.incrementAndGet());
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"4 pm\"}");
+        tool(call, "opt_out", "{\"scope\":\"ALL_CALLS\"}").andExpect(jsonPath("$.ok").value(true));
+        assertThat(jdbc.queryForObject("select status || ' | ' || done_note from callback_request where voice_call_id = ?",
+                String.class, call)).isEqualTo("DONE | " + HandoffService.CANCELLED_NOTE);
+        assertThat(jdbc.queryForList("select body from notification where title like 'Asked not to be called at all%' "
+                + "and dedup_key = ?", String.class, "VINF:" + call)).isNotEmpty()
+                .allMatch(b -> b.endsWith("Their open call-back was cancelled."));
+    }
+
+    @Test
+    void aCallerWhoStopsOnlyAiCallsKeepsTheirCallBackWithAWarning() throws Exception {
+        String admin = login();
+        UUID call = incomingCall(admin, "cu-" + SEQ.incrementAndGet());
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"4 pm\",\"reason\":\"Wants to talk about the plan.\"}");
+        tool(call, "opt_out", "{\"scope\":\"AI_CALLS\"}").andExpect(jsonPath("$.ok").value(true));
+        tool(call, "opt_out", "{\"scope\":\"AI_CALLS\"}").andExpect(jsonPath("$.ok").value(true));
+        assertThat(jdbc.queryForObject("select status from callback_request where voice_call_id = ?", String.class, call))
+                .isEqualTo("OPEN");
+        assertThat(jdbc.queryForObject("select summary from callback_request where voice_call_id = ?", String.class, call))
+                .isEqualTo(HandoffService.AI_ONLY_NOTE + "\n\nWants to talk about the plan.");
+        assertThat(jdbc.queryForList("select title || ' | ' || body from notification where dedup_key = ?", String.class,
+                "VOPT:" + call)).isNotEmpty().allMatch(t -> t.equals("Check before calling back: Nisha Rao | Nisha Rao "
+                + "asked on an AI call to stop AI calls and has 1 open call-back. They did not say no to a call from staff, "
+                + "but read the transcript first."));
+    }
+
+    @Test
+    void anOptOutHeardOnlyAtTheHangUpFlagsTheCallBackToo() throws Exception {
+        String admin = login();
+        String callUuid = "cu-" + SEQ.incrementAndGet();
+        UUID call = incomingCall(admin, callUuid);
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"4 pm\"}");
+        // The stand-in brain does not catch these words; the CRM does when the call ends (VoiceCallService.optOutIfAsked).
+        live("turn", call, "Please take me off your list.");
+        plivoHook("/hangup", null, "CallUUID", callUuid, "CallStatus", "completed", "Duration", "30",
+                "HangupCause", "NORMAL_CLEARING").andExpect(status().isOk());
+        mvc.perform(auth(get("/api/voice/calls/" + call), admin)).andExpect(jsonPath("$.call.outcome").value("CALLBACK_REQUESTED"));
+        assertThat(jdbc.queryForObject("select status || ' | ' || summary from callback_request where voice_call_id = ?",
+                String.class, call)).startsWith("OPEN | " + HandoffService.AI_ONLY_NOTE);
+    }
+
+    @Test
     void anOutboundAnswerLinksPlivosCallIdAndUnknownCallsAreHungUp() throws Exception {
         String unknown = plivoHook("/answer", "call_id=" + UUID.randomUUID(), "CallUUID", "cu-x", "Direction", "outbound")
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();

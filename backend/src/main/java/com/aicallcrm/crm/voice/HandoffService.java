@@ -6,6 +6,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -225,6 +228,59 @@ public class HandoffService {
         }
         return task(call, contact, HandoffReason.TOOL_FAILURE.name(), null, summary, Priority.NORMAL,
                 dueAt(HandoffReason.TOOL_FAILURE, Instant.now(clock)));
+    }
+
+    static final String CANCELLED_NOTE = "Cancelled by the CRM: on an AI call the caller asked not to be called at all.";
+    static final String AI_ONLY_NOTE = "CHECK BEFORE CALLING: on an AI call they then asked to stop AI calls. They did "
+            + "not say no to a call from staff, but read the transcript first.";
+
+    /**
+     * The caller opted out on this call: their open call-backs, from this call or earlier ones, must not be rung as if
+     * nothing happened. Asked for no calls at all ("Do not call"): each is cancelled (closed with a note), since staff
+     * must not ring them either. Asked to stop AI calls only: each stays, since they may still want the person they
+     * asked for, but it says so at the top and whoever has it (or the contact's owner, or the managers) is told to read
+     * the transcript first. Returns how many call-backs this touched; none for a test call.
+     */
+    @Transactional
+    public int optedOut(VoiceCall call, boolean allCalls) {
+        if (call.isTestCall()) {
+            return 0;
+        }
+        List<CallbackRequest> open = call.getContactId() != null
+                ? callbacks.findByContactIdAndStatusIn(call.getContactId(),
+                        List.of(Voice.CallbackStatus.OPEN, Voice.CallbackStatus.ASSIGNED))
+                : callbacks.findByVoiceCallId(call.getId()).stream()
+                        .filter(c -> c.getStatus() != Voice.CallbackStatus.DONE).toList();
+        if (open.isEmpty()) {
+            return 0;
+        }
+        Contact contact = contact(call);
+        Set<AppUser> told = new LinkedHashSet<>();
+        for (CallbackRequest cb : open) {
+            if (allCalls) {
+                cb.complete(null, CANCELLED_NOTE);
+            } else {
+                cb.warn(AI_ONLY_NOTE);
+                if (cb.getAssignedTo() != null && cb.getAssignedTo().isActive()) {
+                    told.add(cb.getAssignedTo());
+                }
+            }
+        }
+        if (!allCalls) {
+            String title = "Check before calling back: " + label(call, contact);
+            String body = label(call, contact) + " asked on an AI call to stop AI calls and has " + open.size()
+                    + (open.size() == 1 ? " open call-back" : " open call-backs") + ". They did not say no to a call "
+                    + "from staff, but read the transcript first.";
+            if (told.isEmpty()) {
+                alerts.notifyOwnerOrManagers(owner(contact), call.getContactId(), "VOICE_CALLBACK", Priority.NORMAL,
+                        title, body, "/voice/callbacks", "VOPT:" + call.getId());
+            }
+            for (AppUser u : told) {
+                alerts.notifyUser(u.getId(), call.getContactId(), "VOICE_CALLBACK", Priority.NORMAL, title, body,
+                        "/voice/callbacks", "VOPT:" + call.getId());
+            }
+        }
+        return open.size();
     }
 
     /** Tells the contact's owner (or the managers) something they should know about this call. */

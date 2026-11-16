@@ -124,6 +124,9 @@ interface CallbackRequestRepository extends JpaRepository<CallbackRequest, Long>
     List<CallbackRequest> findTop100ByStatusOrderByDoneAtDesc(CallbackStatus status);
 
     List<CallbackRequest> findByVoiceCallId(UUID voiceCallId);
+
+    @EntityGraph(attributePaths = "assignedTo")
+    List<CallbackRequest> findByContactIdAndStatusIn(Long contactId, Collection<CallbackStatus> statuses);
 }
 
 interface VoiceWebhookEventRepository extends JpaRepository<VoiceWebhookEvent, Long> {

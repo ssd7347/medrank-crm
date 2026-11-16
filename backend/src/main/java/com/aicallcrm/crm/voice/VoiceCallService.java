@@ -95,13 +95,14 @@ public class VoiceCallService {
     private final AlertService alerts;
     private final SettingsService branding;
     private final ObjectMapper mapper;
+    private final HandoffService handoffs;
 
     public VoiceCallService(VoiceCallRepository calls, VoiceCampaignTargetRepository targets,
                             VoiceCampaignRepository campaigns, VoiceWebhookEventRepository events,
                             VoiceSettingRepository settings, VoiceScriptService scripts, ConsentService consent,
                             VoicePlatforms platforms, VoiceProperties props, ContactRepository contacts,
                             ContactService contactService, CallLogRepository callLogs, AppUserRepository users,
-                            AlertService alerts, SettingsService branding, ObjectMapper mapper) {
+                            AlertService alerts, SettingsService branding, ObjectMapper mapper, HandoffService handoffs) {
         this.calls = calls;
         this.targets = targets;
         this.campaigns = campaigns;
@@ -118,6 +119,7 @@ public class VoiceCallService {
         this.alerts = alerts;
         this.branding = branding;
         this.mapper = mapper;
+        this.handoffs = handoffs;
     }
 
     // ------------------------------------------------------------------ the kill switch
@@ -386,6 +388,7 @@ public class VoiceCallService {
             return false;
         }
         consent.optOut(call.getPhone(), call.getContactId(), "Asked on an AI call to stop AI calls (recorded by the CRM from the caller's words)");
+        handoffs.optedOut(call, false);
         if (call.getOutcome() == null || call.getOutcome() == Outcome.NO_INTERACTION) {
             call.setOutcome(Outcome.OPTED_OUT);
         }

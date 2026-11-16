@@ -72,6 +72,15 @@ public class CallbackRequest {
         this.status = CallbackStatus.ASSIGNED;
     }
 
+    /** Something staff must read before calling, put first so a long summary never hides it. Once only. */
+    public void warn(String note) {
+        if (summary != null && summary.startsWith(note)) {
+            return;
+        }
+        String s = summary == null || summary.isBlank() ? note : note + "\n\n" + summary;
+        this.summary = s.length() <= 2000 ? s : s.substring(0, 2000);
+    }
+
     /** The caller asked for another time in the same call. */
     public void reschedule(Instant dueAt, String preferredTimeText) {
         this.dueAt = dueAt;
