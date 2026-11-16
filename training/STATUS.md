@@ -14,6 +14,33 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 16 November 2026: A WHOLE CALL REHEARSED ON THE LAPTOP, NO PHONE LINE (user: "continue the next task")
+
+Until now the CRM, the gateway and the engine had only been tested apart or against fakes, and yesterday's
+transfer fix could not be tried end to end (Sunday, desk shut). New `voice-engine/rehearse.py` plays Plivo: signed
+callbacks through the gateway (V3 signature, same test values as the CRM's `PlivoSignatureTest`), the call stream with
+the caller's lines as 8 kHz mu-law in 20 ms messages in real time and the line's hiss between them, the agent's replies
+"played" for as long as they last before `playedStream`, and a pretend Plivo API on :8098 that the CRM calls to
+transfer or hang up. It reports each reply's delay, the ending, whether the stream was still open a second after the
+transfer, the desk number Plivo would ring; then sends the hang-up callback. The CRM gets `PLIVO_API_BASE` (was only
+a raw Spring setting; default still Plivo's real API). Docs say it stays unset for real calls.
+**Rehearsal, 16 Nov, 18:50 IST** (in-memory test CRM on 8093, made-up Plivo token, real engine base.en on 8090, real
+gateway on 8099, simulated brain): opening line began 1.4 s after the answer; "Hello, I have a question." heard word
+for word, reply began 1.6 s after the caller stopped; "Can I speak to a real person please?" heard word for word,
+reply began 2.8 s after; the goodbye "I am connecting you to a member of our team now. Please stay on the line.
+Goodbye." played whole, then the CRM asked Plivo to transfer, with the stream still open; the desk hook gave
++914400000000; the call COMPLETED, HANDED_OFF (CALLER_REQUEST), 28 s, no call-back. No errors in any log. The delays
+include the engine's 0.7 s wait for quiet and the simulated brain (instant); the real brain's time comes on top.
+The engine's warm-up took 22.5 s this time (3.9 s yesterday) because the CRM was starting on the same CPU.
+Noticed, not changed: uvicorn's access log writes each call's stream URL, token included, into the engine's and the
+gateway's logs (as before today).
+Tests `test_rehearse` (10): signatures equal the CRM's; 20 ms framing; any WAV to 8 kHz; text through the engine's
+/tts; against a fake CRM-and-engine served on the machine: a transfer followed to the desk and hung up (in real time,
+reply delay checked), an engine that closes the stream at the transfer is reported (the bug fixed yesterday), a hang-up,
+a refused call, a wrong token refused; the pretend API answers 202/204/404 like Plivo. Engine 78/78, backend 103/103.
+Docs: voice-engine README ("Rehearsing a whole call"), first-real-call (step 0 on the day; `PLIVO_API_BASE` not set),
+voice-agent.
+
 # 15 November 2026: THE FIRST CALLER NO LONGER WAITS FOR THE SPEECH MODELS (user: "Yes, do it")
 
 The other known limit from the docs. The speech engine loaded Whisper and Piper on first use, so the first call after

@@ -36,7 +36,8 @@ own account is for demos and test calls to your team.
    address only once staff sign-in codes are really sent (`OTP_SHOW_ON_SCREEN=false`).
 3. CRM settings: `VOICE_PLATFORM=plivo`, `VOICE_HMAC_SECRET`, `PLIVO_AUTH_ID`, `PLIVO_AUTH_TOKEN`,
    `PLIVO_FROM_NUMBER`, `PLIVO_PUBLIC_URL` (the CRM's address exactly as Plivo reaches it: signatures are checked
-   against it), `PLIVO_ENGINE_URL` (`wss://your-engine/call`), and `AI_BRAIN`.
+   against it), `PLIVO_ENGINE_URL` (`wss://your-engine/call`), and `AI_BRAIN`. `PLIVO_API_BASE` stays unset; it is
+   only for rehearsing a call on one machine (`voice-engine/rehearse.py`, see its README).
 4. Engine settings: the same `VOICE_HMAC_SECRET`, `CRM_URL`, and `STT_MODEL=small.en` (on the phone line it heard 34 of
    37 key words of the one Indian voice recorded so far, base.en 27; it needs the GPU machine for speed). On a call to a known contact the CRM sends the contact's name, and with small.en
    the engine gives it to Whisper so names come out as registered (`NAME_HINTS`, see `voice-engine/README.md`).

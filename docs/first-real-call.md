@@ -82,6 +82,7 @@ a pause ("My date of birth is..."), the engine waits up to 1.5 s more for the re
 | `PLIVO_AUTH_ID`, `PLIVO_AUTH_TOKEN`, `PLIVO_FROM_NUMBER` | from the client's Plivo account |
 | `PLIVO_PUBLIC_URL` | the gateway tunnel's `https://` address, exactly as Plivo calls it (signatures are checked against it) |
 | `PLIVO_ENGINE_URL` | the same address as `wss://.../call` |
+| `PLIVO_API_BASE` | **not set** (it is only for a rehearsal; left pointing at the rehearsal, no transfer or hang-up would reach Plivo) |
 | `AI_BRAIN` | `LOCAL` |
 | `LOCAL_LLM_MODEL` | `ourvoice8b-r4` (the default `qwen2.5:3b` is not ours) |
 | `OTP_SHOW_ON_SCREEN`, `COOKIE_SECURE` | unchanged while only the gateway is public (item 3 above) |
@@ -90,6 +91,10 @@ Engine: `VOICE_HMAC_SECRET` (same) and `CRM_URL=http://127.0.0.1:8082`.
 Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
 
 ## Order on the day
+
+0. The day before, on the laptop: rehearse the whole call with `voice-engine/rehearse.py` (README, "Rehearsing a
+   whole call"), with the in-memory test CRM and a made-up token. Done on 16 Nov 2026: answer, two turns, transfer
+   to the desk only after the goodbye was played, the desk rung, the call recorded as handed off.
 
 1. Laptop: start the CRM, the engine and the gateway (`uvicorn gateway:app --host 127.0.0.1 --port 8099`); `/health`
    on the engine answers on `127.0.0.1:8090` and says `"warmed": true` a few seconds after the start (both speech

@@ -117,7 +117,34 @@ CRM) and the `/call` stream, and answers 404 to everything else, including the C
 `/stt` and `/tts`. Then `PLIVO_PUBLIC_URL=https://<tunnel>` and `PLIVO_ENGINE_URL=wss://<tunnel>/call`.
 Setting up the CRM and Plivo: `docs/voice-agent.md`, "Plivo as the phone line".
 
-Tests, with no phone line or models: `.venv\Scripts\python -m unittest test_phone test_gateway test_ear_check`.
+Tests, with no phone line or models: `.venv\Scripts\python -m unittest test_phone test_gateway test_ear_check test_rehearse`.
+
+## Rehearsing a whole call with no phone line (`rehearse.py`)
+
+`rehearse.py` plays Plivo: it rings the CRM through the gateway with correctly signed callbacks, opens the call
+stream, speaks the caller's lines into it as 8 kHz phone audio in real time (text in the engine's voice, or WAV
+recordings), plays the agent's replies for as long as they last, and stands in for Plivo's API, which the CRM calls
+to transfer or hang up. It prints how long each reply took and how the call ended, and the call appears on the CRM's
+`/voice/calls` page with what the engine heard.
+
+Use it with a CRM that real calls never go through (the in-memory test CRM is best), started with a **made-up**
+token, never the real account's:
+
+| CRM setting | Value for a rehearsal |
+|---|---|
+| `VOICE_PLATFORM` | `plivo` |
+| `PLIVO_AUTH_ID`, `PLIVO_FROM_NUMBER` | anything, e.g. `MAREHEARSAL01`, `+918000000001` |
+| `PLIVO_AUTH_TOKEN` | a made-up value, also given to the script |
+| `PLIVO_PUBLIC_URL` / `PLIVO_ENGINE_URL` | `http://127.0.0.1:8099` / `ws://127.0.0.1:8099/call` (the gateway) |
+| `PLIVO_API_BASE` | `http://127.0.0.1:8098/v1` (the script's pretend Plivo API) |
+| `VOICE_DESK_NUMBER` | any number, to see a transfer |
+
+Start the engine and the gateway as for a real call, approve the "Incoming calls" script, add the caller as a
+contact, then:
+
+```
+python rehearse.py --auth-token <the made-up token> --from +919876500001 "Hello, I have a question." "Can I speak to a real person please?"
+```
 
 ## Checking the ears on Indian English (`ear_check.py`)
 
