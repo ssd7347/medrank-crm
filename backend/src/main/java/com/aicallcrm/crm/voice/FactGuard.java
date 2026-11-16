@@ -66,9 +66,19 @@ final class FactGuard {
      * Words that tell whoever answered that someone owes money. Until the identity check passes the agent may use one
      * only if the opening line, an identity question, the caller or a tool used it first (8B test call #7, 31 Oct: it
      * told a stranger "I'm calling about an overdue EMI payment"). Matched against lower case; the kit reads this too.
+     *
+     * <p>Then what the other starter packs call about (compliance checklist 2.5; in the saved training calls the model
+     * told whoever answered "Your appointment is for your dental check-up" and asked about "our courses"): a clinic
+     * visit, a course or admission, an insurance policy, a property. Not "enquiry", which the model also uses for any
+     * question ("happy to help with your inquiry"), nor "of course".
      */
     static final String REASON_WORDS = "\\b(overdue|emis?|loans?|debts?|dues|arrears|outstanding|install?ments?|"
-            + "pay|paying|payments?|premiums?|fees?|amounts?|bills?|owe|owed|owing)\\b";
+            + "pay|paying|payments?|premiums?|fees?|amounts?|bills?|owe|owed|owing|"
+            + "appointments?|check[- ]?ups?|doctors?|consultations?|treatments?|prescriptions?|medicines?|medications?|"
+            + "vaccinations?|scans?|test results?|diagnos[ie]s|symptoms?|"
+            + "admissions?|enrol(?:l)?(?:ments?|ed|ing)?|(?<!of )courses?|class(?:es)?|tuition|exams?|counsell?ors?|"
+            + "insurance|polic(?:y|ies)|renew(?:als?|ed|ing)?|claims?|"
+            + "propert(?:y|ies)|visits?|flats?|apartments?|plots?|villas?)\\b";
     private static final Pattern REASON = Pattern.compile(REASON_WORDS);
 
     /** Said instead when the model names the reason again after its private note; it names nothing. */

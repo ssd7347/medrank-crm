@@ -23,7 +23,7 @@ Every rule below is checked by the code, and tested, before each number is diall
 | Still needed | Just before dialling, the CRM checks that the call is still needed (for example the person has not paid since the campaign started). | No. |
 | AI says it is an AI | Every starter opening line introduces the agent as an AI assistant ("Hello, this is Asha, an AI assistant calling from ..."), and the AI's instructions say it is not a human and must say so. If a caller asks whether it is a machine, it says it is an AI. | The opening line is the company's own text; keep the AI disclosure in it. |
 | Approved scripts only | A real call uses only a script version an admin has approved. Each approval is recorded in the audit log. | Only admins approve. |
-| What the AI may say | Each contact field is marked "To anyone", "Only after verified" or "Never". The AI cannot read out "Never" fields, and the others only as marked. Before the identity check, our own model is stopped from naming the reason for the call (words such as overdue, EMI, loan, fee). | Admins set this per field. |
+| What the AI may say | Each contact field is marked "To anyone", "Only after verified" or "Never". The AI cannot read out "Never" fields, and the others only as marked. Before the identity check, our own model is stopped from naming the reason for the call (words such as overdue, EMI, loan, fee, appointment, check-up, course, admission, policy, renewal, property, site visit). | Admins set this per field. |
 | Identity check | Before personal details, the caller must give their full name and an identity answer (for example customer ID). Three failures end the AI's part and pass the call to a person. | No. |
 | A person when needed | Complaints, distress, a stuck AI or a fault hand the call to a person: a live transfer when the desk is open, otherwise a call-back task. | No. |
 | Keeping transcripts | Call transcripts are deleted after 365 days (`VOICE_RETENTION_DAYS`); the outcome of each call stays. | Only the server setting can change it. |
@@ -68,9 +68,11 @@ built. The CRM must not be put on the internet until codes are really sent (see 
 **2.5 The reason for the call in opening lines.** The starter openings no longer name the reason (they used to say
 "your check-up is due", "your upcoming appointment", "your site visit", "your policy renewal", "you recently
 enquired"): they say who is calling, that it is an AI assistant, and ask for the person by first name; the reason comes
-after the identity check. Two things remain: the company's own openings can still name a reason, and the check that
-stops our own model naming the reason before the identity check knows loan and payment words only (overdue, EMI, loan,
-fee, dues and similar), not words such as appointment, check-up, renewal or admission.
+after the identity check. The check that stops our own model naming the reason before the identity check now
+knows the other starter packs' reasons as well as money words (appointment, check-up, doctor, course, class, admission,
+exam, insurance, policy, renewal, claim, property, visit, flat, plot and similar; 16 November 2026). What remains: the
+company's own openings and identity questions can still name a reason (asking for a "policy number" says there is a
+policy), and a word outside the list is not stopped.
 
 - [ ] Every opening line reviewed by the adviser for what it reveals to someone who is not the customer
 

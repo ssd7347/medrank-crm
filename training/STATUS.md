@@ -14,6 +14,34 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 16 November 2026: THE REASON GUARD NOW KNOWS CLINIC, EDUCATION, INSURANCE AND PROPERTY CALLS (user: "continue the next task")
+
+Compliance checklist 2.5: before the identity check, `FactGuard.reasonWords` stopped our model naming the reason only
+with money words. Replaying the saved calls (train/val, r4 calls, generated, all eval files: 1,261 calls, 2,120 agent
+replies before the check passed, in calls that needed it) found the model telling whoever answered "Your appointment is
+for your dental check-up", "anything you would like to know about our courses?", "which course you're interested in"
+and "a free demo class". `FactGuard.REASON_WORDS` now also has appointment, check-up (and checkup, check up), doctor,
+consultation, treatment, prescription, medicine, medication, vaccination, scan, test result, diagnosis, symptom;
+admission, enrol(l)(ment/ed/ing), course (not "of course"), class, tuition, exam, counsellor; insurance, policy,
+renew(al/ed/ing), claim; property, visit, flat, apartment, plot, villa (each with plurals). Left out on purpose:
+"enquiry"/"inquiry" (the model uses it for any question: "happy to help with your payment inquiry"; the subject word,
+"admission enquiry", "property enquiry", is caught), and "due" ("due to"). On the same replay the final list stops
+those 5 and **no innocent reply**; the first draft also caught "Of course." (86 times) and "enquiry" (47), hence the
+two exclusions. Unchanged: `VOICE_RULES` (our fine-tuned model was trained on its exact text); the guard's note and the
+fixed line do the work.
+Tests: `AiBrainIntegrationTest.theOtherPacksReasonsStayUnsaidToo` (the replies above caught; "Of course", "your
+enquiry", the company name, an identity question asking for the "policy number", the caller's own word allowed) and
+`aStrangerNeverHearsAboutACheckUpOrARenewal` (a fake model through a test call: "It is about your policy renewal" →
+after the note the neutral reply; "your check-up is due" twice → the fixed line). Both fail on the old list (the
+stranger hears "It is about your policy renewal."). Backend 114/114.
+Training kit: `training/spec/agent-spec.json` rewritten (`TrainingSpecTest`, only `reason_words` changed). Its checker
+then failed its own template "Clinic appointment reminder / busy" ("This is about your upcoming appointment." before
+the check): `scenarios.Conv` now says "your account with us" in any call that needs the identity check, as money calls
+did. Kit tests 77/77; 3,100 template calls over 20 seeds, 0 problems. **Note for the live model:** round 4 learned the
+old template lines, so in clinic, education, insurance and property calls with an identity check it may name the reason
+early; the CRM stops it (one retry with the note, then the fixed line), at the cost of a slower reply when it happens.
+Docs: compliance-checklist (1 and 2.5), voice-agent.md.
+
 # 16 November 2026: A CALLER WHO CHANGES THE CALL-BACK TIME IS PROMISED THE NEW ONE (user: "continue the next task")
 
 The gap left in the entry below: a second booking in the same call kept the first task and its time, so "actually,

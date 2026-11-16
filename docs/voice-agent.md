@@ -143,8 +143,9 @@ minutes is refused.
 ## Keeping the reason for the call private
 
 When a call needs the identity check, our own model's replies are checked before the caller hears them
-(`FactGuard.reasonWords`, in `LlmBrain`): until the check passes, words such as overdue, EMI, loan, payment, fee or amount
-are stopped unless the opening line, an identity question, the caller or a tool used that word first. The model is asked
+(`FactGuard.reasonWords`, in `LlmBrain`): until the check passes, words such as overdue, EMI, loan, payment, fee or amount,
+and the other packs' reasons (appointment, check-up, doctor, course, class, admission, policy, renewal, insurance, claim,
+property, visit, flat, plot), are stopped unless the opening line, an identity question, the caller or a tool used that word first. The model is asked
 again with a private note; if it repeats it, the caller hears a fixed line that names nothing: "It is about your account
 with us. May I have your full name, please?" If the caller just asked whether this is a person or a machine, the line
 starts "I am an AI assistant, not a person." This protects only what

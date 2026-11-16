@@ -209,6 +209,40 @@ class AiBrainIntegrationTest {
     }
 
     @Test
+    void theOtherPacksReasonsStayUnsaidToo() {
+        String opening = "Hello, this is Asha, an AI assistant calling from City Clinic. Am I speaking with Meena?";
+        // Said by our model in the saved training calls, before the identity check.
+        assertThat(FactGuard.reasonWords("Your appointment is for your dental check-up.", opening))
+                .containsExactly("appointment", "check-up");
+        assertThat(FactGuard.reasonWords("Is there anything you would like to know about our courses?", opening))
+                .containsExactly("courses");
+        assertThat(FactGuard.reasonWords("Would you like to attend a free demo class?", opening)).containsExactly("class");
+        assertThat(FactGuard.reasonWords("Your policy is due for renewal.", opening)).containsExactly("policy", "renewal");
+        assertThat(FactGuard.reasonWords("It's about your admission and the property site visit.", opening))
+                .containsExactly("admission", "property", "visit");
+        assertThat(FactGuard.reasonWords("You enrolled for the checkup and the insurance claim.", opening))
+                .containsExactly("enrolled", "checkup", "insurance", "claim");
+        // Ordinary words stay ordinary; the company's name, an identity question, or the caller's own word may be used.
+        assertThat(FactGuard.reasonWords("Of course. May I have your full name, please?", opening)).isEmpty();
+        assertThat(FactGuard.reasonWords("I'm happy to help with your enquiry. Is now a good time?", opening)).isEmpty();
+        assertThat(FactGuard.reasonWords("Thank you for calling City Clinic.", opening + " Clinic")).isEmpty();
+        assertThat(FactGuard.reasonWords("May I have your policy number?", opening + " [{\"ask_for\":\"Policy Number\"}]")).isEmpty();
+        assertThat(FactGuard.reasonWords("Yes, it is about your appointment.", "Is this about my appointment?")).isEmpty();
+    }
+
+    @Test
+    void aStrangerNeverHearsAboutACheckUpOrARenewal() throws Exception {
+        String admin = admin();
+        // The note makes the model behave: the caller hears only the second, neutral answer.
+        String heard = say(admin, reminderCall(admin), "Why are you calling Meena?");
+        assertThat(heard).contains("It is about their account with us.").doesNotContainIgnoringCase("renewal")
+                .doesNotContainIgnoringCase("policy");
+        // This model keeps saying it after the note: the caller hears the fixed line.
+        heard = say(admin, reminderCall(admin), "This is Kavya. What is it about?");
+        assertThat(heard).contains(FactGuard.REASON_FALLBACK).doesNotContainIgnoringCase("check-up");
+    }
+
+    @Test
     void aStrangerNeverHearsThatSomeoneOwesMoney() throws Exception {
         String admin = admin();
         // The note makes the model behave: the caller hears only the second, neutral answer.
@@ -505,6 +539,16 @@ class AiBrainIntegrationTest {
             answer(ex, String.valueOf(messages.get(0).get("content")).contains("PRIVATE NOTE")
                     ? "It is about their account with us. May I have your full name?"
                     : "I'm calling about an overdue EMI payment.");
+            return;
+        }
+        if (lastCaller.contains("Why are you calling Meena")) {
+            answer(ex, String.valueOf(messages.get(0).get("content")).contains("PRIVATE NOTE")
+                    ? "It is about their account with us. May I have your full name?"
+                    : "It is about your policy renewal.");
+            return;
+        }
+        if (lastCaller.contains("This is Kavya")) {
+            answer(ex, "I'm calling to remind you that your check-up is due.");
             return;
         }
         if (lastCaller.contains("This is Sunil") || lastCaller.contains("real person")) {

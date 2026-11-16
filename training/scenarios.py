@@ -39,7 +39,10 @@ class Conv:
         self.call, self.rng, self.n = call, rng, 0
         self.p = call.person
         self.first = self.p.first_name if self.p else ""
-        self.topic = TOPIC.get(call.script.name, "your account")
+        # Whoever answered may not be the customer: a call that needs the identity check names no reason before it
+        # (FactGuard.REASON_WORDS, which now has appointments, policies, courses and the like as well as money).
+        self.topic = ("your account with us" if self.p and call.private_fields()
+                      else TOPIC.get(call.script.name, "your account"))
         self.m = [{"role": "system", "content": call.system_prompt()}, {"role": "user", "content": CONNECTED},
                   {"role": "assistant", "content": call.opening()}]
 
