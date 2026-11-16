@@ -226,6 +226,22 @@ class VoicePlivoTest {
     }
 
     @Test
+    void aCallerIsPromisedTheCallBackTimeTheyAskedFor() throws Exception {
+        String admin = login();
+        UUID call = incomingCall(admin, "cu-" + SEQ.incrementAndGet());
+        // Rehearsal of 16 Nov: asked for 4 pm at 11 in the morning, and was told "by 1:00 PM" (then 9:05 PM).
+        String said = JsonPath.read(live("turn", call, "Please call me back at 4 pm").andExpect(jsonPath("$.over").value(true))
+                .andReturn().getResponse().getContentAsString(), "$.say");
+        assertThat(said).contains("A member of our team will call you back on Monday 16 November at 4:00 PM.");
+        assertThat(jdbc.queryForObject("select due_at from callback_request where voice_call_id = ?", Instant.class, call))
+                .isEqualTo(Instant.parse("2026-11-16T10:30:00Z"));
+        assertThat(jdbc.queryForObject("select preferred_time_text from callback_request where voice_call_id = ?",
+                String.class, call)).isEqualTo("Please call me back at 4 pm");
+        assertThat(jdbc.queryForList("select title from notification where link = '/voice/callbacks' and title like ?", String.class,
+                "%Nisha Rao%")).contains("Call back on Monday 16 November at 4:00 PM: Nisha Rao");
+    }
+
+    @Test
     void anOutboundAnswerLinksPlivosCallIdAndUnknownCallsAreHungUp() throws Exception {
         String unknown = plivoHook("/answer", "call_id=" + UUID.randomUUID(), "CallUUID", "cu-x", "Direction", "outbound")
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
@@ -239,6 +255,16 @@ class VoicePlivoTest {
      * for a person: the agent says it is connecting them and the call is over for the engine. Returns our call id.
      */
     private UUID incomingCallAskingForAPerson(String admin, String callUuid) throws Exception {
+        UUID call = incomingCall(admin, callUuid);
+        String said = JsonPath.read(live("turn", call, "Can I speak to a real person").andExpect(jsonPath("$.over").value(true))
+                .andReturn().getResponse().getContentAsString(), "$.say");
+        assertThat(said).contains("I am connecting you to a member of our team now");
+        assertThat(callbacks(call)).isEmpty();
+        return call;
+    }
+
+    /** Nisha Rao rings in and the call streams to our engine, which opens it. Returns our call id. */
+    private UUID incomingCall(String admin, String callUuid) throws Exception {
         approve(admin, "Incoming calls");
         String phone = "9" + String.format("%09d", SEQ.incrementAndGet());
         mvc.perform(auth(post("/api/contacts"), admin).contentType(MediaType.APPLICATION_JSON)
@@ -259,10 +285,6 @@ class VoicePlivoTest {
         assertThat(m.group(2)).isEqualTo(PlivoHooksController.streamToken(SECRET, call));
 
         live("open", call, null).andExpect(jsonPath("$.over").value(false));
-        String said = JsonPath.read(live("turn", call, "Can I speak to a real person").andExpect(jsonPath("$.over").value(true))
-                .andReturn().getResponse().getContentAsString(), "$.say");
-        assertThat(said).contains("I am connecting you to a member of our team now");
-        assertThat(callbacks(call)).isEmpty();
         return call;
     }
 

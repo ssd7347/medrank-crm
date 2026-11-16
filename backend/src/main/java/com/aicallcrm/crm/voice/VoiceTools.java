@@ -370,7 +370,7 @@ public class VoiceTools {
                 reason == null ? "Asked for a call back." : reason);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("callback_id", h.callbackId());
-        data.put("confirmed_slot", ContactFacts.spokenTime(h.dueAt()));
+        data.put("confirmed_slot", h.slot());
         return ToolResult.ok(data, h.message());
     }
 

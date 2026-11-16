@@ -62,7 +62,9 @@ Tick these off with the developer:
    clause); the legal calling hours (the CRM's default is 09:00–20:00 Indian time); DND; what the opening lines
    say. Nothing in the software assumes these answers.
 6. **Your desk**: the phone number of the staff desk for live transfers, and its hours (default 09:30–18:30,
-   Monday to Saturday). Without a desk number every hand-over becomes a call-back task.
+   Monday to Saturday). Without a desk number every hand-over becomes a call-back task. The desk hours also decide
+   call-back times: a caller who asks for one inside them is promised that time ("on Tuesday at 4:00 PM"), and the
+   task is due then; otherwise within two hours of desk time.
 
 ## 4. Using it every day
 

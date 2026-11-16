@@ -14,6 +14,37 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 16 November 2026: THE PROMISED CALL-BACK TIME FOLLOWS WHAT THE CALLER ASKED FOR (user: "Yes, fix it")
+
+Found in the rehearsal below: Priya asked for 4 pm and was told "by ... 9:05 PM". New `voice/CallbackTime` reads the
+caller's words (the model's `preferred_time_text`, or "Caller said: ..." when the CRM books it) in Indian time:
+"4 pm", "4pm", "4 p.m.", "4.30 pm", "16:00", "at 4" (1–7 afternoon, 8–11 morning, 12 noon), "4 o'clock", "noon";
+today, tomorrow, day after tomorrow, a weekday, "next Monday"; "in 2 hours", "in an hour and a half", "within 2 hours";
+"after 5" (5–6 PM), "before 3", "between 4 and 5 pm", "4-5 pm"; morning (to 12), afternoon (12–4), evening (4 to
+closing); "tomorrow" alone (desk hours that day). It promises it only when it is read without doubt and can be kept:
+one day and one time, nothing negated near it ("not tomorrow", "don't call at 4", "busy at 4"), Monday to Saturday
+inside desk hours, at least 15 minutes away. A time already gone today with no day given is the next working day; the
+day is always spoken. Outside desk hours the caller hears "Our team makes calls between 9:30 AM and 6:30 PM, Monday to
+Saturday, so ..." then the usual time; anything unclear gets the usual time. The wording: "will call you back on
+Tuesday 17 November at 4:00 PM", "... on Tuesday 17 November, between 9:30 AM and 12:00 PM", or "by ..." as before.
+The task is due at the promised time (or the window's end), `confirmed_slot` says the same, and the staff alert says
+"Call back on Tuesday 17 November at 4:00 PM: Priya Shankar". Asked twice in one call: still one task, and the caller
+hears the time it was booked for. **Also fixed:** the usual "two hours of desk time" was the desk's open time + 2 h,
+so a request at 5:30 PM was due at 7:30 PM, after the desk closed (handoffs and cut-offs too); now the hours left at
+closing carry over to the next opening (`HandoffService.plusDeskTime`): 5:30 PM → Tuesday 10:30 AM.
+Tests: `CallbackTimeTest` (6, ~70 phrasings: kept, rolled to the next day, windows, outside hours, unclear ones, desk
+time) and `VoicePlivoTest.aCallerIsPromisedTheCallBackTimeTheyAskedFor` (a Plivo call on the fixed Monday 11:00 clock:
+"Please call me back at 4 pm" → spoken "on Monday 16 November at 4:00 PM", task due 10:30Z, alert title). That test
+fails on the old code ("by Monday 16 November, 1:00 PM"). Backend 110/110 (103 + 7). Engine unchanged.
+**Rehearsed, 16 Nov 19:33 IST** (in-memory test CRM, real desk hours 9:30–6:30, scheduling on, real engine and
+gateway, outbound campaign call): heard "Please call me back at 4pm." → **"A member of our team will call you back on
+Tuesday 17 November at 4:00 PM. Goodbye."**; task due 2026-11-17T10:30Z (4:00 PM IST); alert "Call back on Tuesday 17
+November at 4:00 PM: Priya Shankar"; COMPLETED, CALLBACK_REQUESTED; no errors, no stream token in the logs.
+**Not changed:** `training/callkit.py` (the training data's pretend tools) still always says "by"; the model repeats the
+CRM's hint, so this matters only if another training round is made. A caller who changes the time later in the same
+call keeps the first booking (as before).
+Docs: voice-agent.md (schedule_callback), handover-guide.md (desk hours).
+
 # 16 November 2026: THE FIRST-CALL PLAN REHEARSED AS OUTBOUND CAMPAIGN CALLS (user: "continue the next task")
 
 The first real call is an outbound campaign call, but `rehearse.py` only did incoming ones. Now its pretend Plivo

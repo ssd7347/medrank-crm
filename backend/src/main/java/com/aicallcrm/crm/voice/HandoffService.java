@@ -37,8 +37,14 @@ public class HandoffService {
     /** A person was already asked for earlier in this call; no second task is made. */
     public static final String ALREADY_ARRANGED = "ALREADY_ARRANGED";
 
-    /** {@code callbackId} is null for a live transfer and for test calls, which save nothing. */
-    public record Handoff(String mode, String message, Long callbackId, Instant dueAt) {
+    /**
+     * {@code callbackId} is null for a live transfer and for test calls, which save nothing. {@code slot} is the
+     * promised time as the caller hears it ("Tuesday 17 November, 4:00 PM"); null when there is none.
+     */
+    public record Handoff(String mode, String message, Long callbackId, Instant dueAt, String slot) {
+        Handoff(String mode, String message, Long callbackId, Instant dueAt) {
+            this(mode, message, callbackId, dueAt, dueAt == null ? null : ContactFacts.spokenTime(dueAt));
+        }
     }
 
     private final CallbackRequestRepository callbacks;
@@ -136,26 +142,40 @@ public class HandoffService {
                 Instant.now(clock).plus(Duration.ofMinutes(15)));
     }
 
-    /** The caller simply asked to be called back; not an escalation. */
+    /**
+     * The caller simply asked to be called back; not an escalation. They are promised the time they asked for when it
+     * can be kept ({@link CallbackTime}), otherwise the usual two hours of desk time.
+     */
     @Transactional
     public Handoff callback(VoiceCall call, String preferredTimeText, String reason) {
-        Instant due = dueAt(null, Instant.now(clock));
+        Instant now = Instant.now(clock);
+        CallbackTime.Promise promise = promise(preferredTimeText, now);
         if (call.getOutcome() == null) {
             call.setOutcome(Outcome.CALLBACK_REQUESTED);
         }
         if (call.isTestCall()) {
-            return new Handoff(CALLBACK_TASK, callbackMessage(due), null, due);
+            return handoff(promise, null);
         }
-        // Asked twice in one call (the model booking again, or the CRM booking for a logged outcome): one task.
+        // Asked twice in one call (the model booking again, or the CRM booking for a logged outcome): one task, and
+        // the caller hears the time it was booked for.
         CallbackRequest open = callbacks.findByVoiceCallId(call.getId()).stream()
                 .filter(c -> "CALLBACK_REQUESTED".equals(c.getReason()) && c.getStatus() != Voice.CallbackStatus.DONE)
                 .findFirst().orElse(null);
         if (open != null) {
-            return new Handoff(CALLBACK_TASK, callbackMessage(open.getDueAt()), open.getId(), open.getDueAt());
+            CallbackTime.Promise booked = promise(open.getPreferredTimeText(), now);
+            return handoff(booked.due().equals(open.getDueAt()) ? booked : CallbackTime.by(open.getDueAt()), open.getId());
         }
         CallbackRequest cb = task(call, contact(call), "CALLBACK_REQUESTED", preferredTimeText, reason, Priority.NORMAL,
-                due);
-        return new Handoff(CALLBACK_TASK, callbackMessage(cb.getDueAt()), cb.getId(), cb.getDueAt());
+                promise.due(), promise.when());
+        return handoff(promise, cb.getId());
+    }
+
+    CallbackTime.Promise promise(String preferredTimeText, Instant now) {
+        return CallbackTime.promise(preferredTimeText, now, props.deskOpen(), props.deskClose(), dueAt(null, now));
+    }
+
+    private static Handoff handoff(CallbackTime.Promise p, Long callbackId) {
+        return new Handoff(CALLBACK_TASK, p.message(), callbackId, p.due(), p.slot());
     }
 
     /**
@@ -194,10 +214,17 @@ public class HandoffService {
 
     private CallbackRequest task(VoiceCall call, Contact contact, String reason, String preferredTimeText,
                                  String summary, Priority priority, Instant dueAt) {
+        return task(call, contact, reason, preferredTimeText, summary, priority, dueAt,
+                "by " + ContactFacts.spokenTime(dueAt));
+    }
+
+    /** {@code when}: as the caller was told, after "call you back" ("by Monday ...", "on Tuesday ... at 4:00 PM"). */
+    private CallbackRequest task(VoiceCall call, Contact contact, String reason, String preferredTimeText,
+                                 String summary, Priority priority, Instant dueAt, String when) {
         CallbackRequest cb = callbacks.save(new CallbackRequest(call.getContactId(), call.getId(), call.getPhone(),
                 reason, cut(preferredTimeText, 200), cut(summary, 2000), priority, owner(contact), dueAt));
         alerts.notifyOwnerOrManagers(owner(contact), call.getContactId(), "VOICE_CALLBACK", priority,
-                "Call back by " + ContactFacts.spokenTime(dueAt) + ": " + label(call, contact),
+                "Call back " + when + ": " + label(call, contact),
                 (preferredTimeText == null || preferredTimeText.isBlank() ? "" : "Asked for: " + preferredTimeText + ". ")
                         + (summary == null ? "" : summary), "/voice/callbacks", "VCB:" + cb.getId());
         return cb;
@@ -233,7 +260,29 @@ public class HandoffService {
             return now.plus(Duration.ofMinutes(15));
         }
         Duration allowed = reason != null && reason.high() ? Duration.ofMinutes(30) : Duration.ofHours(2);
-        return deskTime(now, props.deskOpen(), props.deskClose()).plus(allowed);
+        return plusDeskTime(now, allowed, props.deskOpen(), props.deskClose());
+    }
+
+    /**
+     * {@code allowed} counted in desk time only: two hours from 5:30 PM, with the desk closing at 6:30, end an hour
+     * after the next opening, not at 7:30 PM when nobody is there to call.
+     */
+    static Instant plusDeskTime(Instant now, Duration allowed, LocalTime open, LocalTime close) {
+        Instant t = deskTime(now, open, close);
+        if (!open.isBefore(close)) {
+            return t.plus(allowed);             // desk hours set wrongly: as before, rather than loop
+        }
+        Duration left = allowed;
+        for (int day = 0; day < 14; day++) {
+            Instant closing = t.atZone(ContactFacts.IST).with(close).toInstant();
+            Duration today = Duration.between(t, closing);
+            if (left.compareTo(today) <= 0) {
+                return t.plus(left);
+            }
+            left = left.minus(today);
+            t = deskTime(closing, open, close);
+        }
+        return t.plus(left);
     }
 
     boolean deskOpen(Instant now) {
@@ -254,7 +303,7 @@ public class HandoffService {
     }
 
     private static String callbackMessage(Instant due) {
-        return "A member of our team will call you back by " + ContactFacts.spokenTime(due) + ".";
+        return CallbackTime.by(due).message();
     }
 
     static String mask(String phone) {
