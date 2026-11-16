@@ -14,6 +14,20 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 16 November 2026: CALL STREAM TOKENS NO LONGER IN THE LOGS (user: "Yes, fix it")
+
+Found during the rehearsal: uvicorn wrote each call's stream address, token included, into the engine's and the
+gateway's logs ("WebSocket /call?call_id=...&token=..." [accepted], and its access log). The token is what lets a
+stream into a call. New `voice-engine/redact.py`: a filter on uvicorn's two loggers (`uvicorn.error`,
+`uvicorn.access`) that writes `token=[hidden]`, keeping the call id; it edits the message's arguments in place, as
+uvicorn's access formatter unpacks them. `engine.py` and `gateway.py` install it on import (once). uvicorn's own
+logging set-up replaces handlers but keeps logger filters, so it holds in either order. The CRM never logged the
+token (checked). Tests `test_redact` (4): hiding keeps the call id; both apps install it once on both loggers;
+uvicorn's access formatter still formats and shows no token; the real engine under a real uvicorn refuses a stream
+and logs its address with the token hidden. Without the filter the two log tests fail. Engine 82/82. **Checked with
+the real processes** (`uvicorn engine:app`, `uvicorn gateway:app`, in-memory test CRM, a rehearsed call that was
+transferred as before): both logs show `token=[hidden]` with the call id, and no 64-character token anywhere in them.
+
 # 16 November 2026: A WHOLE CALL REHEARSED ON THE LAPTOP, NO PHONE LINE (user: "continue the next task")
 
 Until now the CRM, the gateway and the engine had only been tested apart or against fakes, and yesterday's
@@ -32,8 +46,8 @@ Goodbye." played whole, then the CRM asked Plivo to transfer, with the stream st
 +914400000000; the call COMPLETED, HANDED_OFF (CALLER_REQUEST), 28 s, no call-back. No errors in any log. The delays
 include the engine's 0.7 s wait for quiet and the simulated brain (instant); the real brain's time comes on top.
 The engine's warm-up took 22.5 s this time (3.9 s yesterday) because the CRM was starting on the same CPU.
-Noticed, not changed: uvicorn's access log writes each call's stream URL, token included, into the engine's and the
-gateway's logs (as before today).
+Noticed: uvicorn's log wrote each call's stream URL, token included, into the engine's and the gateway's logs
+(fixed the same day, entry above).
 Tests `test_rehearse` (10): signatures equal the CRM's; 20 ms framing; any WAV to 8 kHz; text through the engine's
 /tts; against a fake CRM-and-engine served on the machine: a transfer followed to the desk and hung up (in real time,
 reply delay checked), an engine that closes the stream at the transfer is reported (the bug fixed yesterday), a hang-up,

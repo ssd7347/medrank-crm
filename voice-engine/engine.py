@@ -47,6 +47,9 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 import phone
+import redact
+
+redact.install()        # call stream tokens never reach the log (redact.py)
 
 HERE = Path(__file__).resolve().parent
 STT_MODEL = os.environ.get("STT_MODEL", "base.en")

@@ -117,7 +117,10 @@ CRM) and the `/call` stream, and answers 404 to everything else, including the C
 `/stt` and `/tts`. Then `PLIVO_PUBLIC_URL=https://<tunnel>` and `PLIVO_ENGINE_URL=wss://<tunnel>/call`.
 Setting up the CRM and Plivo: `docs/voice-agent.md`, "Plivo as the phone line".
 
-Tests, with no phone line or models: `.venv\Scripts\python -m unittest test_phone test_gateway test_ear_check test_rehearse`.
+Tests, with no phone line or models: `.venv\Scripts\python -m unittest test_phone test_gateway test_ear_check test_rehearse test_redact`.
+
+The engine and the gateway write each call's stream address into their logs with `token=[hidden]`: the token lets
+a stream into a call, so it never sits in a log file (`redact.py`). The call id stays, to find a call in the log.
 
 ## Rehearsing a whole call with no phone line (`rehearse.py`)
 

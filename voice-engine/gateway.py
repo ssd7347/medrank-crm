@@ -22,6 +22,10 @@ from fastapi import FastAPI, Request, Response, WebSocket
 from fastapi.responses import PlainTextResponse
 from starlette.websockets import WebSocketDisconnect
 
+import redact
+
+redact.install()        # call stream tokens never reach the log (redact.py)
+
 CRM_URL = os.environ.get("CRM_URL", "http://127.0.0.1:8082").rstrip("/")
 ENGINE_URL = os.environ.get("ENGINE_URL", "http://127.0.0.1:8090").rstrip("/")
 HOOKS = ("answer", "hangup", "desk")
