@@ -1,6 +1,2913 @@
 {
   "ai_question_words" : "real person|human|robot|machine|\\bai\\b|\\bbot\\b|automated|computer",
   "callback_asked_arg" : "caller_asked_for_callback",
+  "callback_desk_hours" : [ "09:30", "18:30" ],
+  "callback_time_examples" : [ {
+    "asked" : "this evening",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 6:30 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, between 4:00 PM and 6:30 PM"
+  }, {
+    "asked" : "tomorrow morning",
+    "due" : "2026-11-17T12:00",
+    "from" : "2026-11-17T09:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 9:30 AM and 12:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Tuesday 17 November, between 9:30 AM and 12:00 PM"
+  }, {
+    "asked" : "after 5 pm",
+    "due" : "2026-11-16T18:00",
+    "from" : "2026-11-16T17:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 5:00 PM and 6:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, between 5:00 PM and 6:00 PM"
+  }, {
+    "asked" : "Saturday morning",
+    "due" : "2026-11-21T12:00",
+    "from" : "2026-11-21T09:30",
+    "message" : "A member of our team will call you back on Saturday 21 November, between 9:30 AM and 12:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Saturday 21 November, between 9:30 AM and 12:00 PM"
+  }, {
+    "asked" : "in two hours",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "tomorrow after lunch",
+    "due" : "2026-11-17T18:30",
+    "from" : "2026-11-17T09:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Tuesday 17 November, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "Please call me back at 4 pm.",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4 pm",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4pm",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4 p.m.",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4 P.M.",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "16:00",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "at 4",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4 o'clock",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4 o’clock",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "around 4",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "Good morning, please call me at 4",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "My ref is 4471 and I owe 2,500, call me at 4",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "call me at 4 in the evening",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4.30 pm",
+    "due" : "2026-11-16T16:30",
+    "from" : "2026-11-16T16:30",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:30 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:30 PM"
+  }, {
+    "asked" : "at 4:30",
+    "due" : "2026-11-16T16:30",
+    "from" : "2026-11-16T16:30",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:30 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 4:30 PM"
+  }, {
+    "asked" : "tomorrow at 10:30 am",
+    "due" : "2026-11-17T10:30",
+    "from" : "2026-11-17T10:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 10:30 AM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Tuesday 17 November, 10:30 AM"
+  }, {
+    "asked" : "noon tomorrow",
+    "due" : "2026-11-17T12:00",
+    "from" : "2026-11-17T12:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 12:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Tuesday 17 November, 12:00 PM"
+  }, {
+    "asked" : "day after tomorrow at 3 pm",
+    "due" : "2026-11-18T15:00",
+    "from" : "2026-11-18T15:00",
+    "message" : "A member of our team will call you back on Wednesday 18 November at 3:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Wednesday 18 November, 3:00 PM"
+  }, {
+    "asked" : "Wednesday at 11",
+    "due" : "2026-11-18T11:00",
+    "from" : "2026-11-18T11:00",
+    "message" : "A member of our team will call you back on Wednesday 18 November at 11:00 AM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Wednesday 18 November, 11:00 AM"
+  }, {
+    "asked" : "next Monday at 11 am",
+    "due" : "2026-11-23T11:00",
+    "from" : "2026-11-23T11:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 11:00 AM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 23 November, 11:00 AM"
+  }, {
+    "asked" : "in 2 hours",
+    "due" : "2026-11-16T13:00",
+    "from" : "2026-11-16T13:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "in an hour and a half",
+    "due" : "2026-11-16T12:30",
+    "from" : "2026-11-16T12:30",
+    "message" : "A member of our team will call you back on Monday 16 November at 12:30 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 12:30 PM"
+  }, {
+    "asked" : "after half an hour",
+    "due" : "2026-11-16T11:30",
+    "from" : "2026-11-16T11:30",
+    "message" : "A member of our team will call you back on Monday 16 November at 11:30 AM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 11:30 AM"
+  }, {
+    "asked" : "in 40 minutes",
+    "due" : "2026-11-16T11:40",
+    "from" : "2026-11-16T11:40",
+    "message" : "A member of our team will call you back on Monday 16 November at 11:40 AM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 11:40 AM"
+  }, {
+    "asked" : "call me at 10",
+    "due" : "2026-11-17T10:00",
+    "from" : "2026-11-17T10:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 10:00 AM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Tuesday 17 November, 10:00 AM"
+  }, {
+    "asked" : "today at 10",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "in the evening",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 6:30 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, between 4:00 PM and 6:30 PM"
+  }, {
+    "asked" : "after 5",
+    "due" : "2026-11-16T18:00",
+    "from" : "2026-11-16T17:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 5:00 PM and 6:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, between 5:00 PM and 6:00 PM"
+  }, {
+    "asked" : "between 4 and 5 pm",
+    "due" : "2026-11-16T17:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "4-5 pm",
+    "due" : "2026-11-16T17:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "4 to 5 pm",
+    "due" : "2026-11-16T17:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "tomorrow between 11 and 1 pm",
+    "due" : "2026-11-17T13:00",
+    "from" : "2026-11-17T11:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 11:00 AM and 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Tuesday 17 November, between 11:00 AM and 1:00 PM"
+  }, {
+    "asked" : "from 10 to 12",
+    "due" : "2026-11-16T12:00",
+    "from" : "2026-11-16T11:00",
+    "message" : "A member of our team will call you back by Monday 16 November, 12:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 12:00 PM"
+  }, {
+    "asked" : "tomorrow",
+    "due" : "2026-11-17T18:30",
+    "from" : "2026-11-17T09:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Tuesday 17 November, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "this morning",
+    "due" : "2026-11-16T12:00",
+    "from" : "2026-11-16T11:00",
+    "message" : "A member of our team will call you back by Monday 16 November, 12:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 12:00 PM"
+  }, {
+    "asked" : "this afternoon",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T12:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 12:00 PM and 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, between 12:00 PM and 4:00 PM"
+  }, {
+    "asked" : "before 3 pm",
+    "due" : "2026-11-16T15:00",
+    "from" : "2026-11-16T11:00",
+    "message" : "A member of our team will call you back by Monday 16 November, 3:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 3:00 PM"
+  }, {
+    "asked" : "by 5",
+    "due" : "2026-11-16T17:00",
+    "from" : "2026-11-16T11:00",
+    "message" : "A member of our team will call you back by Monday 16 November, 5:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 5:00 PM"
+  }, {
+    "asked" : "until 6",
+    "due" : "2026-11-16T18:00",
+    "from" : "2026-11-16T11:00",
+    "message" : "A member of our team will call you back by Monday 16 November, 6:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 6:00 PM"
+  }, {
+    "asked" : "within 2 hours",
+    "due" : "2026-11-16T13:00",
+    "from" : "2026-11-16T11:00",
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "in the morning",
+    "due" : "2026-11-16T12:00",
+    "from" : "2026-11-16T11:00",
+    "message" : "A member of our team will call you back by Monday 16 November, 12:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 12:00 PM"
+  }, {
+    "asked" : "at 8 pm",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "tonight",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "Sunday at 4",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "after 7 pm",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "before 9",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "in 9 hours",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "soon",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "later",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "whenever",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "next week",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "on the 20th",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "not tomorrow, call me on Wednesday",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "I'm busy at 4",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "don't call at 4, call at 5",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "dont call me tomorrow",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "tomorrow or Wednesday",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "at 4 or at 5",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "in the morning or the evening",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "in 10 minutes",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "today",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "between 5 and 3 pm",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "at 25",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "13 pm",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "at 4:75",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "I owe 12.50",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "sometime in the next 2 days",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "Monday evening",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 6:30 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, between 4:00 PM and 6:30 PM"
+  }, {
+    "asked" : "next friday afternoon",
+    "due" : "2026-11-20T16:00",
+    "from" : "2026-11-20T12:00",
+    "message" : "A member of our team will call you back on Friday 20 November, between 12:00 PM and 4:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Friday 20 November, between 12:00 PM and 4:00 PM"
+  }, {
+    "asked" : "at 12",
+    "due" : "2026-11-16T12:00",
+    "from" : "2026-11-16T12:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 12:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 12:00 PM"
+  }, {
+    "asked" : "at 9",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "tomorrow night",
+    "due" : "2026-11-16T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:00 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 1:00 PM"
+  }, {
+    "asked" : "after 6:15 pm",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T18:15",
+    "message" : "A member of our team will call you back on Monday 16 November, between 6:15 PM and 6:30 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, between 6:15 PM and 6:30 PM"
+  }, {
+    "asked" : "around 5.45",
+    "due" : "2026-11-16T17:45",
+    "from" : "2026-11-16T17:45",
+    "message" : "A member of our team will call you back on Monday 16 November at 5:45 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 5:45 PM"
+  }, {
+    "asked" : "in 1.5 hours",
+    "due" : "2026-11-16T12:30",
+    "from" : "2026-11-16T12:30",
+    "message" : "A member of our team will call you back on Monday 16 November at 12:30 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Monday 16 November, 12:30 PM"
+  }, {
+    "asked" : "day after tomorow",
+    "due" : "2026-11-18T18:30",
+    "from" : "2026-11-18T09:30",
+    "message" : "A member of our team will call you back on Wednesday 18 November, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-11-16T11:00",
+    "slot" : "Wednesday 18 November, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "this evening",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 6:30 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, between 4:00 PM and 6:30 PM"
+  }, {
+    "asked" : "tomorrow morning",
+    "due" : "2026-11-17T12:00",
+    "from" : "2026-11-17T09:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 9:30 AM and 12:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Tuesday 17 November, between 9:30 AM and 12:00 PM"
+  }, {
+    "asked" : "after 5 pm",
+    "due" : "2026-11-16T18:00",
+    "from" : "2026-11-16T17:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 5:00 PM and 6:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, between 5:00 PM and 6:00 PM"
+  }, {
+    "asked" : "Saturday morning",
+    "due" : "2026-11-21T12:00",
+    "from" : "2026-11-21T09:30",
+    "message" : "A member of our team will call you back on Saturday 21 November, between 9:30 AM and 12:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Saturday 21 November, between 9:30 AM and 12:00 PM"
+  }, {
+    "asked" : "in two hours",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "tomorrow after lunch",
+    "due" : "2026-11-17T18:30",
+    "from" : "2026-11-17T09:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Tuesday 17 November, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "Please call me back at 4 pm.",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4 pm",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4pm",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4 p.m.",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4 P.M.",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "16:00",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "at 4",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4 o'clock",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4 o’clock",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "around 4",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "Good morning, please call me at 4",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "My ref is 4471 and I owe 2,500, call me at 4",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "call me at 4 in the evening",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:00 PM"
+  }, {
+    "asked" : "4.30 pm",
+    "due" : "2026-11-16T16:30",
+    "from" : "2026-11-16T16:30",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:30 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:30 PM"
+  }, {
+    "asked" : "at 4:30",
+    "due" : "2026-11-16T16:30",
+    "from" : "2026-11-16T16:30",
+    "message" : "A member of our team will call you back on Monday 16 November at 4:30 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 4:30 PM"
+  }, {
+    "asked" : "tomorrow at 10:30 am",
+    "due" : "2026-11-17T10:30",
+    "from" : "2026-11-17T10:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 10:30 AM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Tuesday 17 November, 10:30 AM"
+  }, {
+    "asked" : "noon tomorrow",
+    "due" : "2026-11-17T12:00",
+    "from" : "2026-11-17T12:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 12:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Tuesday 17 November, 12:00 PM"
+  }, {
+    "asked" : "day after tomorrow at 3 pm",
+    "due" : "2026-11-18T15:00",
+    "from" : "2026-11-18T15:00",
+    "message" : "A member of our team will call you back on Wednesday 18 November at 3:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Wednesday 18 November, 3:00 PM"
+  }, {
+    "asked" : "Wednesday at 11",
+    "due" : "2026-11-18T11:00",
+    "from" : "2026-11-18T11:00",
+    "message" : "A member of our team will call you back on Wednesday 18 November at 11:00 AM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Wednesday 18 November, 11:00 AM"
+  }, {
+    "asked" : "next Monday at 11 am",
+    "due" : "2026-11-23T11:00",
+    "from" : "2026-11-23T11:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 11:00 AM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 23 November, 11:00 AM"
+  }, {
+    "asked" : "in 2 hours",
+    "due" : "2026-11-16T13:50",
+    "from" : "2026-11-16T13:50",
+    "message" : "A member of our team will call you back on Monday 16 November at 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "in an hour and a half",
+    "due" : "2026-11-16T13:20",
+    "from" : "2026-11-16T13:20",
+    "message" : "A member of our team will call you back on Monday 16 November at 1:20 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:20 PM"
+  }, {
+    "asked" : "after half an hour",
+    "due" : "2026-11-16T12:20",
+    "from" : "2026-11-16T12:20",
+    "message" : "A member of our team will call you back on Monday 16 November at 12:20 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 12:20 PM"
+  }, {
+    "asked" : "in 40 minutes",
+    "due" : "2026-11-16T12:30",
+    "from" : "2026-11-16T12:30",
+    "message" : "A member of our team will call you back on Monday 16 November at 12:30 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 12:30 PM"
+  }, {
+    "asked" : "call me at 10",
+    "due" : "2026-11-17T10:00",
+    "from" : "2026-11-17T10:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 10:00 AM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Tuesday 17 November, 10:00 AM"
+  }, {
+    "asked" : "today at 10",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "in the evening",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 6:30 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, between 4:00 PM and 6:30 PM"
+  }, {
+    "asked" : "after 5",
+    "due" : "2026-11-16T18:00",
+    "from" : "2026-11-16T17:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 5:00 PM and 6:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, between 5:00 PM and 6:00 PM"
+  }, {
+    "asked" : "between 4 and 5 pm",
+    "due" : "2026-11-16T17:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "4-5 pm",
+    "due" : "2026-11-16T17:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "4 to 5 pm",
+    "due" : "2026-11-16T17:00",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "tomorrow between 11 and 1 pm",
+    "due" : "2026-11-17T13:00",
+    "from" : "2026-11-17T11:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 11:00 AM and 1:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Tuesday 17 November, between 11:00 AM and 1:00 PM"
+  }, {
+    "asked" : "from 10 to 12",
+    "due" : "2026-11-17T12:00",
+    "from" : "2026-11-17T10:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 10:00 AM and 12:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Tuesday 17 November, between 10:00 AM and 12:00 PM"
+  }, {
+    "asked" : "tomorrow",
+    "due" : "2026-11-17T18:30",
+    "from" : "2026-11-17T09:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Tuesday 17 November, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "this morning",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "this afternoon",
+    "due" : "2026-11-16T16:00",
+    "from" : "2026-11-16T12:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 12:00 PM and 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, between 12:00 PM and 4:00 PM"
+  }, {
+    "asked" : "before 3 pm",
+    "due" : "2026-11-16T15:00",
+    "from" : "2026-11-16T11:50",
+    "message" : "A member of our team will call you back by Monday 16 November, 3:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 3:00 PM"
+  }, {
+    "asked" : "by 5",
+    "due" : "2026-11-16T17:00",
+    "from" : "2026-11-16T11:50",
+    "message" : "A member of our team will call you back by Monday 16 November, 5:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 5:00 PM"
+  }, {
+    "asked" : "until 6",
+    "due" : "2026-11-16T18:00",
+    "from" : "2026-11-16T11:50",
+    "message" : "A member of our team will call you back by Monday 16 November, 6:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 6:00 PM"
+  }, {
+    "asked" : "within 2 hours",
+    "due" : "2026-11-16T13:50",
+    "from" : "2026-11-16T11:50",
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "in the morning",
+    "due" : "2026-11-17T12:00",
+    "from" : "2026-11-17T09:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 9:30 AM and 12:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Tuesday 17 November, between 9:30 AM and 12:00 PM"
+  }, {
+    "asked" : "at 8 pm",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "tonight",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "Sunday at 4",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "after 7 pm",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "before 9",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "in 9 hours",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "soon",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "later",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "whenever",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "next week",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "on the 20th",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "not tomorrow, call me on Wednesday",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "I'm busy at 4",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "don't call at 4, call at 5",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "dont call me tomorrow",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "tomorrow or Wednesday",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "at 4 or at 5",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "in the morning or the evening",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "in 10 minutes",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "today",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "between 5 and 3 pm",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "at 25",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "13 pm",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "at 4:75",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "I owe 12.50",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "sometime in the next 2 days",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "Monday evening",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T16:00",
+    "message" : "A member of our team will call you back on Monday 16 November, between 4:00 PM and 6:30 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, between 4:00 PM and 6:30 PM"
+  }, {
+    "asked" : "next friday afternoon",
+    "due" : "2026-11-20T16:00",
+    "from" : "2026-11-20T12:00",
+    "message" : "A member of our team will call you back on Friday 20 November, between 12:00 PM and 4:00 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Friday 20 November, between 12:00 PM and 4:00 PM"
+  }, {
+    "asked" : "at 12",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "at 9",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "tomorrow night",
+    "due" : "2026-11-16T13:50",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 16 November, 1:50 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:50 PM"
+  }, {
+    "asked" : "after 6:15 pm",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T18:15",
+    "message" : "A member of our team will call you back on Monday 16 November, between 6:15 PM and 6:30 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, between 6:15 PM and 6:30 PM"
+  }, {
+    "asked" : "around 5.45",
+    "due" : "2026-11-16T17:45",
+    "from" : "2026-11-16T17:45",
+    "message" : "A member of our team will call you back on Monday 16 November at 5:45 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 5:45 PM"
+  }, {
+    "asked" : "in 1.5 hours",
+    "due" : "2026-11-16T13:20",
+    "from" : "2026-11-16T13:20",
+    "message" : "A member of our team will call you back on Monday 16 November at 1:20 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Monday 16 November, 1:20 PM"
+  }, {
+    "asked" : "day after tomorow",
+    "due" : "2026-11-18T18:30",
+    "from" : "2026-11-18T09:30",
+    "message" : "A member of our team will call you back on Wednesday 18 November, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-11-16T11:50",
+    "slot" : "Wednesday 18 November, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "this evening",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T17:40",
+    "message" : "A member of our team will call you back by Monday 16 November, 6:30 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Monday 16 November, 6:30 PM"
+  }, {
+    "asked" : "tomorrow morning",
+    "due" : "2026-11-17T12:00",
+    "from" : "2026-11-17T09:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 9:30 AM and 12:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, between 9:30 AM and 12:00 PM"
+  }, {
+    "asked" : "after 5 pm",
+    "due" : "2026-11-16T18:00",
+    "from" : "2026-11-16T17:40",
+    "message" : "A member of our team will call you back by Monday 16 November, 6:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Monday 16 November, 6:00 PM"
+  }, {
+    "asked" : "Saturday morning",
+    "due" : "2026-11-21T12:00",
+    "from" : "2026-11-21T09:30",
+    "message" : "A member of our team will call you back on Saturday 21 November, between 9:30 AM and 12:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Saturday 21 November, between 9:30 AM and 12:00 PM"
+  }, {
+    "asked" : "in two hours",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "tomorrow after lunch",
+    "due" : "2026-11-17T18:30",
+    "from" : "2026-11-17T09:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "Please call me back at 4 pm.",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "4 pm",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "4pm",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "4 p.m.",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "4 P.M.",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "16:00",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "at 4",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "4 o'clock",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "4 o’clock",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "around 4",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "Good morning, please call me at 4",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "My ref is 4471 and I owe 2,500, call me at 4",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "call me at 4 in the evening",
+    "due" : "2026-11-17T16:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:00 PM"
+  }, {
+    "asked" : "4.30 pm",
+    "due" : "2026-11-17T16:30",
+    "from" : "2026-11-17T16:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:30 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:30 PM"
+  }, {
+    "asked" : "at 4:30",
+    "due" : "2026-11-17T16:30",
+    "from" : "2026-11-17T16:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 4:30 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 4:30 PM"
+  }, {
+    "asked" : "tomorrow at 10:30 am",
+    "due" : "2026-11-17T10:30",
+    "from" : "2026-11-17T10:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 10:30 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:30 AM"
+  }, {
+    "asked" : "noon tomorrow",
+    "due" : "2026-11-17T12:00",
+    "from" : "2026-11-17T12:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 12:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 12:00 PM"
+  }, {
+    "asked" : "day after tomorrow at 3 pm",
+    "due" : "2026-11-18T15:00",
+    "from" : "2026-11-18T15:00",
+    "message" : "A member of our team will call you back on Wednesday 18 November at 3:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Wednesday 18 November, 3:00 PM"
+  }, {
+    "asked" : "Wednesday at 11",
+    "due" : "2026-11-18T11:00",
+    "from" : "2026-11-18T11:00",
+    "message" : "A member of our team will call you back on Wednesday 18 November at 11:00 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Wednesday 18 November, 11:00 AM"
+  }, {
+    "asked" : "next Monday at 11 am",
+    "due" : "2026-11-23T11:00",
+    "from" : "2026-11-23T11:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 11:00 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Monday 23 November, 11:00 AM"
+  }, {
+    "asked" : "in 2 hours",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "in an hour and a half",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "after half an hour",
+    "due" : "2026-11-16T18:10",
+    "from" : "2026-11-16T18:10",
+    "message" : "A member of our team will call you back on Monday 16 November at 6:10 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Monday 16 November, 6:10 PM"
+  }, {
+    "asked" : "in 40 minutes",
+    "due" : "2026-11-16T18:20",
+    "from" : "2026-11-16T18:20",
+    "message" : "A member of our team will call you back on Monday 16 November at 6:20 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Monday 16 November, 6:20 PM"
+  }, {
+    "asked" : "call me at 10",
+    "due" : "2026-11-17T10:00",
+    "from" : "2026-11-17T10:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 10:00 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:00 AM"
+  }, {
+    "asked" : "today at 10",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "in the evening",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T17:40",
+    "message" : "A member of our team will call you back by Monday 16 November, 6:30 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Monday 16 November, 6:30 PM"
+  }, {
+    "asked" : "after 5",
+    "due" : "2026-11-16T18:00",
+    "from" : "2026-11-16T17:40",
+    "message" : "A member of our team will call you back by Monday 16 November, 6:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Monday 16 November, 6:00 PM"
+  }, {
+    "asked" : "between 4 and 5 pm",
+    "due" : "2026-11-17T17:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "4-5 pm",
+    "due" : "2026-11-17T17:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "4 to 5 pm",
+    "due" : "2026-11-17T17:00",
+    "from" : "2026-11-17T16:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "tomorrow between 11 and 1 pm",
+    "due" : "2026-11-17T13:00",
+    "from" : "2026-11-17T11:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 11:00 AM and 1:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, between 11:00 AM and 1:00 PM"
+  }, {
+    "asked" : "from 10 to 12",
+    "due" : "2026-11-17T12:00",
+    "from" : "2026-11-17T10:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 10:00 AM and 12:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, between 10:00 AM and 12:00 PM"
+  }, {
+    "asked" : "tomorrow",
+    "due" : "2026-11-17T18:30",
+    "from" : "2026-11-17T09:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "this morning",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "this afternoon",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "before 3 pm",
+    "due" : "2026-11-17T15:00",
+    "from" : "2026-11-16T17:40",
+    "message" : "A member of our team will call you back by Tuesday 17 November, 3:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 3:00 PM"
+  }, {
+    "asked" : "by 5",
+    "due" : "2026-11-17T17:00",
+    "from" : "2026-11-16T17:40",
+    "message" : "A member of our team will call you back by Tuesday 17 November, 5:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 5:00 PM"
+  }, {
+    "asked" : "until 6",
+    "due" : "2026-11-16T18:00",
+    "from" : "2026-11-16T17:40",
+    "message" : "A member of our team will call you back by Monday 16 November, 6:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Monday 16 November, 6:00 PM"
+  }, {
+    "asked" : "within 2 hours",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "in the morning",
+    "due" : "2026-11-17T12:00",
+    "from" : "2026-11-17T09:30",
+    "message" : "A member of our team will call you back on Tuesday 17 November, between 9:30 AM and 12:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, between 9:30 AM and 12:00 PM"
+  }, {
+    "asked" : "at 8 pm",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "tonight",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "Sunday at 4",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "after 7 pm",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "before 9",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "in 9 hours",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "soon",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "later",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "whenever",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "next week",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "on the 20th",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "not tomorrow, call me on Wednesday",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "I'm busy at 4",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "don't call at 4, call at 5",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "dont call me tomorrow",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "tomorrow or Wednesday",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "at 4 or at 5",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "in the morning or the evening",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "in 10 minutes",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "today",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "between 5 and 3 pm",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "at 25",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "13 pm",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "at 4:75",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "I owe 12.50",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "sometime in the next 2 days",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "Monday evening",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T17:40",
+    "message" : "A member of our team will call you back by Monday 16 November, 6:30 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Monday 16 November, 6:30 PM"
+  }, {
+    "asked" : "next friday afternoon",
+    "due" : "2026-11-20T16:00",
+    "from" : "2026-11-20T12:00",
+    "message" : "A member of our team will call you back on Friday 20 November, between 12:00 PM and 4:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Friday 20 November, between 12:00 PM and 4:00 PM"
+  }, {
+    "asked" : "at 12",
+    "due" : "2026-11-17T12:00",
+    "from" : "2026-11-17T12:00",
+    "message" : "A member of our team will call you back on Tuesday 17 November at 12:00 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 12:00 PM"
+  }, {
+    "asked" : "at 9",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "tomorrow night",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "after 6:15 pm",
+    "due" : "2026-11-16T18:30",
+    "from" : "2026-11-16T18:15",
+    "message" : "A member of our team will call you back on Monday 16 November, between 6:15 PM and 6:30 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Monday 16 November, between 6:15 PM and 6:30 PM"
+  }, {
+    "asked" : "around 5.45",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "A member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "in 1.5 hours",
+    "due" : "2026-11-17T10:40",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Tuesday 17 November, 10:40 AM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Tuesday 17 November, 10:40 AM"
+  }, {
+    "asked" : "day after tomorow",
+    "due" : "2026-11-18T18:30",
+    "from" : "2026-11-18T09:30",
+    "message" : "A member of our team will call you back on Wednesday 18 November, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-11-16T17:40",
+    "slot" : "Wednesday 18 November, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "this evening",
+    "due" : "2026-11-21T18:30",
+    "from" : "2026-11-21T17:00",
+    "message" : "A member of our team will call you back by Saturday 21 November, 6:30 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Saturday 21 November, 6:30 PM"
+  }, {
+    "asked" : "tomorrow morning",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "after 5 pm",
+    "due" : "2026-11-21T18:00",
+    "from" : "2026-11-21T17:00",
+    "message" : "A member of our team will call you back by Saturday 21 November, 6:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Saturday 21 November, 6:00 PM"
+  }, {
+    "asked" : "Saturday morning",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "in two hours",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "tomorrow after lunch",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "Please call me back at 4 pm.",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "4 pm",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "4pm",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "4 p.m.",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "4 P.M.",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "16:00",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "at 4",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "4 o'clock",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "4 o’clock",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "around 4",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "Good morning, please call me at 4",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "My ref is 4471 and I owe 2,500, call me at 4",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "call me at 4 in the evening",
+    "due" : "2026-11-23T16:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:00 PM"
+  }, {
+    "asked" : "4.30 pm",
+    "due" : "2026-11-23T16:30",
+    "from" : "2026-11-23T16:30",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:30 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:30 PM"
+  }, {
+    "asked" : "at 4:30",
+    "due" : "2026-11-23T16:30",
+    "from" : "2026-11-23T16:30",
+    "message" : "A member of our team will call you back on Monday 23 November at 4:30 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 4:30 PM"
+  }, {
+    "asked" : "tomorrow at 10:30 am",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "noon tomorrow",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "day after tomorrow at 3 pm",
+    "due" : "2026-11-23T15:00",
+    "from" : "2026-11-23T15:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 3:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 3:00 PM"
+  }, {
+    "asked" : "Wednesday at 11",
+    "due" : "2026-11-25T11:00",
+    "from" : "2026-11-25T11:00",
+    "message" : "A member of our team will call you back on Wednesday 25 November at 11:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Wednesday 25 November, 11:00 AM"
+  }, {
+    "asked" : "next Monday at 11 am",
+    "due" : "2026-11-23T11:00",
+    "from" : "2026-11-23T11:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 11:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 11:00 AM"
+  }, {
+    "asked" : "in 2 hours",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "in an hour and a half",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "after half an hour",
+    "due" : "2026-11-21T17:30",
+    "from" : "2026-11-21T17:30",
+    "message" : "A member of our team will call you back on Saturday 21 November at 5:30 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Saturday 21 November, 5:30 PM"
+  }, {
+    "asked" : "in 40 minutes",
+    "due" : "2026-11-21T17:40",
+    "from" : "2026-11-21T17:40",
+    "message" : "A member of our team will call you back on Saturday 21 November at 5:40 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Saturday 21 November, 5:40 PM"
+  }, {
+    "asked" : "call me at 10",
+    "due" : "2026-11-23T10:00",
+    "from" : "2026-11-23T10:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "today at 10",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "in the evening",
+    "due" : "2026-11-21T18:30",
+    "from" : "2026-11-21T17:00",
+    "message" : "A member of our team will call you back by Saturday 21 November, 6:30 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Saturday 21 November, 6:30 PM"
+  }, {
+    "asked" : "after 5",
+    "due" : "2026-11-21T18:00",
+    "from" : "2026-11-21T17:00",
+    "message" : "A member of our team will call you back by Saturday 21 November, 6:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Saturday 21 November, 6:00 PM"
+  }, {
+    "asked" : "between 4 and 5 pm",
+    "due" : "2026-11-23T17:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "4-5 pm",
+    "due" : "2026-11-23T17:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "4 to 5 pm",
+    "due" : "2026-11-23T17:00",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "tomorrow between 11 and 1 pm",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "from 10 to 12",
+    "due" : "2026-11-23T12:00",
+    "from" : "2026-11-23T10:00",
+    "message" : "A member of our team will call you back on Monday 23 November, between 10:00 AM and 12:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, between 10:00 AM and 12:00 PM"
+  }, {
+    "asked" : "tomorrow",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "this morning",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "this afternoon",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "before 3 pm",
+    "due" : "2026-11-23T15:00",
+    "from" : "2026-11-21T17:00",
+    "message" : "A member of our team will call you back by Monday 23 November, 3:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 3:00 PM"
+  }, {
+    "asked" : "by 5",
+    "due" : "2026-11-23T17:00",
+    "from" : "2026-11-21T17:00",
+    "message" : "A member of our team will call you back by Monday 23 November, 5:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 5:00 PM"
+  }, {
+    "asked" : "until 6",
+    "due" : "2026-11-21T18:00",
+    "from" : "2026-11-21T17:00",
+    "message" : "A member of our team will call you back by Saturday 21 November, 6:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Saturday 21 November, 6:00 PM"
+  }, {
+    "asked" : "within 2 hours",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "in the morning",
+    "due" : "2026-11-23T12:00",
+    "from" : "2026-11-23T09:30",
+    "message" : "A member of our team will call you back on Monday 23 November, between 9:30 AM and 12:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, between 9:30 AM and 12:00 PM"
+  }, {
+    "asked" : "at 8 pm",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "tonight",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "Sunday at 4",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "after 7 pm",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "before 9",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "in 9 hours",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "soon",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "later",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "whenever",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "next week",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "on the 20th",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "not tomorrow, call me on Wednesday",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "I'm busy at 4",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "don't call at 4, call at 5",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "dont call me tomorrow",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "tomorrow or Wednesday",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "at 4 or at 5",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "in the morning or the evening",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "in 10 minutes",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "today",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "between 5 and 3 pm",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "at 25",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "13 pm",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "at 4:75",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "I owe 12.50",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "sometime in the next 2 days",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "Monday evening",
+    "due" : "2026-11-23T18:30",
+    "from" : "2026-11-23T16:00",
+    "message" : "A member of our team will call you back on Monday 23 November, between 4:00 PM and 6:30 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, between 4:00 PM and 6:30 PM"
+  }, {
+    "asked" : "next friday afternoon",
+    "due" : "2026-11-27T16:00",
+    "from" : "2026-11-27T12:00",
+    "message" : "A member of our team will call you back on Friday 27 November, between 12:00 PM and 4:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Friday 27 November, between 12:00 PM and 4:00 PM"
+  }, {
+    "asked" : "at 12",
+    "due" : "2026-11-23T12:00",
+    "from" : "2026-11-23T12:00",
+    "message" : "A member of our team will call you back on Monday 23 November at 12:00 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 12:00 PM"
+  }, {
+    "asked" : "at 9",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "tomorrow night",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "after 6:15 pm",
+    "due" : "2026-11-21T18:30",
+    "from" : "2026-11-21T18:15",
+    "message" : "A member of our team will call you back on Saturday 21 November, between 6:15 PM and 6:30 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Saturday 21 November, between 6:15 PM and 6:30 PM"
+  }, {
+    "asked" : "around 5.45",
+    "due" : "2026-11-21T17:45",
+    "from" : "2026-11-21T17:45",
+    "message" : "A member of our team will call you back on Saturday 21 November at 5:45 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Saturday 21 November, 5:45 PM"
+  }, {
+    "asked" : "in 1.5 hours",
+    "due" : "2026-11-23T10:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Monday 23 November, 10:00 AM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, 10:00 AM"
+  }, {
+    "asked" : "day after tomorow",
+    "due" : "2026-11-23T18:30",
+    "from" : "2026-11-23T09:30",
+    "message" : "A member of our team will call you back on Monday 23 November, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-11-21T17:00",
+    "slot" : "Monday 23 November, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "this evening",
+    "due" : "2026-10-14T18:30",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October, between 4:00 PM and 6:30 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, between 4:00 PM and 6:30 PM"
+  }, {
+    "asked" : "tomorrow morning",
+    "due" : "2026-10-15T12:00",
+    "from" : "2026-10-15T09:30",
+    "message" : "A member of our team will call you back on Thursday 15 October, between 9:30 AM and 12:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Thursday 15 October, between 9:30 AM and 12:00 PM"
+  }, {
+    "asked" : "after 5 pm",
+    "due" : "2026-10-14T18:00",
+    "from" : "2026-10-14T17:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October, between 5:00 PM and 6:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, between 5:00 PM and 6:00 PM"
+  }, {
+    "asked" : "Saturday morning",
+    "due" : "2026-10-17T12:00",
+    "from" : "2026-10-17T09:30",
+    "message" : "A member of our team will call you back on Saturday 17 October, between 9:30 AM and 12:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Saturday 17 October, between 9:30 AM and 12:00 PM"
+  }, {
+    "asked" : "in two hours",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "tomorrow after lunch",
+    "due" : "2026-10-15T18:30",
+    "from" : "2026-10-15T09:30",
+    "message" : "A member of our team will call you back on Thursday 15 October, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Thursday 15 October, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "Please call me back at 4 pm.",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "4 pm",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "4pm",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "4 p.m.",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "4 P.M.",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "16:00",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "at 4",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "4 o'clock",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "4 o’clock",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "around 4",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "Good morning, please call me at 4",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "My ref is 4471 and I owe 2,500, call me at 4",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "call me at 4 in the evening",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:00 PM"
+  }, {
+    "asked" : "4.30 pm",
+    "due" : "2026-10-14T16:30",
+    "from" : "2026-10-14T16:30",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:30 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:30 PM"
+  }, {
+    "asked" : "at 4:30",
+    "due" : "2026-10-14T16:30",
+    "from" : "2026-10-14T16:30",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 4:30 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 4:30 PM"
+  }, {
+    "asked" : "tomorrow at 10:30 am",
+    "due" : "2026-10-15T10:30",
+    "from" : "2026-10-15T10:30",
+    "message" : "A member of our team will call you back on Thursday 15 October at 10:30 AM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Thursday 15 October, 10:30 AM"
+  }, {
+    "asked" : "noon tomorrow",
+    "due" : "2026-10-15T12:00",
+    "from" : "2026-10-15T12:00",
+    "message" : "A member of our team will call you back on Thursday 15 October at 12:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Thursday 15 October, 12:00 PM"
+  }, {
+    "asked" : "day after tomorrow at 3 pm",
+    "due" : "2026-10-16T15:00",
+    "from" : "2026-10-16T15:00",
+    "message" : "A member of our team will call you back on Friday 16 October at 3:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Friday 16 October, 3:00 PM"
+  }, {
+    "asked" : "Wednesday at 11",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "next Monday at 11 am",
+    "due" : "2026-10-19T11:00",
+    "from" : "2026-10-19T11:00",
+    "message" : "A member of our team will call you back on Monday 19 October at 11:00 AM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Monday 19 October, 11:00 AM"
+  }, {
+    "asked" : "in 2 hours",
+    "due" : "2026-10-14T13:00",
+    "from" : "2026-10-14T13:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "in an hour and a half",
+    "due" : "2026-10-14T12:30",
+    "from" : "2026-10-14T12:30",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 12:30 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 12:30 PM"
+  }, {
+    "asked" : "after half an hour",
+    "due" : "2026-10-14T11:30",
+    "from" : "2026-10-14T11:30",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 11:30 AM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 11:30 AM"
+  }, {
+    "asked" : "in 40 minutes",
+    "due" : "2026-10-14T11:40",
+    "from" : "2026-10-14T11:40",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 11:40 AM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 11:40 AM"
+  }, {
+    "asked" : "call me at 10",
+    "due" : "2026-10-15T10:00",
+    "from" : "2026-10-15T10:00",
+    "message" : "A member of our team will call you back on Thursday 15 October at 10:00 AM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Thursday 15 October, 10:00 AM"
+  }, {
+    "asked" : "today at 10",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "in the evening",
+    "due" : "2026-10-14T18:30",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October, between 4:00 PM and 6:30 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, between 4:00 PM and 6:30 PM"
+  }, {
+    "asked" : "after 5",
+    "due" : "2026-10-14T18:00",
+    "from" : "2026-10-14T17:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October, between 5:00 PM and 6:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, between 5:00 PM and 6:00 PM"
+  }, {
+    "asked" : "between 4 and 5 pm",
+    "due" : "2026-10-14T17:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "4-5 pm",
+    "due" : "2026-10-14T17:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "4 to 5 pm",
+    "due" : "2026-10-14T17:00",
+    "from" : "2026-10-14T16:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October, between 4:00 PM and 5:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, between 4:00 PM and 5:00 PM"
+  }, {
+    "asked" : "tomorrow between 11 and 1 pm",
+    "due" : "2026-10-15T13:00",
+    "from" : "2026-10-15T11:00",
+    "message" : "A member of our team will call you back on Thursday 15 October, between 11:00 AM and 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Thursday 15 October, between 11:00 AM and 1:00 PM"
+  }, {
+    "asked" : "from 10 to 12",
+    "due" : "2026-10-14T12:00",
+    "from" : "2026-10-14T11:00",
+    "message" : "A member of our team will call you back by Wednesday 14 October, 12:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 12:00 PM"
+  }, {
+    "asked" : "tomorrow",
+    "due" : "2026-10-15T18:30",
+    "from" : "2026-10-15T09:30",
+    "message" : "A member of our team will call you back on Thursday 15 October, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Thursday 15 October, between 9:30 AM and 6:30 PM"
+  }, {
+    "asked" : "this morning",
+    "due" : "2026-10-14T12:00",
+    "from" : "2026-10-14T11:00",
+    "message" : "A member of our team will call you back by Wednesday 14 October, 12:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 12:00 PM"
+  }, {
+    "asked" : "this afternoon",
+    "due" : "2026-10-14T16:00",
+    "from" : "2026-10-14T12:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October, between 12:00 PM and 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, between 12:00 PM and 4:00 PM"
+  }, {
+    "asked" : "before 3 pm",
+    "due" : "2026-10-14T15:00",
+    "from" : "2026-10-14T11:00",
+    "message" : "A member of our team will call you back by Wednesday 14 October, 3:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 3:00 PM"
+  }, {
+    "asked" : "by 5",
+    "due" : "2026-10-14T17:00",
+    "from" : "2026-10-14T11:00",
+    "message" : "A member of our team will call you back by Wednesday 14 October, 5:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 5:00 PM"
+  }, {
+    "asked" : "until 6",
+    "due" : "2026-10-14T18:00",
+    "from" : "2026-10-14T11:00",
+    "message" : "A member of our team will call you back by Wednesday 14 October, 6:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 6:00 PM"
+  }, {
+    "asked" : "within 2 hours",
+    "due" : "2026-10-14T13:00",
+    "from" : "2026-10-14T11:00",
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "in the morning",
+    "due" : "2026-10-14T12:00",
+    "from" : "2026-10-14T11:00",
+    "message" : "A member of our team will call you back by Wednesday 14 October, 12:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 12:00 PM"
+  }, {
+    "asked" : "at 8 pm",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "tonight",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "Sunday at 4",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "after 7 pm",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "before 9",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "in 9 hours",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "soon",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "later",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "whenever",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "next week",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "on the 20th",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "not tomorrow, call me on Wednesday",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "I'm busy at 4",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "don't call at 4, call at 5",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "dont call me tomorrow",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "tomorrow or Wednesday",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "at 4 or at 5",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "in the morning or the evening",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "in 10 minutes",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "today",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "between 5 and 3 pm",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "at 25",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "13 pm",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "at 4:75",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "I owe 12.50",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "sometime in the next 2 days",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "A member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "Monday evening",
+    "due" : "2026-10-19T18:30",
+    "from" : "2026-10-19T16:00",
+    "message" : "A member of our team will call you back on Monday 19 October, between 4:00 PM and 6:30 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Monday 19 October, between 4:00 PM and 6:30 PM"
+  }, {
+    "asked" : "next friday afternoon",
+    "due" : "2026-10-16T16:00",
+    "from" : "2026-10-16T12:00",
+    "message" : "A member of our team will call you back on Friday 16 October, between 12:00 PM and 4:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Friday 16 October, between 12:00 PM and 4:00 PM"
+  }, {
+    "asked" : "at 12",
+    "due" : "2026-10-14T12:00",
+    "from" : "2026-10-14T12:00",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 12:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 12:00 PM"
+  }, {
+    "asked" : "at 9",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "tomorrow night",
+    "due" : "2026-10-14T13:00",
+    "from" : null,
+    "message" : "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our team will call you back by Wednesday 14 October, 1:00 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 1:00 PM"
+  }, {
+    "asked" : "after 6:15 pm",
+    "due" : "2026-10-14T18:30",
+    "from" : "2026-10-14T18:15",
+    "message" : "A member of our team will call you back on Wednesday 14 October, between 6:15 PM and 6:30 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, between 6:15 PM and 6:30 PM"
+  }, {
+    "asked" : "around 5.45",
+    "due" : "2026-10-14T17:45",
+    "from" : "2026-10-14T17:45",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 5:45 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 5:45 PM"
+  }, {
+    "asked" : "in 1.5 hours",
+    "due" : "2026-10-14T12:30",
+    "from" : "2026-10-14T12:30",
+    "message" : "A member of our team will call you back on Wednesday 14 October at 12:30 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Wednesday 14 October, 12:30 PM"
+  }, {
+    "asked" : "day after tomorow",
+    "due" : "2026-10-16T18:30",
+    "from" : "2026-10-16T09:30",
+    "message" : "A member of our team will call you back on Friday 16 October, between 9:30 AM and 6:30 PM.",
+    "now" : "2026-10-14T11:00",
+    "slot" : "Friday 16 October, between 9:30 AM and 6:30 PM"
+  } ],
   "callback_withdrawn_not_after" : "\\b(if|why|unless|whether)\\b",
   "callback_withdrawn_not_before" : "\\b(after|before|at|on|by|until|till|between|from|today|tomorrow|tonight|morning|afternoon|evening|night|week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b|\\d",
   "callback_withdrawn_words" : "no need (to|for) (a |any |the )?call(ing)? (me )?back|no need (to|for) (a |any |the )?call-?back|not (necessary|needed) to call (me )?back|(don'?t|do not) (need (you |anyone |anybody |someone )?to |have to |bother (to )?)?call(ing)? (me )?back|(don'?t|do not) (need|want) (a |any |the |that )?call-?back|no call-? ?back (is )?(needed|required)|cancel (the |my |that |this )?call-? ?back|(forget|never ?mind)( about)? (the |that |my )?call-? ?back",

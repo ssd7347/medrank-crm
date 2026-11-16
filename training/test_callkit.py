@@ -4,11 +4,13 @@
 """
 
 import copy
+import datetime as dt
 import json
 import random
 import unittest
 
-from callkit import (CALLBACK_ASKED, EMPTY_THINK, TOOLS, FieldDef, all_scripts, answer_matches, callback_asked, callback_withdrawn, check,
+from callkit import (CALLBACK_ASKED, EMPTY_THINK, SPEC, TOOLS, FieldDef, all_scripts, answer_matches, callback_asked, callback_promise,
+                     callback_withdrawn, check,
                      identity_habits, new_call, read_tool_call_tags, render_for_training, spoken_amount, tools_in_system, upgrade)
 from scenarios import SCENARIOS, build, for_script
 
@@ -148,6 +150,47 @@ class FakeCrmTest(unittest.TestCase):
         call.run("request_human_handoff", {"reason_code": "CALLER_REQUEST"})
         self.assertNotIn("callback_id", json.loads(call.run("log_call_outcome", {"outcome_code": "CALLBACK_REQUESTED"}))["data"])
         self.assertEqual(call.outcome, "HANDED_OFF")
+
+    def test_call_back_times_are_the_crms(self):
+        # TrainingSpecTest writes what the CRM promises (CallbackTime) for ~80 requests at five moments.
+        examples = SPEC["callback_time_examples"]
+        self.assertGreater(len(examples), 400)
+        for r in examples:
+            p = callback_promise(r["asked"], dt.datetime.fromisoformat(r["now"]))
+            self.assertEqual((p.message(), p.slot, p.due, p.start),
+                             (r["message"], r["slot"], dt.datetime.fromisoformat(r["due"]),
+                              dt.datetime.fromisoformat(r["from"]) if r["from"] else None), (r["now"], r["asked"]))
+
+    def test_the_caller_hears_the_call_back_time_they_asked_for(self):
+        # As VoicePlivoTest.aCallerIsPromisedTheCallBackTimeTheyAskedFor and aCallerWhoChangesTheTime...
+        call = new_call(script("Payment reminder"), random.Random(4))
+        call.clock = dt.datetime(2026, 10, 12, 11, 0)          # Monday 11 AM
+        res = json.loads(call.run("schedule_callback", {"preferred_time_text": "tomorrow morning"}))
+        self.assertEqual(res["say"], "A member of our team will call you back on Tuesday 13 October, between 9:30 AM and 12:00 PM.")
+        self.assertEqual(res["data"]["confirmed_slot"], "Tuesday 13 October, between 9:30 AM and 12:00 PM")
+        first = res["data"]["callback_id"]
+        # The same request said vaguer, or nothing clear: the booked time.
+        for vaguer in ("tomorrow", "later", None):
+            again = json.loads(call.run("schedule_callback", {"preferred_time_text": vaguer}))
+            self.assertEqual(again["say"], res["say"], vaguer)
+        # Outside desk hours: told the hours, then the booked time.
+        late = json.loads(call.run("schedule_callback", {"preferred_time_text": "at 8 pm"}))
+        self.assertEqual(late["say"], "Our team makes calls between 9:30 AM and 6:30 PM, Monday to Saturday, so a member of our "
+                                      "team will call you back on Tuesday 13 October, between 9:30 AM and 12:00 PM.")
+        # A new clear time the booked one does not fit: the same task, moved.
+        moved = json.loads(call.run("schedule_callback", {"preferred_time_text": "actually, make it 5 pm today"}))
+        self.assertEqual(moved["say"], "A member of our team will call you back on Monday 12 October at 5:00 PM.")
+        self.assertEqual(moved["data"], {"callback_id": first, "confirmed_slot": "Monday 12 October, 5:00 PM"})
+        # Nothing readable: the usual two hours.
+        call = new_call(script("Payment reminder"), random.Random(4))
+        call.clock = dt.datetime(2026, 10, 12, 11, 0)
+        self.assertEqual(json.loads(call.run("schedule_callback", {"preferred_time_text": "whenever"}))["say"],
+                         "A member of our team will call you back by Monday 12 October, 1:00 PM.")
+        # The CRM books for a logged outcome with the caller's own words.
+        call = new_call(script("Payment reminder"), random.Random(4))
+        call.clock = dt.datetime(2026, 10, 12, 11, 0)
+        res = json.loads(call.run("log_call_outcome", {"outcome_code": "ACKNOWLEDGED", CALLBACK_ASKED: "can you call me back at 4 pm?"}))
+        self.assertEqual(res["say"], "A member of our team will call you back on Monday 12 October at 4:00 PM.")
 
     def test_a_call_back_the_caller_asked_for_is_booked_with_the_models_outcome_kept(self):
         # As VoiceAgentIntegrationTest.aCallBackTheCallerAskedForIsBookedWithTheModelsOutcomeKept.

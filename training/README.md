@@ -30,7 +30,9 @@ Every call, from any source, goes through `callkit.check()` before it can be tra
 agent shares a private detail before the identity check, repeats an ID or date of birth, says an amount no tool
 returned, uses markdown or more than three sentences, claims to be human, uses a tool wrongly, or ends without
 recording how the call went. `spec/agent-spec.json` holds the live agent's exact rules and tools; the backend test
-`TrainingSpecTest` fails if the code and this file ever differ.
+`TrainingSpecTest` fails if the code and this file ever differ. It also holds the CRM's own call-back promises for
+about 80 requests ("tomorrow morning", "at 4", "after 7 pm"...) at five moments; the fake CRM's copy of that rule
+(`callkit.callback_promise`) is tested against every one, so training calls hear the same times real callers do.
 
 ## Licence: the base model must allow commercial use
 

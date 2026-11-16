@@ -14,6 +14,27 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 16 November 2026: THE TRAINING KIT NOW PROMISES THE CALL-BACK TIME THE CRM DOES (user: "continue the next task")
+
+Left over from the call-back time work (e683f40, 6dc7f7f): the CRM promises the time the caller asked for, but the
+kit's fake CRM still answered every schedule_callback with "A member of our team will call you back by <11 AM + 2 h>",
+so a training caller who asked for "tomorrow morning" heard "by Monday 12 October, 1:00 PM", and the model was taught
+exchanges that real calls never have. Now `callkit.callback_promise` is a line-by-line port of `CallbackTime.promise`
+(and `plus_desk_time` of `HandoffService.plusDeskTime`), and `FakeCrm.t_schedule_callback` does what
+`HandoffService.callback` does: the asked-for time when it can be kept, the desk hours first when it was outside them,
+one task per call, moved by a new clear time the booked one does not fit, otherwise the booked time again. A call-back
+booked for a logged outcome reads "Caller said: <their words>", as `VoiceTools.logOutcome` does. Each call now has one
+"now" (a weekday 11 AM in October, chosen once), so a hand-over and a call-back in the same call agree on the day.
+To keep the port honest, `TrainingSpecTest` writes the CRM's own answer for 83 requests at 5 moments (Monday 11:00,
+11:50, 5:40 PM, Saturday 5 PM, and the kit's October dates) into agent-spec.json (`callback_time_examples`, 415 rows,
+plus `callback_desk_hours`); `test_callkit` checks the port against all 415 (it matched every one first time).
+Test `test_the_caller_hears_the_call_back_time_they_asked_for`: "tomorrow morning" → "on Tuesday 13 October, between
+9:30 AM and 12:00 PM"; vaguer or unclear repeats keep it; "at 8 pm" gets the desk hours then the booked time;
+"actually, make it 5 pm today" moves the same task; "whenever" gets the usual two hours; a logged outcome with "call me
+back at 4 pm" books 4:00 PM. With the old schedule_callback it fails: "by Monday 12 October, 1:00 PM". Backend
+123/123, engine 87, training kit 80. The data already generated (data/, out/) still has the old wording: the next
+`generate.py` run picks this up; nothing else to do now.
+
 # 16 November 2026: "NO NEED TO CALL ME BACK" AFTER BOOKING NOW REACHES THE CALL-BACK (user: "Yes, fix it")
 
 Before: a caller who booked a call-back and then said "no need to call me back" kept the task as if nothing was said,

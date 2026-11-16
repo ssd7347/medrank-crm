@@ -291,6 +291,285 @@ def answer_matches(f: FieldDef, stored: str | None, said: str | None) -> bool:
     return len(v) >= 6 and len(s) == 4 and v.endswith(s)
 
 
+# --------------------------------------------------------------------------------------------- call-back times
+
+# CallbackTime and HandoffService's desk-time maths (the CRM), ported: the time a caller is promised for the time they
+# asked for. Kept honest by TrainingSpecTest's callback_time_examples (the CRM's own answers for ~80 requests at five
+# moments), which test_callkit checks this port against. All times here are naive datetimes in Indian time.
+DESK_OPEN, DESK_CLOSE = (dt.time.fromisoformat(t) for t in SPEC["callback_desk_hours"])
+MIN_NOTICE = dt.timedelta(minutes=15)
+USUAL_WAIT = dt.timedelta(hours=2)
+
+
+def _clock_text(t) -> str:
+    hour = t.hour % 12 or 12
+    return f"{hour}:{t.minute:02d} {'AM' if t.hour < 12 else 'PM'}"
+
+
+def _day_text(d) -> str:
+    return f"{d:%A} {d.day} {d:%B}"
+
+
+@dataclass(frozen=True)
+class CallbackPromise:
+    """CallbackTime.Promise: when follows "will call you back"; slot is the tool's confirmed_slot; note (the desk
+    hours) comes first; start is the start of what the caller asked for, None for the usual time."""
+    due: dt.datetime
+    when: str
+    slot: str
+    note: str | None = None
+    start: dt.datetime | None = None
+
+    def message(self) -> str:
+        promise = "a member of our team will call you back " + self.when + "."
+        return "A" + promise[1:] if self.note is None else self.note + promise
+
+    def asked(self) -> bool:
+        return self.start is not None
+
+    def allows(self, t: dt.datetime) -> bool:
+        return self.start is not None and self.start <= t <= self.due
+
+    def with_note(self, note: str | None) -> "CallbackPromise":
+        return CallbackPromise(self.due, self.when, self.slot, note, self.start)
+
+
+def _by(due: dt.datetime, start: dt.datetime | None = None) -> CallbackPromise:
+    return CallbackPromise(due, "by " + spoken_time(due), spoken_time(due), None, start)
+
+
+def _at(at: dt.datetime) -> CallbackPromise:
+    return CallbackPromise(at, f"on {_day_text(at)} at {_clock_text(at)}", spoken_time(at), None, at)
+
+
+def desk_time(now: dt.datetime, open_: dt.time, close: dt.time) -> dt.datetime:
+    """HandoffService.deskTime: now if the desk is open (Monday to Saturday, desk hours); otherwise its next opening."""
+    if now.weekday() != 6 and open_ <= now.time() < close:
+        return now
+    nxt = dt.datetime.combine(now.date() if now.time() < open_ else now.date() + dt.timedelta(days=1), open_)
+    return nxt + dt.timedelta(days=1) if nxt.weekday() == 6 else nxt
+
+
+def plus_desk_time(now: dt.datetime, allowed: dt.timedelta, open_: dt.time = DESK_OPEN, close: dt.time = DESK_CLOSE) -> dt.datetime:
+    """HandoffService.plusDeskTime: allowed counted in desk time only."""
+    t = desk_time(now, open_, close)
+    if not open_ < close:
+        return t + allowed
+    left = allowed
+    for _ in range(14):
+        closing = dt.datetime.combine(t.date(), close)
+        today = closing - t
+        if left <= today:
+            return t + left
+        left -= today
+        t = desk_time(closing, open_, close)
+    return t + left
+
+
+@dataclass(frozen=True)
+class _Asked:
+    day: dt.date | None
+    start: dt.time | None
+    end: dt.time | None
+    exact: bool
+    by_only: bool
+    within: dt.timedelta | None
+
+
+_WEEKDAYS = "monday|tuesday|wednesday|thursday|friday|saturday|sunday"
+_TOMORROW = "tomorrow|tomorow|tommorow|tommorrow|tmrw|tmr"
+_A = re.ASCII
+_NEGATED = re.compile(r"(?:\b(?:not|never|except|dont|cant|cannot|wont|busy)|n't)\s+(?:\S+\s+){0,3}?"
+                      r"(?:today|" + _TOMORROW + r"|tonight|morning|afternoon|evening|night|" + _WEEKDAYS + r"|\d)", _A)
+_GREETING = re.compile(r"\bgood\s+(?:morning|afternoon|evening|night)\b", _A)
+_DAY_AFTER = re.compile(r"\bday\s+after\s+(?:" + _TOMORROW + r")\b", _A)
+_DAY_WORD = re.compile(r"\b(?:(" + _TOMORROW + r")|(today|tonight)|(next\s+)?(" + _WEEKDAYS + r")s?)\b", _A)
+_THIS_PART = re.compile(r"\bthis\s+(?:morning|afternoon|evening)\b", _A)
+_PART = re.compile(r"\b(morning|afternoon|evening|night|tonight)\b", _A)
+_RELATIVE = re.compile(r"\b(in|after|within)\s+(?:(?:(an?|one|\d{1,2}(?:\.5)?)\s*(?:hours?|hrs?)(\s+and\s+a\s+half)?)|"
+                       r"(half\s+an?\s+hour)|(\d{1,3})\s*(?:minutes?|mins?))\b", _A)
+_T = r"(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm|oclock)?"
+_BETWEEN = re.compile(r"\b(?:between|from)\s+" + _T + r"\s*(?:and|to|till|until|-)\s*" + _T + r"\b", _A)
+_RANGE = re.compile(r"\b" + _T + r"\s*(?:-|to)\s*(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b", _A)
+_TIME_SAID = re.compile(r"(?:\b(at|after|before|by|around|about|till|until|untill)\s+)?"
+                        r"\b(\d{1,2})(?:([:.])(\d{2}))?(?:\s*(am|pm|oclock))?\b(?!\s*(?:hours?|hrs?|minutes?|mins?|days?|%))", _A)
+_WEEKDAY_INDEX = {d: i for i, d in enumerate(_WEEKDAYS.split("|"))}
+
+
+def _clock(h: str, m: str | None, mer: str | None) -> dt.time | None:
+    """CallbackTime.clock: "4 pm" is 16:00; a bare 1 to 7 is the afternoon, 8 to 11 the morning, 12 noon."""
+    hour, minute = int(h), 0 if m is None else int(m)
+    if minute > 59:
+        return None
+    if mer in ("am", "pm"):
+        if hour < 1 or hour > 12:
+            return None
+        hour = hour % 12 + (12 if mer == "pm" else 0)
+    elif hour > 23:
+        return None
+    elif 1 <= hour <= 7:
+        hour += 12
+    return dt.time(hour, minute)
+
+
+def _read_asked(asked: str | None, today: dt.date) -> _Asked | None:
+    """CallbackTime.read: None when the request is missing, unclear, or says two different things."""
+    if asked is None or not asked.strip():
+        return None
+    s = re.sub(r"[\u2018\u2019`]", "'", asked.lower())
+    s = re.sub(r"\ba\.?\s?m\b\.?", "am", s, flags=_A)
+    s = re.sub(r"\bp\.?\s?m\b\.?", "pm", s, flags=_A)
+    s = re.sub(r"\bo'?\s?clock\b|\bbaje\b", "oclock", s, flags=_A)
+    s = " " + re.sub(r"\b(?:12\s*)?noon\b|\bmidday\b", "12:00 pm", s, flags=_A) + " "
+    if _NEGATED.search(s):
+        return None
+    s = _GREETING.sub(" ", s)
+
+    days: dict[dt.date, None] = {}
+    for _ in _DAY_AFTER.finditer(s):
+        days[today + dt.timedelta(days=2)] = None
+    s = _DAY_AFTER.sub(" ", s)
+    if _THIS_PART.search(s):
+        days[today] = None
+    for m in _DAY_WORD.finditer(s):
+        if m.group(1) is not None:
+            days[today + dt.timedelta(days=1)] = None
+        elif m.group(2) is not None:
+            days[today] = None
+        else:
+            ahead = (_WEEKDAY_INDEX[m.group(4)] - today.weekday()) % 7
+            if ahead == 0 and m.group(3) is not None:
+                ahead = 7                                   # "next Monday" on a Monday: a week on
+            days[today + dt.timedelta(days=ahead)] = None
+    if len(days) > 1:
+        return None
+    day = next(iter(days), None)
+
+    within, by_only, relatives = None, False, 0
+    for m in _RELATIVE.finditer(s):
+        relatives += 1
+        by_only = m.group(1) == "within"
+        if m.group(4) is not None:
+            within = dt.timedelta(minutes=30)
+        elif m.group(5) is not None:
+            within = dt.timedelta(minutes=int(m.group(5)))
+        else:
+            n = m.group(2)
+            hours = 1.0 if n.startswith("a") or n == "one" else float(n)
+            within = dt.timedelta(minutes=int(hours * 60 + 0.5) + (30 if m.group(3) is not None else 0))
+    s = _RELATIVE.sub(" ", s)
+
+    windows: list[tuple[dt.time, dt.time]] = []
+    for rng_ in (_BETWEEN, _RANGE):
+        for m in rng_.finditer(s):
+            b = _clock(m.group(4), m.group(5), m.group(6))
+            a = _clock(m.group(1), m.group(2), m.group(3) if m.group(3) is not None else m.group(6))
+            if a is not None and b is not None and m.group(3) is None and a > b and a.hour >= 12:
+                a = a.replace(hour=a.hour - 12)                # "between 11 and 1 pm": 11 in the morning
+                if a.hour < 8:
+                    return None                                # "between 5 and 3 pm": not 5 in the morning
+            if a is None or b is None or not a < b:
+                return None
+            windows.append((a, b))
+        s = rng_.sub(" ", s)
+
+    times: list[_Asked] = []
+    for m in _TIME_SAID.finditer(s):
+        cue, sep, mer = m.group(1), m.group(3), m.group(5)
+        if cue is None and mer is None and sep != ":":
+            continue                                           # a bare number is not a time
+        t = _clock(m.group(2), m.group(4), mer)
+        if t is None:
+            return None
+        cue = cue or "at"
+        if cue in ("before", "by", "till", "until", "untill"):
+            times.append(_Asked(day, None, t, False, True, None))
+        elif cue == "after":
+            times.append(_Asked(day, t, dt.time.max if t.hour == 23 else t.replace(hour=t.hour + 1), False, False, None))
+        else:
+            times.append(_Asked(day, t, t, True, False, None))
+
+    parts = list(dict.fromkeys("night" if m.group(1) == "tonight" else m.group(1) for m in _PART.finditer(s)))
+
+    if relatives > 0:
+        return (_Asked(None, None, None, False, by_only, within)
+                if relatives == 1 and day is None and not windows and not times and not parts else None)
+    if len(windows) + len(times) > 1:
+        return None
+    if windows:
+        return _Asked(day, windows[0][0], windows[0][1], False, False, None)
+    if times:
+        return times[0]
+    if len(parts) == 1:
+        lo, hi = {"morning": (6, 12), "afternoon": (12, 16), "evening": (16, 19)}.get(parts[0], (19, 22))
+        return _Asked(day, dt.time(lo), dt.time(hi), False, False, None)
+    if day is not None and day > today:
+        return _Asked(day, dt.time.min, dt.time.max, False, False, None)    # "tomorrow": any time that day
+    return None
+
+
+def _round_up(at: dt.datetime) -> dt.datetime:
+    z = at.replace(second=0, microsecond=0)
+    over = z.minute % 5
+    return z if over == 0 and z == at else z + dt.timedelta(minutes=5 - over)
+
+
+def _in_hours(at: dt.datetime, open_: dt.time, close: dt.time) -> bool:
+    return at.weekday() != 6 and open_ <= at.time() < close
+
+
+def _next_working_day(day: dt.date) -> dt.date:
+    nxt = day + dt.timedelta(days=1)
+    return nxt + dt.timedelta(days=1) if nxt.weekday() == 6 else nxt
+
+
+def callback_promise(asked: str | None, now: dt.datetime, open_: dt.time = DESK_OPEN, close: dt.time = DESK_CLOSE,
+                     fallback: dt.datetime | None = None) -> CallbackPromise:
+    """CallbackTime.promise: the time asked for when it is clear and can be kept, otherwise the usual "by" time
+    (fallback; by default two hours of desk time), told the desk hours first when the request was outside them."""
+    if fallback is None:
+        fallback = plus_desk_time(now, USUAL_WAIT, open_, close)
+    a = _read_asked(asked, now.date())
+    if a is None:
+        return _by(fallback)
+    outside = CallbackPromise(fallback, "by " + spoken_time(fallback), spoken_time(fallback),
+                              f"Our team makes calls between {_clock_text(open_)} and {_clock_text(close)}, Monday to Saturday, so ")
+    if a.within is not None:
+        at = _round_up(now + a.within)
+        if a.within < MIN_NOTICE:
+            return _by(fallback)
+        if not _in_hours(at, open_, close):
+            return outside
+        return _by(at, now) if a.by_only else _at(at)
+    day = a.day if a.day is not None else now.date()
+    for tries in range(2):
+        if day.weekday() == 6:
+            return outside
+        if a.exact:
+            if a.start < open_ or not a.start < close:
+                return outside
+            at = dt.datetime.combine(day, a.start)
+            if at < now and a.day is None and tries == 0:
+                day = _next_working_day(day)
+                continue
+            return _by(fallback) if at < now + MIN_NOTICE else _at(at)
+        lo = open_ if a.start is None or a.start < open_ else a.start
+        hi = close if a.end > close else a.end
+        if dt.datetime.combine(day, hi) - dt.datetime.combine(day, lo) < MIN_NOTICE:
+            return outside
+        start, end = dt.datetime.combine(day, lo), dt.datetime.combine(day, hi)
+        if end < now + MIN_NOTICE:
+            if a.day is None and tries == 0:
+                day = _next_working_day(day)
+                continue
+            return _by(fallback)
+        if a.by_only or not start > now:
+            return _by(end, now)
+        slot = f"{_day_text(day)}, between {_clock_text(lo)} and {_clock_text(hi)}"
+        return CallbackPromise(end, "on " + slot, slot, None, start)
+    return _by(fallback)
+
+
 @dataclass
 class FakeCrm:
     """One call's view of the CRM: the contact, the company's answers and what has happened so far."""
@@ -314,7 +593,8 @@ class FakeCrm:
     name_asks: int = 0                                           # identity checks with only part of the name
     thinking: int = 0              # replies with hidden reasoning (removed before speaking, but they cost time)
     upgrades: list[dict] = field(default_factory=list)   # call-backs / hand-overs the CRM made urgent (upgrade())
-    callback: tuple[int, str] | None = None              # this call's booked call-back: (id, slot)
+    callback: tuple[int, CallbackPromise] | None = None  # this call's booked call-back: (id, what was promised)
+    clock: dt.datetime | None = None                     # "now" for this call (chosen on first use)
 
     # ---- context and prompt
 
@@ -370,9 +650,14 @@ class FakeCrm:
             self.settled = True
         return out
 
+    def _now(self) -> dt.datetime:
+        """A weekday morning in October 2026, the same all through the call."""
+        if self.clock is None:
+            self.clock = dt.datetime(2026, 10, 12, 11, 0) + dt.timedelta(days=self.rng.randint(0, 2))
+        return self.clock
+
     def _callback_slot(self, minutes: int) -> str:
-        base = dt.datetime(2026, 10, 12, 11, 0) + dt.timedelta(days=self.rng.randint(0, 2), minutes=minutes)
-        return spoken_time(base)
+        return spoken_time(self._now() + dt.timedelta(minutes=minutes))
 
     def t_get_call_context(self, args):
         c = self.context()
@@ -461,12 +746,20 @@ class FakeCrm:
     def t_schedule_callback(self, args):
         if self.outcome is None:
             self.outcome = "CALLBACK_REQUESTED"
-        # As HandoffService.callback: booking twice in one call makes one task.
+        # As HandoffService.callback: the caller is promised the time they asked for when it can be kept
+        # (callback_promise). Booking twice in one call makes one task; a new clear time the booked one does not fit
+        # moves it, anything else keeps the booked time (after the desk hours, if they asked outside them).
+        asked = str(args.get("preferred_time_text") or "").strip() or None
+        promise = callback_promise(asked, self._now())
         if self.callback is None:
-            self.callback = (self.rng.randint(100, 999), self._callback_slot(120))
-        cb_id, slot = self.callback
-        return result_json(True, {"callback_id": cb_id, "confirmed_slot": slot},
-                           "A member of our team will call you back by " + slot + ".")
+            self.callback = (self.rng.randint(100, 999), promise)
+        else:
+            cb_id, booked = self.callback
+            if promise.asked() and not promise.allows(booked.due):
+                self.callback = (cb_id, promise)
+            else:
+                promise = booked if promise.note is None else booked.with_note(promise.note)
+        return result_json(True, {"callback_id": self.callback[0], "confirmed_slot": promise.slot}, promise.message())
 
     def t_request_human_handoff(self, args):
         reason = handoff_reason(args.get("reason_code"))
@@ -503,7 +796,7 @@ class FakeCrm:
         data, say = {"recorded": True}, None
         asked = args.get(CALLBACK_ASKED)
         if (code == "CALLBACK_REQUESTED" or asked) and not settled and self.outcome != "CALLBACK_REQUESTED":
-            booked = json.loads(self.t_schedule_callback({}))
+            booked = json.loads(self.t_schedule_callback({"preferred_time_text": "Caller said: " + asked} if asked else {}))
             data.update(booked["data"])
             say = booked["say"]
         if not settled:
