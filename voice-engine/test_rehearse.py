@@ -90,8 +90,8 @@ class AudioTest(unittest.TestCase):
 
 # ---------------------------------------------------------------------------------------------- a fake CRM + engine
 
-SEEN = {"hooks": [], "bad_signatures": 0}
-MODE = {"end": "transfer", "answer": "stream"}
+SEEN = {"hooks": [], "bad_signatures": 0, "forms": []}
+MODE = {"end": "transfer", "answer": "stream", "reply": "end"}
 fake = FastAPI()
 
 
@@ -104,12 +104,14 @@ def free_port() -> int:
 @fake.post("/api/voice/hooks/plivo/{hook}")
 async def hook(hook: str, request: Request):
     form = dict(parse_qsl((await request.body()).decode()))
-    url = f"{FakeCall.base}/api/voice/hooks/plivo/{hook}"
+    query = request.url.query
+    url = f"{FakeCall.base}/api/voice/hooks/plivo/{hook}" + (f"?{query}" if query else "")
     nonce = request.headers.get("x-plivo-signature-v3-nonce", "")
     if request.headers.get("x-plivo-signature-v3") != rehearse.signature(TOKEN, url, form, nonce):
         SEEN["bad_signatures"] += 1
         return Response("bad signature", 401)
-    SEEN["hooks"].append(hook)
+    SEEN["hooks"].append(hook + (f"?{query}" if query else ""))
+    SEEN["forms"].append(form)
     if hook == "answer" and MODE["answer"] == "refuse":
         return Response("<Response><Hangup/></Response>", media_type="application/xml")
     if hook == "answer":
@@ -141,7 +143,7 @@ async def call(ws: WebSocket, call_id: str = "", token: str = ""):
                 loud = np.abs(phone.ulaw_decode(base64.b64decode(m["media"]["payload"])).astype(int)).mean() > 500
                 spoke, quiet = spoke or loud, 0 if loud else quiet + 1
                 if spoke and quiet == 20:
-                    await say("end-2")
+                    await say("end-2" if MODE["reply"] == "end" else "say-2")
                     spoke = False
             elif m["event"] == "playedStream" and m["name"] == "end-2":
                 api = f"http://127.0.0.1:{FakeCall.api.port}/v1/Account/A/Call/{uuid}/"
@@ -178,21 +180,69 @@ class FakeCall(unittest.TestCase):
         FakeCall.api.close()
 
     def setUp(self):
-        SEEN.update(hooks=[], bad_signatures=0)
-        MODE.update(end="transfer", answer="stream")
+        SEEN.update(hooks=[], bad_signatures=0, forms=[])
+        MODE.update(end="transfer", answer="stream", reply="end")
         self.said = []
 
-    def run_call(self, speed=4.0):
+    def run_call(self, speed=4.0, **kwargs):
         hooks = rehearse.Hooks(self.base, self.base, TOKEN)
         speech = np.concatenate([tone(0.6), np.zeros(800, dtype=np.int16)])
+        caller = {} if kwargs.get("outbound") else {"caller": "+919876500001", "number": "+918000000001"}
         return asyncio.run(rehearse.rehearse(hooks, self.api, [speech], ["Can I speak to a real person"],
-                                             "+919876500001", "+918000000001", speed=speed, wait_s=10,
-                                             say=self.said.append))
+                                             speed=speed, wait_s=10, say=self.said.append, **caller, **kwargs))
+
+    def dial_soon(self, call_id="c-out"):
+        """What the CRM does when a campaign calls someone: asks Plivo to place the call, a moment from now."""
+        def dial():
+            time.sleep(0.3)
+            requests.post(f"http://127.0.0.1:{self.api.port}/v1/Account/A/Call/", timeout=5, json={
+                "from": "+918000000001", "to": "+919876500002",
+                "answer_url": f"{self.base}/api/voice/hooks/plivo/answer?call_id={call_id}",
+                "hangup_url": f"{self.base}/api/voice/hooks/plivo/hangup?call_id={call_id}"})
+        threading.Thread(target=dial, daemon=True).start()
+
+    def test_an_outbound_call_is_answered_on_the_crms_own_urls(self):
+        self.dial_soon()
+        r = self.run_call(outbound=True, dial_wait_s=10)
+        self.assertEqual((r["ending"], r["dialled"]), ("transferred", "+919876500002"))
+        self.assertTrue(r["request_uuid"].startswith("rehearsal-req-"))
+        self.assertEqual(SEEN["hooks"], ["answer?call_id=c-out", "desk", "hangup?call_id=c-out"])
+        self.assertEqual(SEEN["bad_signatures"], 0)
+        answered = SEEN["forms"][0]
+        self.assertEqual((answered["Direction"], answered["From"], answered["To"], answered["RequestUUID"]),
+                         ("outbound", "+918000000001", "+919876500002", r["request_uuid"]))
+        self.assertEqual(answered["CallUUID"], r["call_uuid"])     # Plivo's call id, which the CRM links to its call
+
+    def test_an_outbound_call_nobody_answers(self):
+        self.dial_soon()
+        r = self.run_call(outbound=True, answer=False, dial_wait_s=10)
+        self.assertEqual((r["ending"], r["turns"]), ("not answered", []))
+        self.assertEqual(SEEN["hooks"], ["hangup?call_id=c-out"])
+        self.assertEqual(SEEN["forms"][0]["CallStatus"], "no-answer")
+
+    def test_a_crm_that_never_dials_is_reported(self):
+        r = self.run_call(outbound=True, dial_wait_s=0.3)
+        self.assertEqual(r["ending"], "not dialled")
+        self.assertEqual(SEEN["hooks"], [])
+
+    def test_a_caller_who_runs_out_of_lines_hangs_up_at_once(self):
+        MODE["reply"] = "say"           # the agent carries on, no goodbye
+        t = time.monotonic()
+        r = self.run_call()
+        self.assertEqual(r["ending"], "caller hung up")
+        self.assertLess(time.monotonic() - t, 8)        # not the 15 s wait for a goodbye's hang-up
+        self.assertEqual(SEEN["hooks"], ["answer", "hangup"])
+
+    def test_a_url_off_the_crms_public_address_is_not_followed(self):
+        hooks = rehearse.Hooks(self.base, self.base, TOKEN)
+        with self.assertRaisesRegex(ValueError, "not on its PLIVO_PUBLIC_URL"):
+            hooks("answer", {}, "https://elsewhere.example/api/voice/hooks/plivo/answer?call_id=x")
+        self.assertEqual(SEEN["hooks"], [])
 
     def test_a_transferred_call_is_followed_to_the_desk_and_hung_up(self):
         r = self.run_call(speed=1.0)        # in real time, so the reply time means something
         self.assertEqual((r["ending"], r["stream_open_at_transfer"], r["desk"]), ("transferred", True, "+914400000000"))
-        self.assertEqual(SEEN, {"hooks": ["answer", "desk", "hangup"], "bad_signatures": 0})
+        self.assertEqual((SEEN["hooks"], SEEN["bad_signatures"]), (["answer", "desk", "hangup"], 0))
         self.assertEqual([t["said"] for t in r["turns"]], ["Can I speak to a real person"])
         # The fake answers after 20 quiet messages, 15 of them after the caller's audio ended: about 0.3 s.
         self.assertGreater(r["turns"][0]["reply_s"], 0.2)
@@ -230,6 +280,10 @@ class FakeCall(unittest.TestCase):
         self.assertEqual(requests.post(base + "x", timeout=5).status_code, 404)
         self.assertEqual([(r["method"], r["call"]) for r in self.api.requests[before:]],
                          [("POST", "u-1"), ("DELETE", "u-1")])
+        placed = requests.post(base[:-len("u-1/")], json={"to": "+919876500002"}, timeout=5)
+        self.assertEqual(placed.status_code, 201)
+        self.assertEqual(self.api.dialled(before)["call"], placed.json()["request_uuid"])
+        self.assertEqual(requests.delete(base[:-len("u-1/")], timeout=5).status_code, 404)
 
 
 if __name__ == "__main__":

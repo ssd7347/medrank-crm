@@ -93,8 +93,11 @@ Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
 ## Order on the day
 
 0. The day before, on the laptop: rehearse the whole call with `voice-engine/rehearse.py` (README, "Rehearsing a
-   whole call"), with the in-memory test CRM and a made-up token. Done on 16 Nov 2026: answer, two turns, transfer
-   to the desk only after the goodbye was played, the desk rung, the call recorded as handed off.
+   whole call"), with the in-memory test CRM and a made-up token, an outbound campaign call as in step 4. Done on
+   16 Nov 2026: an incoming call transferred to the desk only after the goodbye was played; and campaign calls dialled,
+   answered, identity checked (full name and customer ref), details given only after it, "call me back at 4 pm" booked
+   and hung up; "stop calling me" opted out and the campaign skipped the number; a call nobody answered recorded as
+   NO_ANSWER.
 
 1. Laptop: start the CRM, the engine and the gateway (`uvicorn gateway:app --host 127.0.0.1 --port 8099`); `/health`
    on the engine answers on `127.0.0.1:8090` and says `"warmed": true` a few seconds after the start (both speech

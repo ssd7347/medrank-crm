@@ -14,6 +14,33 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 16 November 2026: THE FIRST-CALL PLAN REHEARSED AS OUTBOUND CAMPAIGN CALLS (user: "continue the next task")
+
+The first real call is an outbound campaign call, but `rehearse.py` only did incoming ones. Now its pretend Plivo
+API also takes the CRM's dial request (POST .../Call/, answered 201 with a request id) and `--outbound` waits for it,
+then answers on the call's own `answer_url` (with the CRM's call_id, signed for that exact URL) as the person called,
+with Plivo's own CallUUID and RequestUUID; the hang-up goes to the call's `hangup_url`. `--no-answer` reports no-answer
+instead. A URL off the CRM's public address is refused. When the caller's lines run out before the agent's goodbye,
+it now says "the caller hung up" at once (it waited 15 s for a hang-up that could not come).
+Tests `test_rehearse` 15 (5 new): an outbound call answered on the CRM's URLs with the right fields; nobody answers;
+a CRM that never dials; a caller who runs out of lines; a URL off the public address; the API's dial answer.
+Engine 87/87.
+**Rehearsed, 16 Nov ~19:05 IST** (in-memory test CRM with `--app.alerts.scheduling-enabled=true`, real engine base.en,
+real gateway, simulated brain; one-contact "Payment reminder" campaigns; a "verify with" field Customer Ref):
+(1) Priya: dialled, answered; "Yes, speaking." → asked for full name and customer ref; "Priya Shankar, and my
+customer ref is 4471." heard as "...4,471" and **verified**, then "Balance Due: 2,500 rupees" (only after the check);
+"Please call me back at 4 pm." → call-back booked, goodbye, CRM hung up. COMPLETED, CALLBACK_REQUESTED, target DONE.
+(2) Ravi: "Please stop calling me." → opt_out, consent OPTED_OUT, target SKIPPED (OPTED_OUT), no call-back.
+(3) Meena, `--no-answer`: call NO_ANSWER, target SKIPPED (MAX_ATTEMPTS, 1 allowed), campaign DONE.
+Replies began 1.4–1.9 s after the caller stopped (incl. the 0.7 s wait for quiet; the simulated brain is instant).
+No errors in any log, no stream token in the engine's or gateway's log. Found on the way: the test CRM's settings
+switch off scheduled jobs, so its campaign never dialled until started with scheduling on (README now says so).
+**Found, not changed:** a call-back's promised time ignores what the caller asked for. Priya asked for 4 pm and was
+told "by Monday 16 November, 9:05 PM": the due time is always the desk's next open time + 2 h
+(`HandoffService.dueAt`); "4 pm" is only kept as text for staff. So "call me tomorrow at 4" at 11:00 would be told
+"by 1:00 PM" today.
+Docs: voice-engine README (outbound, scheduling flag), first-real-call step 0.
+
 # 16 November 2026: CALL STREAM TOKENS NO LONGER IN THE LOGS (user: "Yes, fix it")
 
 Found during the rehearsal: uvicorn wrote each call's stream address, token included, into the engine's and the

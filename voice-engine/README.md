@@ -124,7 +124,8 @@ a stream into a call, so it never sits in a log file (`redact.py`). The call id 
 
 ## Rehearsing a whole call with no phone line (`rehearse.py`)
 
-`rehearse.py` plays Plivo: it rings the CRM through the gateway with correctly signed callbacks, opens the call
+`rehearse.py` plays Plivo: it rings the CRM through the gateway with correctly signed callbacks (or, with
+`--outbound`, waits for the CRM to dial and answers on that call's own URLs as the person called), opens the call
 stream, speaks the caller's lines into it as 8 kHz phone audio in real time (text in the engine's voice, or WAV
 recordings), plays the agent's replies for as long as they last, and stands in for Plivo's API, which the CRM calls
 to transfer or hang up. It prints how long each reply took and how the call ended, and the call appears on the CRM's
@@ -141,12 +142,21 @@ token, never the real account's:
 | `PLIVO_PUBLIC_URL` / `PLIVO_ENGINE_URL` | `http://127.0.0.1:8099` / `ws://127.0.0.1:8099/call` (the gateway) |
 | `PLIVO_API_BASE` | `http://127.0.0.1:8098/v1` (the script's pretend Plivo API) |
 | `VOICE_DESK_NUMBER` | any number, to see a transfer |
+| `--app.alerts.scheduling-enabled=true` | on the test CRM's command line, for outbound calls: its test settings switch off the scheduled jobs, and the campaign dispatcher is one of them |
 
 Start the engine and the gateway as for a real call, approve the "Incoming calls" script, add the caller as a
 contact, then:
 
 ```
 python rehearse.py --auth-token <the made-up token> --from +919876500001 "Hello, I have a question." "Can I speak to a real person please?"
+```
+
+An outbound call, as the first real call will be: start `rehearse.py --outbound` first (it waits up to 5 minutes),
+then a one-contact campaign in the CRM (the contact with AI-call consent, the script approved). The dispatcher picks
+it up within about 30 seconds. `--no-answer` rehearses a call nobody picks up.
+
+```
+python rehearse.py --auth-token <the made-up token> --outbound "Yes, speaking." "Priya Shankar, and my customer ref is 4471." "Please call me back at 4 pm."
 ```
 
 ## Checking the ears on Indian English (`ear_check.py`)
