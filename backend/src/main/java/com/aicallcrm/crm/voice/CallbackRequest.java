@@ -72,6 +72,12 @@ public class CallbackRequest {
         this.status = CallbackStatus.ASSIGNED;
     }
 
+    /** The caller asked for another time in the same call. */
+    public void reschedule(Instant dueAt, String preferredTimeText) {
+        this.dueAt = dueAt;
+        this.preferredTimeText = preferredTimeText;
+    }
+
     public void complete(Long userId, String note) {
         this.status = CallbackStatus.DONE;
         this.doneAt = Instant.now();

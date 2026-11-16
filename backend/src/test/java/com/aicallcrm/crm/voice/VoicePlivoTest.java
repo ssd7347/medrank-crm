@@ -242,6 +242,41 @@ class VoicePlivoTest {
     }
 
     @Test
+    void aCallerWhoChangesTheTimeIsPromisedTheNewOneAndStaffAreTold() throws Exception {
+        String admin = login();
+        UUID call = incomingCall(admin, "cu-" + SEQ.incrementAndGet());
+        String due = "select due_at from callback_request where voice_call_id = ?";
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"4 pm\"}")
+                .andExpect(jsonPath("$.speak_hint").value("A member of our team will call you back on Monday 16 November at 4:00 PM."));
+
+        // Said again, vaguer: the 4 pm booking stands.
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"this afternoon\"}")
+                .andExpect(jsonPath("$.speak_hint").value("A member of our team will call you back on Monday 16 November at 4:00 PM."));
+        assertThat(jdbc.queryForObject(due, Instant.class, call)).isEqualTo(Instant.parse("2026-11-16T10:30:00Z"));
+
+        // "Actually, make it 5 pm": the task moves, and staff are told what it was.
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"actually, make it 5 pm\"}")
+                .andExpect(jsonPath("$.speak_hint").value("A member of our team will call you back on Monday 16 November at 5:00 PM."))
+                .andExpect(jsonPath("$.data.confirmed_slot").value("Monday 16 November, 5:00 PM"));
+        assertThat(jdbc.queryForObject(due, Instant.class, call)).isEqualTo(Instant.parse("2026-11-16T11:30:00Z"));
+        assertThat(jdbc.queryForObject("select preferred_time_text from callback_request where voice_call_id = ?",
+                String.class, call)).isEqualTo("actually, make it 5 pm");
+        assertThat(jdbc.queryForList("select title || ' | ' || body from notification where link = '/voice/callbacks' "
+                + "and title like 'Call-back time changed%'", String.class))
+                .contains("Call-back time changed, call back on Monday 16 November at 5:00 PM: Nisha Rao | Asked for: "
+                        + "actually, make it 5 pm. It was on Monday 16 November at 4:00 PM.");
+
+        // Nothing clear, or a time that cannot be kept: the 5 pm booking, with the desk hours first for the latter.
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"soon\"}")
+                .andExpect(jsonPath("$.speak_hint").value("A member of our team will call you back on Monday 16 November at 5:00 PM."));
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"Sunday at 4\"}")
+                .andExpect(jsonPath("$.speak_hint").value("Our team makes calls between 12:00 AM and 11:59 PM, Monday to "
+                        + "Saturday, so a member of our team will call you back on Monday 16 November at 5:00 PM."));
+        assertThat(jdbc.queryForObject(due, Instant.class, call)).isEqualTo(Instant.parse("2026-11-16T11:30:00Z"));
+        assertThat(callbacks(call)).containsExactly("CALLBACK_REQUESTED NORMAL");
+    }
+
+    @Test
     void anOutboundAnswerLinksPlivosCallIdAndUnknownCallsAreHungUp() throws Exception {
         String unknown = plivoHook("/answer", "call_id=" + UUID.randomUUID(), "CallUUID", "cu-x", "Direction", "outbound")
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
@@ -315,6 +350,14 @@ class VoicePlivoTest {
         String body = "{\"call_id\":\"" + call + "\"" + (said == null ? "" : ",\"said\":\"" + said + "\"") + "}";
         String ts = String.valueOf(Instant.now().getEpochSecond());
         return mvc.perform(post("/api/voice/hooks/live/" + step).contentType(MediaType.APPLICATION_JSON).content(body)
+                .header("X-Voice-Timestamp", ts).header("X-Voice-Signature", VoiceSignatures.sign(SECRET, ts, body)))
+                .andExpect(status().isOk());
+    }
+
+    private ResultActions tool(UUID call, String tool, String args) throws Exception {
+        String body = "{\"call_id\":\"" + call + "\",\"args\":" + args + "}";
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+        return mvc.perform(post("/api/voice/hooks/tools/" + tool).contentType(MediaType.APPLICATION_JSON).content(body)
                 .header("X-Voice-Timestamp", ts).header("X-Voice-Signature", VoiceSignatures.sign(SECRET, ts, body)))
                 .andExpect(status().isOk());
     }

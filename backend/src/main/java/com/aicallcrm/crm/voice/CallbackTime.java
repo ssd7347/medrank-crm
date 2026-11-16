@@ -38,12 +38,27 @@ final class CallbackTime {
     /**
      * {@code when} follows "will call you back" ("on Tuesday 17 November at 4:00 PM"); {@code slot} is the tool's
      * {@code confirmed_slot}; {@code note}, if any, comes first (the desk hours, when the caller asked for a time
-     * outside them).
+     * outside them). {@code from}: the start of what the caller asked for ({@code due} itself for an exact time, the
+     * moment it was asked for "before 3"); null when this is the usual time, not the caller's.
      */
-    record Promise(Instant due, String when, String slot, String note) {
+    record Promise(Instant due, String when, String slot, String note, Instant from) {
         String message() {
             String promise = "a member of our team will call you back " + when + ".";
             return note == null ? "A" + promise.substring(1) : note + promise;
+        }
+
+        /** The time the caller asked for, read and kept (not the usual time). */
+        boolean asked() {
+            return from != null;
+        }
+
+        /** A call at {@code t} is what this request asked for: 4:00 PM is "this afternoon", not "at 5". */
+        boolean allows(Instant t) {
+            return from != null && !t.isBefore(from) && !t.isAfter(due);
+        }
+
+        Promise withNote(String note) {
+            return new Promise(due, when, slot, note, from);
         }
     }
 
@@ -52,7 +67,11 @@ final class CallbackTime {
 
     /** The usual promise: by this time. */
     static Promise by(Instant due) {
-        return new Promise(due, "by " + ContactFacts.spokenTime(due), ContactFacts.spokenTime(due), null);
+        return by(due, null);
+    }
+
+    private static Promise by(Instant due, Instant from) {
+        return new Promise(due, "by " + ContactFacts.spokenTime(due), ContactFacts.spokenTime(due), null, from);
     }
 
     /**
@@ -67,7 +86,7 @@ final class CallbackTime {
         }
         Promise outside = new Promise(fallback, "by " + ContactFacts.spokenTime(fallback),
                 ContactFacts.spokenTime(fallback), "Our team makes calls between " + time(open) + " and " + time(close)
-                + ", Monday to Saturday, so ");
+                + ", Monday to Saturday, so ", null);
         if (a.in != null) {
             Instant at = roundUp(now.plus(a.in));
             if (a.in.compareTo(MIN_NOTICE) < 0) {
@@ -76,7 +95,7 @@ final class CallbackTime {
             if (!inHours(at, open, close)) {
                 return outside;
             }
-            return a.byOnly ? by(at) : at(at);
+            return a.byOnly ? by(at, now) : at(at);
         }
         LocalDate day = a.day != null ? a.day : here.toLocalDate();
         for (int tries = 0; tries < 2; tries++) {
@@ -109,17 +128,17 @@ final class CallbackTime {
                 return by(fallback);
             }
             if (a.byOnly || !start.isAfter(now)) {
-                return by(end);
+                return by(end, now);
             }
             String slot = DAY.format(day) + ", between " + time(lo) + " and " + time(hi);
-            return new Promise(end, "on " + slot, slot, null);
+            return new Promise(end, "on " + slot, slot, null, start);
         }
         return by(fallback);
     }
 
     private static Promise at(Instant at) {
         ZonedDateTime z = at.atZone(ContactFacts.IST);
-        return new Promise(at, "on " + DAY.format(z) + " at " + TIME.format(z), ContactFacts.spokenTime(at), null);
+        return new Promise(at, "on " + DAY.format(z) + " at " + TIME.format(z), ContactFacts.spokenTime(at), null, at);
     }
 
     private static boolean inHours(Instant at, LocalTime open, LocalTime close) {

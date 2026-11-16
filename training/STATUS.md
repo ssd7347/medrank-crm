@@ -14,6 +14,25 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 16 November 2026: A CALLER WHO CHANGES THE CALL-BACK TIME IS PROMISED THE NEW ONE (user: "continue the next task")
+
+The gap left in the entry below: a second booking in the same call kept the first task and its time, so "actually,
+make it 5 pm" after "4 pm" was told 4:00 PM again, and staff would call at 4. Now (`HandoffService.callback`) a new
+request read as the caller's own time (`CallbackTime.Promise.asked`) that the booked time does not fit
+(`Promise.allows`: inside what they asked for, e.g. 4:00 PM fits "this afternoon" and "before 5", not "at 5" or
+"tomorrow") moves the task (`CallbackRequest.reschedule`: due time and the caller's words) and tells whoever has it
+(the assigned staff member if active, else the contact's owner, else the managers): "Call-back time changed, call
+back on Monday 16 November at 5:00 PM: Nisha Rao", body "Asked for: ... It was on Monday 16 November at 4:00 PM.",
+one alert per new time. The same request said vaguer, anything unclear ("soon"), or a time that cannot be kept keeps
+the booked time; for the last the caller hears the desk hours first. Still one task per call.
+Tests: `CallbackTimeTest.aPromiseKnowsWhichTimesTheCallerAskedFor` and `VoicePlivoTest.aCallerWhoChangesTheTime...`
+(fixed Monday 11:00 clock, the CRM's signed tool hook: 4 pm → 4:00 PM; "this afternoon" → still 4:00 PM, due
+unchanged; "actually, make it 5 pm" → 5:00 PM, due 11:30Z, words updated, the alert as above; "soon" and "Sunday at
+4" → 5:00 PM, the latter after the desk hours; one task). The second fails on the previous code (told 4:00 PM).
+Backend 112/112. Not rehearsed on the laptop: the stand-in brain says goodbye after the first booking, so a call never
+books twice; the hook test above goes through the CRM's real HTTP path.
+Docs: voice-agent.md (schedule_callback).
+
 # 16 November 2026: THE PROMISED CALL-BACK TIME FOLLOWS WHAT THE CALLER ASKED FOR (user: "Yes, fix it")
 
 Found in the rehearsal below: Priya asked for 4 pm and was told "by ... 9:05 PM". New `voice/CallbackTime` reads the
@@ -42,7 +61,7 @@ Tuesday 17 November at 4:00 PM. Goodbye."**; task due 2026-11-17T10:30Z (4:00 PM
 November at 4:00 PM: Priya Shankar"; COMPLETED, CALLBACK_REQUESTED; no errors, no stream token in the logs.
 **Not changed:** `training/callkit.py` (the training data's pretend tools) still always says "by"; the model repeats the
 CRM's hint, so this matters only if another training round is made. A caller who changes the time later in the same
-call keeps the first booking (as before).
+call keeps the first booking (fixed the same evening, entry above).
 Docs: voice-agent.md (schedule_callback), handover-guide.md (desk hours).
 
 # 16 November 2026: THE FIRST-CALL PLAN REHEARSED AS OUTBOUND CAMPAIGN CALLS (user: "continue the next task")

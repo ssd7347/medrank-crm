@@ -129,6 +129,25 @@ class CallbackTimeTest {
     }
 
     @Test
+    void aPromiseKnowsWhichTimesTheCallerAskedFor() {
+        Instant four = ist(2026, 11, 16, 16, 0);
+        assertThat(asked("4 pm").allows(four)).isTrue();
+        assertThat(asked("this afternoon").allows(four)).isTrue();
+        assertThat(asked("between 3 and 5 pm").allows(four)).isTrue();
+        assertThat(asked("before 5 pm").allows(four)).isTrue();
+        assertThat(asked("tomorrow").allows(four)).isFalse();
+        assertThat(asked("at 5").allows(four)).isFalse();
+        assertThat(asked("before 3 pm").allows(four)).isFalse();
+        assertThat(asked("this morning").allows(four)).isFalse();
+        for (String words : new String[] {"soon", "at 8 pm", "at 4 or at 5"}) {
+            assertThat(asked(words).asked()).as(words).isFalse();
+            assertThat(asked(words).allows(four)).as(words).isFalse();
+        }
+        assertThat(asked("4 pm").asked()).isTrue();
+        assertThat(asked("before 3 pm").asked()).isTrue();
+    }
+
+    @Test
     void twoHoursAreCountedInDeskTime() {
         Duration two = Duration.ofHours(2);
         assertThat(HandoffService.plusDeskTime(MONDAY_11, two, OPEN, CLOSE)).isEqualTo(ist(2026, 11, 16, 13, 0));

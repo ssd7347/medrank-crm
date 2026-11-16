@@ -156,18 +156,41 @@ public class HandoffService {
         if (call.isTestCall()) {
             return handoff(promise, null);
         }
-        // Asked twice in one call (the model booking again, or the CRM booking for a logged outcome): one task, and
-        // the caller hears the time it was booked for.
+        // Asked twice in one call (the model booking again, or the CRM booking for a logged outcome): one task.
         CallbackRequest open = callbacks.findByVoiceCallId(call.getId()).stream()
                 .filter(c -> "CALLBACK_REQUESTED".equals(c.getReason()) && c.getStatus() != Voice.CallbackStatus.DONE)
                 .findFirst().orElse(null);
         if (open != null) {
             CallbackTime.Promise booked = promise(open.getPreferredTimeText(), now);
-            return handoff(booked.due().equals(open.getDueAt()) ? booked : CallbackTime.by(open.getDueAt()), open.getId());
+            if (!booked.due().equals(open.getDueAt())) {
+                booked = CallbackTime.by(open.getDueAt());
+            }
+            if (promise.asked() && !promise.allows(open.getDueAt())) {
+                return moved(call, open, preferredTimeText, booked, promise);
+            }
+            // The same request again, said vaguer ("this afternoon" after "4 pm"), or one that cannot be kept: the
+            // caller hears the time already booked (after the desk hours, if they asked outside them).
+            return handoff(promise.note() == null ? booked : booked.withNote(promise.note()), open.getId());
         }
         CallbackRequest cb = task(call, contact(call), "CALLBACK_REQUESTED", preferredTimeText, reason, Priority.NORMAL,
                 promise.due(), promise.when());
         return handoff(promise, cb.getId());
+    }
+
+    /**
+     * The caller changed the time ("actually, make it 5"): the task moves to it, and whoever has the task (or the
+     * contact's owner, or the managers) is told, since they may have planned the call for the first time.
+     */
+    private Handoff moved(VoiceCall call, CallbackRequest open, String preferredTimeText, CallbackTime.Promise before,
+                          CallbackTime.Promise now) {
+        open.reschedule(now.due(), cut(preferredTimeText, 200));
+        Contact contact = contact(call);
+        AppUser who = open.getAssignedTo() != null && open.getAssignedTo().isActive() ? open.getAssignedTo() : owner(contact);
+        alerts.notifyOwnerOrManagers(who, call.getContactId(), "VOICE_CALLBACK", open.getPriority(),
+                "Call-back time changed, call back " + now.when() + ": " + label(call, contact),
+                "Asked for: " + preferredTimeText + ". It was " + before.when() + ".", "/voice/callbacks",
+                "VCB:" + open.getId() + ":" + now.due().getEpochSecond());
+        return handoff(now, open.getId());
     }
 
     CallbackTime.Promise promise(String preferredTimeText, Instant now) {
