@@ -365,6 +365,33 @@ class AiBrainIntegrationTest {
     }
 
     @Test
+    void aCallBackTakenBackIsHeardInTheCallersWords() {
+        Map<String, String> withdrawn = new LinkedHashMap<>();
+        withdrawn.put("No need to call me back.", "no need to call me back.");
+        withdrawn.put("Okay. Actually, you don't have to call me back, I will pay online.",
+                "actually, you don't have to call me back, i will pay online.");
+        withdrawn.put("Call me back at 4. Sorry, no need for a callback, I paid already.",
+                "sorry, no need for a callback, i paid already.");
+        withdrawn.put("Please cancel the call back.", "please cancel the call back.");
+        withdrawn.put("I don't need anyone to call me back.", "i don't need anyone to call me back.");
+        withdrawn.put("Don't bother calling me back.", "don't bother calling me back.");
+        withdrawn.forEach((said, sentence) -> assertThat(CallerSignals.callbackWithdrawn(said)).as(said).isEqualTo(sentence));
+        // Asked again afterwards, only a limit, a condition or a question, or never said: not taken back.
+        for (String said : List.of("No need to call me back today. Call me tomorrow at 11.", "Don't call me back after 6 pm.",
+                "No need to call me back, just call me tomorrow.", "If you don't call me back I will complain.",
+                "Why don't you call me back later?", "Don't call me back. Actually, call me back tomorrow.",
+                "I don't want to change the date.", "Please call me back at 4.")) {
+            assertThat(CallerSignals.callbackWithdrawn(said)).as(said).isNull();
+        }
+        assertThat(CallerSignals.callbackWithdrawn(null)).isNull();
+        // A call-back taken back is no longer one asked for, so logging the outcome does not book it.
+        assertThat(CallerSignals.callbackAsked("Call me back at 4. Actually, no need to call me back.")).isNull();
+        assertThat(CallerSignals.callbackAsked("No need to call me back today. Call me tomorrow at 11.")).isEqualTo("call me tomorrow at 11.");
+        LlmClient.ToolCall logged = new LlmClient.ToolCall("c7", "log_call_outcome", Map.of("outcome_code", "WILL_ACT"));
+        assertThat(CallerSignals.upgrade(logged, " Call me back at 4. Actually, no need to call me back.")).isSameAs(logged);
+    }
+
+    @Test
     void aCallBackAskedForIsHeardInTheCallersWords() {
         Map<String, String> asked = new LinkedHashMap<>();
         asked.put("I'm busy, call me back later.", "i'm busy, call me back later.");

@@ -256,33 +256,65 @@ public class HandoffService {
         if (open.isEmpty()) {
             return 0;
         }
+        if (allCalls) {
+            open.forEach(cb -> cb.complete(null, CANCELLED_NOTE));
+            return open.size();
+        }
         Contact contact = contact(call);
+        flag(call, contact, open, AI_ONLY_NOTE, "Check before calling back: " + label(call, contact),
+                label(call, contact) + " asked on an AI call to stop AI calls and has " + open.size()
+                        + (open.size() == 1 ? " open call-back" : " open call-backs") + ". They did not say no to a call "
+                        + "from staff, but read the transcript first.", "VOPT:" + call.getId());
+        return open.size();
+    }
+
+    static final String WITHDRAWN_NOTE = "CHECK BEFORE CALLING: later in the AI call they said they do not need a "
+            + "call-back. Read the transcript; if that is right, mark this done.";
+
+    /**
+     * The caller took the call-back back ("no need to call me back", {@link CallerSignals#callbackWithdrawn}) after it
+     * was booked, or the model booked one anyway. Only the call-backs this call booked: a "no" to the agent's offer of
+     * a call-back says nothing about one booked on another day (a dispute, say). They are not closed, since the words
+     * come from a phone line and a closed call-back cannot be reopened: each starts with {@link #WITHDRAWN_NOTE}, and
+     * whoever has it (or the contact's owner, or the managers) is told, with the caller's words. Returns how many
+     * call-backs this touched; none for a test call.
+     */
+    @Transactional
+    public int withdrawn(VoiceCall call, String sentence) {
+        if (call.isTestCall()) {
+            return 0;
+        }
+        List<CallbackRequest> open = callbacks.findByVoiceCallId(call.getId()).stream()
+                .filter(c -> c.getStatus() != Voice.CallbackStatus.DONE).toList();
+        if (open.isEmpty()) {
+            return 0;
+        }
+        Contact contact = contact(call);
+        String said = sentence.length() <= 200 ? sentence : sentence.substring(0, 200) + "...";
+        flag(call, contact, open, WITHDRAWN_NOTE, "Call-back may not be needed: " + label(call, contact),
+                label(call, contact) + " said on an AI call: \"" + said + "\" Read the transcript before calling; if "
+                        + "they do not need the call-back, mark it done.", "VWD:" + call.getId());
+        return open.size();
+    }
+
+    /** Puts a warning on each call-back and tells whoever has one, or else the contact's owner or the managers. */
+    private void flag(VoiceCall call, Contact contact, List<CallbackRequest> open, String note, String title,
+                      String body, String key) {
         Set<AppUser> told = new LinkedHashSet<>();
         for (CallbackRequest cb : open) {
-            if (allCalls) {
-                cb.complete(null, CANCELLED_NOTE);
-            } else {
-                cb.warn(AI_ONLY_NOTE);
-                if (cb.getAssignedTo() != null && cb.getAssignedTo().isActive()) {
-                    told.add(cb.getAssignedTo());
-                }
+            cb.warn(note);
+            if (cb.getAssignedTo() != null && cb.getAssignedTo().isActive()) {
+                told.add(cb.getAssignedTo());
             }
         }
-        if (!allCalls) {
-            String title = "Check before calling back: " + label(call, contact);
-            String body = label(call, contact) + " asked on an AI call to stop AI calls and has " + open.size()
-                    + (open.size() == 1 ? " open call-back" : " open call-backs") + ". They did not say no to a call "
-                    + "from staff, but read the transcript first.";
-            if (told.isEmpty()) {
-                alerts.notifyOwnerOrManagers(owner(contact), call.getContactId(), "VOICE_CALLBACK", Priority.NORMAL,
-                        title, body, "/voice/callbacks", "VOPT:" + call.getId());
-            }
-            for (AppUser u : told) {
-                alerts.notifyUser(u.getId(), call.getContactId(), "VOICE_CALLBACK", Priority.NORMAL, title, body,
-                        "/voice/callbacks", "VOPT:" + call.getId());
-            }
+        if (told.isEmpty()) {
+            alerts.notifyOwnerOrManagers(owner(contact), call.getContactId(), "VOICE_CALLBACK", Priority.NORMAL,
+                    title, body, "/voice/callbacks", key);
         }
-        return open.size();
+        for (AppUser u : told) {
+            alerts.notifyUser(u.getId(), call.getContactId(), "VOICE_CALLBACK", Priority.NORMAL, title, body,
+                    "/voice/callbacks", key);
+        }
     }
 
     static final String DO_NOT_CALL_NOTE = "Cancelled by the CRM: the contact was marked \"Do not call\".";

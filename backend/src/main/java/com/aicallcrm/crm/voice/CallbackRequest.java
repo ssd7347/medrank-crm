@@ -74,7 +74,7 @@ public class CallbackRequest {
 
     /** Something staff must read before calling, put first so a long summary never hides it. Once only. */
     public void warn(String note) {
-        if (summary != null && summary.startsWith(note)) {
+        if (summary != null && summary.contains(note)) {
             return;
         }
         String s = summary == null || summary.isBlank() ? note : note + "\n\n" + summary;

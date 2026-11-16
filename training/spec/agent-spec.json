@@ -1,6 +1,9 @@
 {
   "ai_question_words" : "real person|human|robot|machine|\\bai\\b|\\bbot\\b|automated|computer",
   "callback_asked_arg" : "caller_asked_for_callback",
+  "callback_withdrawn_not_after" : "\\b(if|why|unless|whether)\\b",
+  "callback_withdrawn_not_before" : "\\b(after|before|at|on|by|until|till|between|from|today|tomorrow|tonight|morning|afternoon|evening|night|week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b|\\d",
+  "callback_withdrawn_words" : "no need (to|for) (a |any |the )?call(ing)? (me )?back|no need (to|for) (a |any |the )?call-?back|not (necessary|needed) to call (me )?back|(don'?t|do not) (need (you |anyone |anybody |someone )?to |have to |bother (to )?)?call(ing)? (me )?back|(don'?t|do not) (need|want) (a |any |the |that )?call-?back|no call-? ?back (is )?(needed|required)|cancel (the |my |that |this )?call-? ?back|(forget|never ?mind)( about)? (the |that |my )?call-? ?back",
   "callback_words" : "call (me )?back|call me (again )?(later|tomorrow|after|in an? |next|this evening|tonight|some ?time)|ring me (back|later)|call-?back|re-?schedule|postpone|(change|move|shift) (it|the (date|time|day|appointment|visit|slot)|my (appointment|visit|slot|booking))|(another|some other|a different) (day|date|time|slot)",
   "closing_tools" : [ "log_call_outcome", "opt_out", "request_human_handoff" ],
   "dispute_words" : "already paid|already cleared|amount[^.?!]{0,30}(wrong|incorrect|not due)|paid (it|this|that) (already|last)|(amount|charge|bill) (is|was) (wrong|incorrect|not correct)|charged twice|double charged|refund|money back|not my (loan|account|charge)|never (took|agreed)|wrong amount|incorrect amount|overcharged|lawyer|consumer court|i want to complain|file a complaint",

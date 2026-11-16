@@ -322,6 +322,79 @@ class VoicePlivoTest {
     }
 
     @Test
+    void aCallerWhoTakesBackTheirCallBackHasItFlagged() throws Exception {
+        String admin = login();
+        String callUuid = "cu-" + SEQ.incrementAndGet();
+        UUID call = incomingCall(admin, callUuid);
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"4 pm\",\"reason\":\"Wants to talk about the plan.\"}");
+        live("turn", call, "Cancel the callback please, I will pay online.");
+        hangUp(callUuid);
+        assertThat(jdbc.queryForList("select status || ' | ' || summary from callback_request where voice_call_id = ?",
+                String.class, call)).containsExactly("OPEN | " + HandoffService.WITHDRAWN_NOTE + "\n\nWants to talk about the plan.");
+        assertThat(jdbc.queryForList("select title || ' | ' || body from notification where dedup_key = ?", String.class,
+                "VWD:" + call)).isNotEmpty().allMatch(t -> t.equals("Call-back may not be needed: Nisha Rao | Nisha Rao said "
+                + "on an AI call: \"cancel the callback please, i will pay online.\" Read the transcript before calling; "
+                + "if they do not need the call-back, mark it done."));
+    }
+
+    @Test
+    void aCallBackBookedOnANoOrTakenBackInTheLastWordsIsFlaggedToo() throws Exception {
+        String admin = login();
+        // The caller says no, and the model books a call-back anyway.
+        String firstUuid = "cu-" + SEQ.incrementAndGet();
+        UUID first = incomingCall(admin, firstUuid);
+        live("turn", first, "No need to call me back, thanks.");
+        tool(first, "schedule_callback", "{\"preferred_time_text\":\"later\"}");
+        assertThat(jdbc.queryForObject("select summary from callback_request where voice_call_id = ?", String.class, first))
+                .doesNotContain(HandoffService.WITHDRAWN_NOTE);
+        hangUp(firstUuid);
+        assertThat(jdbc.queryForObject("select status || ' | ' || summary from callback_request where voice_call_id = ?",
+                String.class, first)).startsWith("OPEN | " + HandoffService.WITHDRAWN_NOTE);
+        // Said only after the hang-up, in the last words the engine sends.
+        String secondUuid = "cu-" + SEQ.incrementAndGet();
+        UUID second = incomingCall(admin, secondUuid);
+        tool(second, "schedule_callback", "{\"preferred_time_text\":\"4 pm\"}");
+        hangUp(secondUuid);
+        assertThat(jdbc.queryForObject("select summary from callback_request where voice_call_id = ?", String.class, second))
+                .doesNotContain(HandoffService.WITHDRAWN_NOTE);
+        live("last", second, "Oh, no need to call me back.");
+        assertThat(jdbc.queryForObject("select summary from callback_request where voice_call_id = ?", String.class, second))
+                .startsWith(HandoffService.WITHDRAWN_NOTE);
+    }
+
+    @Test
+    void aCallerWhoMovesTheirCallBackIsNotFlagged() throws Exception {
+        String admin = login();
+        String callUuid = "cu-" + SEQ.incrementAndGet();
+        UUID call = incomingCall(admin, callUuid);
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"4 pm\"}");
+        live("turn", call, "No need to call me back today, call me tomorrow.");
+        hangUp(callUuid);
+        assertThat(jdbc.queryForList("select status || ' | ' || summary from callback_request where voice_call_id = ?",
+                String.class, call)).singleElement().asString().startsWith("OPEN").doesNotContain(HandoffService.WITHDRAWN_NOTE);
+        assertThat(jdbc.queryForList("select id from notification where dedup_key = ?", Long.class, "VWD:" + call)).isEmpty();
+    }
+
+    @Test
+    void aNoToTheAgentsOfferLeavesACallBackFromAnotherCallAlone() throws Exception {
+        String admin = login();
+        String firstUuid = "cu-" + SEQ.incrementAndGet();
+        UUID first = incomingCall(admin, firstUuid);
+        tool(first, "schedule_callback", "{\"preferred_time_text\":\"4 pm\",\"reason\":\"Disputes the charge.\"}");
+        hangUp(firstUuid);
+        String phone = jdbc.queryForObject("select phone from voice_call where id = ?", String.class, first);
+        // Rings in again; asked whether they want someone to call them back, they say no.
+        String secondUuid = "cu-" + SEQ.incrementAndGet();
+        UUID second = ringsIn(phone.replaceFirst("^\\+91", ""), secondUuid);
+        live("turn", second, "No need to call me back, thanks.");
+        hangUp(secondUuid);
+        assertThat(jdbc.queryForObject("select count(*) from callback_request where voice_call_id = ?", Integer.class, second)).isZero();
+        assertThat(jdbc.queryForObject("select status || ' | ' || summary from callback_request where voice_call_id = ?",
+                String.class, first)).isEqualTo("OPEN | Disputes the charge.");
+        assertThat(jdbc.queryForList("select id from notification where dedup_key = ?", Long.class, "VWD:" + second)).isEmpty();
+    }
+
+    @Test
     void anOutboundAnswerLinksPlivosCallIdAndUnknownCallsAreHungUp() throws Exception {
         String unknown = plivoHook("/answer", "call_id=" + UUID.randomUUID(), "CallUUID", "cu-x", "Direction", "outbound")
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
@@ -349,6 +422,11 @@ class VoicePlivoTest {
         String phone = "9" + String.format("%09d", SEQ.incrementAndGet());
         mvc.perform(auth(post("/api/contacts"), admin).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"fullName\":\"Nisha Rao\",\"phone\":\"" + phone + "\",\"fields\":{}}")).andExpect(status().isCreated());
+        return ringsIn(phone, callUuid);
+    }
+
+    /** The contact with this phone number rings in and the call streams to our engine, which opens it. */
+    private UUID ringsIn(String phone, String callUuid) throws Exception {
 
         // Unsigned or wrongly signed: refused.
         mvc.perform(post("/api/voice/hooks/plivo/answer").param("From", "+91" + phone).param("CallUUID", callUuid))
@@ -389,6 +467,12 @@ class VoicePlivoTest {
             req.param(fields[i], fields[i + 1]);
         }
         return mvc.perform(req);
+    }
+
+    /** Plivo reports that the call ended normally. */
+    private void hangUp(String callUuid) throws Exception {
+        plivoHook("/hangup", null, "CallUUID", callUuid, "CallStatus", "completed", "Duration", "30",
+                "HangupCause", "NORMAL_CLEARING").andExpect(status().isOk());
     }
 
     private ResultActions live(String step, UUID call, String said) throws Exception {

@@ -44,11 +44,28 @@ final class CallerSignals {
     static final String NO_CALLBACK = "(don'?t|do not|never|no need to|not) (need |want )?(to )?(a |an |any )?"
             + "(call (me )?back|call-?back|re-?schedule|postpone|(change|move|shift) (it|the|my))|"
             + "no call-? ?back|no need (to|for) (a |any )?call";
+    /**
+     * The caller taking a call-back back ("no need to call me back", "you don't have to call me back", "cancel the
+     * callback"). Narrower than NO_CALLBACK, which also covers "I don't want to change the date" (keep the booking).
+     */
+    static final String CALLBACK_WITHDRAWN = "no need (to|for) (a |any |the )?call(ing)? (me )?back|"
+            + "no need (to|for) (a |any |the )?call-?back|not (necessary|needed) to call (me )?back|"
+            + "(don'?t|do not) (need (you |anyone |anybody |someone )?to |have to |bother (to )?)?call(ing)? (me )?back|"
+            + "(don'?t|do not) (need|want) (a |any |the |that )?call-?back|no call-? ?back (is )?(needed|required)|"
+            + "cancel (the |my |that |this )?call-? ?back|(forget|never ?mind)( about)? (the |that |my )?call-? ?back";
+    /** Before those words in the sentence, these make it a condition or a question ("if you don't call me back..."). */
+    static final String WITHDRAWN_NOT_AFTER = "\\b(if|why|unless|whether)\\b";
+    /** Right after them (up to a comma), these make it a limit, not a "no" ("don't call me back after 6 pm"). */
+    static final String WITHDRAWN_NOT_BEFORE = "\\b(after|before|at|on|by|until|till|between|from|today|tomorrow|tonight|"
+            + "morning|afternoon|evening|night|week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b|\\d";
     /** The argument the CRM adds to log_call_outcome: the caller's sentence asking for a call-back. */
     static final String CALLBACK_ASKED = "caller_asked_for_callback";
     private static final Pattern OPT_OUT_WORDS = Pattern.compile(OPT_OUT);
     private static final Pattern CALLBACK_WORDS = Pattern.compile(CALLBACK);
     private static final Pattern NO_CALLBACK_WORDS = Pattern.compile(NO_CALLBACK);
+    private static final Pattern WITHDRAWN_WORDS = Pattern.compile(CALLBACK_WITHDRAWN);
+    private static final Pattern WITHDRAWN_CONDITION = Pattern.compile(WITHDRAWN_NOT_AFTER);
+    private static final Pattern WITHDRAWN_LIMIT = Pattern.compile(WITHDRAWN_NOT_BEFORE);
     private static final Pattern SENTENCE = Pattern.compile("[^.?!]+[.?!]?");
     private static final Pattern DISTRESS_WORDS = Pattern.compile(DISTRESS);
     private static final Pattern DISPUTE_WORDS = Pattern.compile(DISPUTE);
@@ -82,17 +99,57 @@ final class CallerSignals {
         return DISPUTE_WORDS.matcher(s).find() ? HandoffReason.COMPLAINT_OR_DISPUTE : null;
     }
 
-    /** The caller's last sentence asking for a call-back or a new date (lower case), or null when there is none. */
+    /**
+     * The caller's last sentence asking for a call-back or a new date (lower case), or null when there is none, or
+     * when they took it back later ({@link #callbackWithdrawn}).
+     */
     static String callbackAsked(String callerWords) {
+        if (callbackWithdrawn(callerWords) != null) {
+            return null;
+        }
         String asked = null;
         Matcher m = SENTENCE.matcher(callerWords == null ? "" : callerWords.toLowerCase(Locale.ROOT));
         while (m.find()) {
             String s = m.group().trim();
-            if (CALLBACK_WORDS.matcher(s).find() && !NO_CALLBACK_WORDS.matcher(s).find()) {
+            if (asks(s)) {
                 asked = s;
             }
         }
         return asked;
+    }
+
+    /**
+     * The caller's sentence taking a call-back back ("no need to call me back"), lower case, when that is the last
+     * thing they said about a call-back; null when they never did, or asked for one again afterwards ("... actually,
+     * call me tomorrow"), or only set a limit ("don't call me back after 6 pm"). Words in a condition or a question
+     * ("if you don't call me back", "why don't you call me back") do not count. The training kit has the same rule
+     * (callkit.callback_withdrawn).
+     */
+    static String callbackWithdrawn(String callerWords) {
+        String withdrawn = null;
+        Matcher m = SENTENCE.matcher(callerWords == null ? "" : callerWords.toLowerCase(Locale.ROOT));
+        while (m.find()) {
+            String s = m.group().trim();
+            int end = -1;
+            Matcher w = WITHDRAWN_WORDS.matcher(s);
+            while (w.find()) {
+                if (!WITHDRAWN_CONDITION.matcher(s.substring(0, w.start())).find()) {
+                    end = w.end();
+                }
+            }
+            if (end >= 0) {
+                String rest = s.substring(end);
+                boolean limit = WITHDRAWN_LIMIT.matcher(rest.split("[,;]", 2)[0]).find();
+                withdrawn = asks(rest) || limit ? null : s;
+            } else if (asks(s)) {
+                withdrawn = null;
+            }
+        }
+        return withdrawn;
+    }
+
+    private static boolean asks(String s) {
+        return CALLBACK_WORDS.matcher(s).find() && !NO_CALLBACK_WORDS.matcher(s).find();
     }
 
     /** The caller asked not to be called again ("stop calling", "don't call me again", "remove my number"...). */

@@ -346,6 +346,7 @@ public class VoiceCallService {
         call.setDisconnectReason(cut(disconnectReason, 40));
         if (status == CallStatus.COMPLETED) {
             optOutIfAsked(call);
+            callbackWithdrawnIfSaid(call);
         }
         if (status == CallStatus.COMPLETED && call.getOutcome() == null) {
             call.setOutcome(Outcome.NO_INTERACTION);
@@ -396,6 +397,21 @@ public class VoiceCallService {
         noted.add(Line.tool("opt_out", "OK", "The caller asked to stop; recorded by the CRM from their words"));
         call.setTranscript(toJson(noted));
         return true;
+    }
+
+    /**
+     * The caller's last word on a call-back was "no need to call me back" ({@link CallerSignals#callbackWithdrawn}):
+     * the call-back is flagged for staff ({@link HandoffService#withdrawn}). Run when a call ends and when the engine
+     * sends the caller's last words; real calls only, and doing it twice changes nothing. True if it flagged one.
+     */
+    boolean callbackWithdrawnIfSaid(VoiceCall call) {
+        if (call.isTestCall()) {
+            return false;
+        }
+        String said = lines(call).stream().filter(l -> "caller".equals(l.role()) && l.text() != null).map(Line::text)
+                .collect(java.util.stream.Collectors.joining(" "));
+        String sentence = CallerSignals.callbackWithdrawn(said);
+        return sentence != null && handoffs.withdrawn(call, sentence) > 0;
     }
 
     private static String defaultSummary(VoiceCall call) {

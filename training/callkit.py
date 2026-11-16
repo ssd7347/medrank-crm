@@ -607,14 +607,42 @@ DISPUTE_WORDS = re.compile(SPEC["dispute_words"])
 OPT_OUT_WORDS = re.compile(SPEC["opt_out_words"])
 CALLBACK_WORDS = re.compile(SPEC["callback_words"])
 NO_CALLBACK_WORDS = re.compile(SPEC["no_callback_words"])
+CALLBACK_WITHDRAWN_WORDS = re.compile(SPEC["callback_withdrawn_words"])
+WITHDRAWN_CONDITION = re.compile(SPEC["callback_withdrawn_not_after"])
+WITHDRAWN_LIMIT = re.compile(SPEC["callback_withdrawn_not_before"])
 CALLBACK_ASKED: str = SPEC["callback_asked_arg"]
 SENTENCE = re.compile(r"[^.?!]+[.?!]?")
 
 
+def _asks(s: str) -> bool:
+    return bool(CALLBACK_WORDS.search(s)) and not NO_CALLBACK_WORDS.search(s)
+
+
+def callback_withdrawn(caller_words: str) -> str | None:
+    """CallerSignals.callbackWithdrawn(): the caller's sentence taking a call-back back ("no need to call me back"),
+    when that is the last thing they said about one; None otherwise (asked again, only a limit, or a condition)."""
+    withdrawn = None
+    for sentence in SENTENCE.findall((caller_words or "").lower()):
+        s = sentence.strip()
+        end = -1
+        for w in CALLBACK_WITHDRAWN_WORDS.finditer(s):
+            if not WITHDRAWN_CONDITION.search(s[:w.start()]):
+                end = w.end()
+        if end >= 0:
+            rest = s[end:]
+            limit = WITHDRAWN_LIMIT.search(re.split(r"[,;]", rest, maxsplit=1)[0])
+            withdrawn = None if _asks(rest) or limit else s
+        elif _asks(s):
+            withdrawn = None
+    return withdrawn
+
+
 def callback_asked(caller_words: str) -> str | None:
-    """CallerSignals.callbackAsked(): the caller's last sentence asking for a call-back or a new date, or None."""
-    hits = [s.strip() for s in SENTENCE.findall((caller_words or "").lower())
-            if CALLBACK_WORDS.search(s) and not NO_CALLBACK_WORDS.search(s)]
+    """CallerSignals.callbackAsked(): the caller's last sentence asking for a call-back or a new date, or None (also
+    when they took it back later)."""
+    if callback_withdrawn(caller_words) is not None:
+        return None
+    hits = [s.strip() for s in SENTENCE.findall((caller_words or "").lower()) if _asks(s)]
     return hits[-1] if hits else None
 
 

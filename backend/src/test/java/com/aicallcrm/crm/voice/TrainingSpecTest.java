@@ -60,6 +60,9 @@ class TrainingSpecTest {
         spec.put("opt_out_words", CallerSignals.OPT_OUT);
         spec.put("callback_words", CallerSignals.CALLBACK);
         spec.put("no_callback_words", CallerSignals.NO_CALLBACK);
+        spec.put("callback_withdrawn_words", CallerSignals.CALLBACK_WITHDRAWN);
+        spec.put("callback_withdrawn_not_after", CallerSignals.WITHDRAWN_NOT_AFTER);
+        spec.put("callback_withdrawn_not_before", CallerSignals.WITHDRAWN_NOT_BEFORE);
         spec.put("callback_asked_arg", CallerSignals.CALLBACK_ASKED);
         spec.put("max_name_asks", VoiceTools.MAX_NAME_ASKS);
 

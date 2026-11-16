@@ -96,7 +96,8 @@ Tick these off with the developer:
     and how the calls are going. **Pause all** (admin) stops every campaign at once and sends incoming callers to
     the normal greeting. Use it whenever something looks wrong; "Resume calling" undoes it.
   - *Call-backs*: people the agent promised a call from a person. Call them and mark each one done. Complaints and
-    distress come in marked urgent.
+    distress come in marked urgent. One that starts "CHECK BEFORE CALLING" means the caller said something later
+    (for example "no need to call me back"): read the call's transcript first, and mark it done if they really don't want the call.
   - *Calls*: every AI call with its transcript and what the agent did. If the agent got something wrong, press
     **Flag as wrong** and say what: flagged calls are counted on the Overview so they get looked at.
   - *Campaigns* (admin): who to call (by stage, by upload, by a field such as "due date within 7 days"), with a

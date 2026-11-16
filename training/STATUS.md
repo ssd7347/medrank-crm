@@ -14,6 +14,36 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 16 November 2026: "NO NEED TO CALL ME BACK" AFTER BOOKING NOW REACHES THE CALL-BACK (user: "Yes, fix it")
+
+Before: a caller who booked a call-back and then said "no need to call me back" kept the task as if nothing was said,
+and if the model then logged the outcome, `upgrade()` could even book one from their earlier "call me back at 4".
+Now `CallerSignals.callbackWithdrawn` reads the caller's sentences in order: their last word on a call-back is a "no"
+("no need to call me back", "you don't have to call me back", "don't bother calling me back", "cancel the callback",
+"never mind the callback"...), not counting a condition or question before it ("if you don't call me back", "why
+don't you call me back"), a limit right after it ("don't call me back after 6 pm", "... today"), or a new request
+after it ("... call me tomorrow"). Then:
+- `callbackAsked` returns nothing, so logging the outcome books no call-back.
+- When the call ends, and again when the engine sends the caller's last words (`VoiceCallService.callbackWithdrawnIfSaid`),
+  `HandoffService.withdrawn` flags the call-backs this call booked, and only those. Each stays
+  OPEN but starts "CHECK BEFORE CALLING: later in the AI call they said they do not need a call-back. Read the
+  transcript; if that is right, mark this done." Whoever has it, else the owner, else the managers, gets
+  "Call-back may not be needed: <name>" with the caller's words (key `VWD:callId`).
+- Only this call's: I first also flagged the contact's older call-backs when this call booked none, and caught in
+  review that a "no" to the agent's offer ("Would you like someone to call you back?") would then flag, say, last
+  week's dispute follow-up. Removed; a test now shows it would have (the dispute's call-back got the warning).
+- Flagged, not closed, on purpose: the words come from a phone line, and a closed call-back cannot be reopened, so a
+  wrongly closed one would be a lead lost without anyone seeing it.
+`CallbackRequest.warn` now checks the whole summary for the note (it only looked at the start), so two different
+warnings never repeat. The training kit has the same rule (`callkit.callback_withdrawn`, words from the spec: 3 new
+keys). Tests: `AiBrainIntegrationTest.aCallBackTakenBackIsHeardInTheCallersWords` and the kit's twin (6 "no"s,
+8 sentences that are not one); `VoicePlivoTest`: taken back on the line → flagged with the alert text, one task;
+booked by the model after the "no", and a "no" heard only in the last words → flagged; moved to tomorrow → not
+flagged, no alert; the same contact rings again and says no to the offer → their earlier call-back untouched. With
+the fix turned off, the first three fail; the last fails with the older-call-backs version. Backend 123/123, engine 87,
+training kit 78.
+Docs: voice-agent.md (schedule_callback row), handover-guide (Call-backs).
+
 # 16 November 2026: MARKING A CONTACT "DO NOT CALL" CANCELS THEIR CALL-BACKS (user: "continue the next task")
 
 The gap left by the opt-out work: a contact marked "Do not call" by staff kept its open call-backs, and the call-backs

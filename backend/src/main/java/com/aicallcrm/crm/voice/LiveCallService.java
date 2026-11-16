@@ -189,7 +189,11 @@ public class LiveCallService {
             List<Line> all = new ArrayList<>(callService.lines(call));
             all.add(Line.caller(words));
             call.setTranscript(callService.toJson(all));
-            return callService.optOutIfAsked(call);
+            boolean optedOut = callService.optOutIfAsked(call);
+            if (call.getEndedAt() != null) {
+                callService.callbackWithdrawnIfSaid(call);   // the call is over, so these really are the last words
+            }
+            return optedOut;
         }));
     }
 

@@ -8,7 +8,7 @@ import json
 import random
 import unittest
 
-from callkit import (CALLBACK_ASKED, EMPTY_THINK, TOOLS, FieldDef, all_scripts, answer_matches, callback_asked, check,
+from callkit import (CALLBACK_ASKED, EMPTY_THINK, TOOLS, FieldDef, all_scripts, answer_matches, callback_asked, callback_withdrawn, check,
                      identity_habits, new_call, read_tool_call_tags, render_for_training, spoken_amount, tools_in_system, upgrade)
 from scenarios import SCENARIOS, build, for_script
 
@@ -159,6 +159,28 @@ class FakeCrmTest(unittest.TestCase):
         # Booking again in the same call gives the same task.
         again = json.loads(call.run("schedule_callback", {"preferred_time_text": "4 pm"}))
         self.assertEqual(again["data"], {k: res["data"][k] for k in ("callback_id", "confirmed_slot")})
+
+    def test_a_call_back_taken_back_is_heard_in_the_callers_words(self):
+        # As AiBrainIntegrationTest.aCallBackTakenBackIsHeardInTheCallersWords.
+        withdrawn = {"No need to call me back.": "no need to call me back.",
+                     "Okay. Actually, you don't have to call me back, I will pay online.":
+                         "actually, you don't have to call me back, i will pay online.",
+                     "Call me back at 4. Sorry, no need for a callback, I paid already.":
+                         "sorry, no need for a callback, i paid already.",
+                     "Please cancel the call back.": "please cancel the call back.",
+                     "I don't need anyone to call me back.": "i don't need anyone to call me back.",
+                     "Don't bother calling me back.": "don't bother calling me back."}
+        for said, sentence in withdrawn.items():
+            self.assertEqual(callback_withdrawn(said), sentence, said)
+        for said in ("No need to call me back today. Call me tomorrow at 11.", "Don't call me back after 6 pm.",
+                     "No need to call me back, just call me tomorrow.", "If you don't call me back I will complain.",
+                     "Why don't you call me back later?", "Don't call me back. Actually, call me back tomorrow.",
+                     "I don't want to change the date.", "Please call me back at 4.", None):
+            self.assertIsNone(callback_withdrawn(said), said)
+        self.assertIsNone(callback_asked("Call me back at 4. Actually, no need to call me back."))
+        self.assertEqual(callback_asked("No need to call me back today. Call me tomorrow at 11."), "call me tomorrow at 11.")
+        logged = {"outcome_code": "WILL_ACT"}
+        self.assertIs(upgrade("log_call_outcome", logged, " Call me back at 4. Actually, no need to call me back.")[1], logged)
 
     def test_a_call_back_asked_for_is_heard_in_the_callers_words(self):
         # As AiBrainIntegrationTest.aCallBackAskedForIsHeardInTheCallersWords.
