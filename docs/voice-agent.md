@@ -149,8 +149,11 @@ property, visit, flat, plot), are stopped unless the opening line, an identity q
 again with a private note; if it repeats it, the caller hears a fixed line that names nothing: "It is about your account
 with us. May I have your full name, please?" If the caller just asked whether this is a person or a machine, the line
 starts "I am an AI assistant, not a person." This protects only what
-the model says. **The opening line is the customer's own**: the clinic scripts' openings say "your check-up is due" and
-"your upcoming appointment", and asking for a "loan account number" also hints at a loan. Review these with the
+the model says. **The opening line is the customer's own**, and so are the names of the identity questions: asking for a
+"loan account number" hints at a loan. The Scripts page flags both with the same word list
+(`VoiceScriptService.openingWarnings` under each version's opening line, and approving one asks again;
+`identityWarnings` at the top of the page, from `/voice/scripts/identity-warnings`), but a word outside the list is not
+flagged. Review these with the
 customer's compliance adviser before going live.
 
 ## When the model gets stuck

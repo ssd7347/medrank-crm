@@ -763,6 +763,54 @@ class VoiceAgentIntegrationTest {
         mvc.perform(auth(get("/api/voice/script-names"), admin)).andExpect(jsonPath("$").value(Matchers.hasItem("Renewal call")));
     }
 
+    /** Checklist 2.5: the company's own opening line and identity questions are said before the identity check. */
+    @Test
+    void openingLinesAndIdentityQuestionsThatNameTheReasonAreFlagged() throws Exception {
+        String body = "{\"name\":\"Policy call\",\"kind\":\"OUTBOUND\",\"model\":\"claude-haiku-4-5\",\"systemPrompt\":"
+                + "\"Rules...\",\"openingLine\":\"Hello {{first_name}}, this is {{agent_name}} from {{company_name}},"
+                + " calling about your policy renewal and the premium.\"}";
+        mvc.perform(auth(post("/api/voice/scripts"), admin).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.warnings").value(Matchers.contains("The opening line says \"policy\", \"renewal\","
+                        + " \"premium\" before the AI knows it is speaking to the right person. Whoever answers may not be"
+                        + " the customer, and the AI may then say these words too before the identity check. Say only who"
+                        + " is calling and ask for the person; the reason for the call comes after the check.")));
+        // The starter packs' opening: nothing to flag (the placeholders are not read as words).
+        mvc.perform(auth(post("/api/voice/scripts"), admin).contentType(MediaType.APPLICATION_JSON).content(body.replace(
+                        "Hello {{first_name}}, this is {{agent_name}} from {{company_name}}, calling about your policy renewal"
+                                + " and the premium.", "Hello, this is {{agent_name}}, an AI assistant calling from"
+                                + " {{company_name}}. Am I speaking with {{first_name}}? Of course, take your time.")))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.warnings").isEmpty());
+        mvc.perform(auth(get("/api/voice/scripts"), admin))
+                .andExpect(jsonPath("$[?(@.name == 'Policy call')].warnings[0]").value(Matchers.contains(
+                        Matchers.startsWith("The opening line says \"policy\", \"renewal\", \"premium\" before"))));
+
+        MvcResult made = mvc.perform(auth(post("/api/fields"), admin).contentType(MediaType.APPLICATION_JSON).content(
+                        "{\"label\":\"Loan Account No\",\"fieldType\":\"TEXT\",\"agentAccess\":\"NONE\",\"verifyWith\":true,"
+                                + "\"sortOrder\":10,\"active\":true}"))
+                .andExpect(status().isCreated()).andReturn();
+        long field = id(made);
+        String agent = login(user("AGENT"), "StaffPass123!");
+        mvc.perform(auth(get("/api/voice/scripts/identity-warnings"), agent)).andExpect(status().isForbidden());
+        mvc.perform(auth(get("/api/voice/scripts/identity-warnings"), admin)).andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(Matchers.hasItem("To check who it is speaking to, the AI asks for \"Loan"
+                        + " Account No\", so whoever answers hears \"loan\" before the check has passed, and the AI may"
+                        + " then say it too. Rename the field (Custom fields) to a name that does not say why you are"
+                        + " calling, such as \"Account number\".")))
+                // "Customer Ref" (set up for every test here) names no reason.
+                .andExpect(jsonPath("$").value(Matchers.not(Matchers.hasItem(Matchers.containsString("Customer Ref")))));
+        // Renamed: nothing to flag. Then switched off, so the other tests here never ask for it.
+        String rename = "{\"label\":\"Account No\",\"fieldType\":\"TEXT\",\"agentAccess\":\"NONE\",\"verifyWith\":true,"
+                + "\"sortOrder\":10,\"active\":true}";
+        mvc.perform(auth(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/fields/" + field), admin)
+                .contentType(MediaType.APPLICATION_JSON).content(rename)).andExpect(status().isOk());
+        mvc.perform(auth(get("/api/voice/scripts/identity-warnings"), admin))
+                .andExpect(jsonPath("$").value(Matchers.not(Matchers.hasItem(Matchers.containsString("Account No")))));
+        mvc.perform(auth(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/fields/" + field), admin)
+                .contentType(MediaType.APPLICATION_JSON).content(rename.replace("\"active\":true", "\"active\":false")))
+                .andExpect(status().isOk());
+    }
+
     @Test
     void scriptedConversationsAndRedTeamLinesInTheTestConsole() throws Exception {
         String agent = login(user("AGENT"), "StaffPass123!");

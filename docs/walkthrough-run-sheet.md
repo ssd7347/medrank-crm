@@ -95,6 +95,9 @@ and no call recording.
 
 - **AI voice agent → Scripts**: *EMI due reminder* is approved, version 1, by Demo Admin. Every edit makes a new
   version, used only once the admin approves it. The opening line says it is an AI assistant.
+- At the top of the page an amber **Identity question** note says that asking for the "Loan account number" tells
+  whoever answers there is a loan. This is expected in the demo: it is the CRM checking the company's own wording.
+  Their decision, with their adviser: keep it, or rename the field (e.g. "Account number").
 - Point out what the opening does not say: why it is calling (that comes only after the identity check), and that
   the call may be recorded (calls are not recorded; if they want recording, the line goes back in; compliance
   checklist, 2.2).

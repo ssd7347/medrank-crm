@@ -10,19 +10,23 @@ import { useApi } from "@/lib/use-api";
 
 export default function ScriptsPage() {
   const { data, error, loading, reload } = useApi<VoiceScript[]>("/api/voice/scripts");
+  const identity = useApi<string[]>("/api/voice/scripts/identity-warnings");
   const [draft, setDraft] = useState<Partial<VoiceScript> | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<VoiceScript | null>(null);
 
   const approve = async (s: VoiceScript) => {
     setBusy(true);
     setActionError(null);
     try {
       await api(`/api/voice/scripts/${s.id}/approve`, { method: "POST" });
+      setConfirming(null);
       reload();
     } catch (e) {
       setActionError(errorMessage(e));
+      setConfirming(null);
     } finally {
       setBusy(false);
     }
@@ -41,6 +45,12 @@ export default function ScriptsPage() {
         <Button onClick={() => setDraft({ name: "", kind: "OUTBOUND", model: "claude-sonnet-5-5" })}>New script</Button>
       </div>
       {(error || actionError) && <Alert>{error ?? actionError}</Alert>}
+      {(identity.data ?? []).map((w) => (
+        <Alert key={w} tone="amber">
+          <span className="font-medium">Identity question: </span>
+          {w}
+        </Alert>
+      ))}
       {names.map((name) => {
         const versions = (data ?? []).filter((s) => s.name === name);
         return (
@@ -65,13 +75,18 @@ export default function ScriptsPage() {
                         New version
                       </Button>
                       {!s.active && (
-                        <Button size="sm" loading={busy} onClick={() => approve(s)}>
+                        <Button size="sm" loading={busy} onClick={() => (s.warnings?.length ? setConfirming(s) : approve(s))}>
                           Approve
                         </Button>
                       )}
                     </div>
                   </div>
                   <p className="mt-1 text-sm break-words text-ink-soft">&ldquo;{s.openingLine}&rdquo;</p>
+                  {(s.warnings ?? []).map((w) => (
+                    <p key={w} className="mt-1 text-xs text-amber-800">
+                      {w}
+                    </p>
+                  ))}
                   {open === s.id && <pre className="mt-2 max-h-96 overflow-auto rounded-lg bg-muted p-3 text-xs whitespace-pre-wrap">{s.systemPrompt}</pre>}
                 </li>
               ))}
@@ -79,6 +94,26 @@ export default function ScriptsPage() {
           </Card>
         );
       })}
+      {confirming && (
+        <Modal open onClose={() => setConfirming(null)} title={`Approve version ${confirming.version} of ${confirming.name}?`}>
+          <div className="space-y-4 text-sm">
+            {confirming.warnings.map((w) => (
+              <Alert key={w} tone="amber">
+                {w}
+              </Alert>
+            ))}
+            <p className="text-ink-soft">Approve it only if your compliance adviser has agreed to this opening line.</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setConfirming(null)}>
+                Cancel
+              </Button>
+              <Button loading={busy} onClick={() => approve(confirming)}>
+                Approve anyway
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
       <Modal open={draft !== null} onClose={() => setDraft(null)} title={draft?.id ? `New version of ${draft.name}` : "New script"} wide>
         {draft && (
           <ScriptForm

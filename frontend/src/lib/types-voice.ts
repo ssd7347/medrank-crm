@@ -211,6 +211,8 @@ export type VoiceScript = {
   approvedAt: string | null;
   approvedBy: string | null;
   createdAt: string;
+  /** What the opening line gives away before the identity check (compliance checklist 2.5). */
+  warnings: string[];
 };
 
 export type TestCall = {

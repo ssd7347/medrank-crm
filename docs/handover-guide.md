@@ -103,7 +103,10 @@ Tick these off with the developer:
   - *Campaigns* (admin): who to call (by stage, by upload, by a field such as "due date within 7 days"), with a
     preview of who will be called and why others will not; start, pause, finish.
   - *Scripts* (admin): what the agent is calling about and how it opens. Every save makes a new version, and a
-    version is used on calls only after the admin approves it (approving retires the previous one).
+    version is used on calls only after the admin approves it (approving retires the previous one). An amber note
+    under an opening line means it says why you are calling (for example "your policy renewal") before the AI knows
+    it is talking to the right person; an amber "Identity question" note at the top means the same of a field's name.
+    Change them, or approve only if your compliance adviser agrees.
   - *Test console* (admin): talk to the agent as if you were the contact, with no effect on the contact at all.
 - **Admin** pages: Staff users, Branches, Custom fields, Stages, AI knowledge base (the only answers the agent
   gives to questions), Company settings, Industry starter packs, Connected services.
@@ -111,7 +114,9 @@ Tick these off with the developer:
 **Custom fields and privacy.** For each field you choose what the agent may say: *Never read out* (anything used
 only to check identity, such as customer ID or date of birth), *Only after the caller is verified* (amount due,
 appointment time), or *To anyone who answers* (only harmless details). Tick **Ask to confirm** on one or two fields
-the real person would know (for example a customer ID): the agent uses them to check identity.
+the real person would know (for example a customer ID): the agent uses them to check identity. It asks for them by
+the field's name before it knows who answered, so the name should not say why you are calling ("Account number",
+not "Loan account number").
 
 ## 5. What a call is like
 

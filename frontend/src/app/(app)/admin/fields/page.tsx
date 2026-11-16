@@ -125,6 +125,12 @@ function FieldForm({ initial, onSaved, onCancel }: { initial: Partial<FieldDef>;
         )}
       </Field>
       <Checkbox label="Ask the caller to confirm this to prove who they are" checked={verify} onChange={(e) => setVerify(e.target.checked)} />
+      {verify && (
+        <p className="-mt-2 text-xs text-ink-faint">
+          The AI asks for it by this name before it knows who answered, so the name should not say why you are calling: &ldquo;Account number&rdquo;, not
+          &ldquo;Loan account number&rdquo;.
+        </p>
+      )}
       <Checkbox label="Show this field" checked={active} onChange={(e) => setActive(e.target.checked)} />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" onClick={onCancel}>

@@ -70,9 +70,14 @@ built. The CRM must not be put on the internet until codes are really sent (see 
 enquired"): they say who is calling, that it is an AI assistant, and ask for the person by first name; the reason comes
 after the identity check. The check that stops our own model naming the reason before the identity check now
 knows the other starter packs' reasons as well as money words (appointment, check-up, doctor, course, class, admission,
-exam, insurance, policy, renewal, claim, property, visit, flat, plot and similar; 16 November 2026). What remains: the
-company's own openings and identity questions can still name a reason (asking for a "policy number" says there is a
-policy), and a word outside the list is not stopped.
+exam, insurance, policy, renewal, claim, property, visit, flat, plot and similar; 16 November 2026). The company's own
+openings and identity questions can still name a reason (asking for a "policy number" says there is a policy); since
+16 November 2026 the Scripts page flags both with the same word list, and approving a flagged opening asks again.
+The finance and insurance starter packs' identity questions ("Loan account number", "Policy number") are flagged
+this way. What remains: a word outside the list is neither stopped nor flagged, and a flag does not stop anything.
+
+- [ ] Each flagged identity question renamed (Custom fields, e.g. "Account number") or kept with the adviser's
+  agreement
 
 - [ ] Every opening line reviewed by the adviser for what it reveals to someone who is not the customer
 

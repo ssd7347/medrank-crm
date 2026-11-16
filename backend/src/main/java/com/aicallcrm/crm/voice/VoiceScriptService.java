@@ -1,6 +1,7 @@
 package com.aicallcrm.crm.voice;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.aicallcrm.crm.audit.AuditService;
 import com.aicallcrm.crm.common.ApiException;
+import com.aicallcrm.crm.contact.FieldDefinition;
 import com.aicallcrm.crm.security.CurrentUser;
 import com.aicallcrm.crm.user.AppUserRepository;
 import com.aicallcrm.crm.voice.Voice.ScriptKind;
@@ -34,17 +36,61 @@ public class VoiceScriptService {
 
     public record ScriptView(Long id, String name, ScriptKind kind, int version, String model, String systemPrompt,
                              String openingLine, boolean active, boolean approved, Instant approvedAt,
-                             String approvedBy, Instant createdAt) {
+                             String approvedBy, Instant createdAt, List<String> warnings) {
     }
 
     private final VoiceScriptRepository scripts;
     private final AppUserRepository users;
     private final AuditService audit;
+    private final ContactFacts facts;
 
-    public VoiceScriptService(VoiceScriptRepository scripts, AppUserRepository users, AuditService audit) {
+    public VoiceScriptService(VoiceScriptRepository scripts, AppUserRepository users, AuditService audit,
+                              ContactFacts facts) {
         this.scripts = scripts;
         this.users = users;
         this.audit = audit;
+        this.facts = facts;
+    }
+
+    /**
+     * What the opening line tells whoever answers about why we are calling (compliance checklist 2.5). It is said
+     * before the identity check, to someone who may not be the customer, and its words are also ones the AI may then
+     * say before the check (LlmBrain.tooSoon). Placeholders are left out: the company's name says who is calling.
+     */
+    static List<String> openingWarnings(String openingLine) {
+        String text = openingLine == null ? "" : openingLine.replaceAll("\\{\\{[a-z_]+}}", " ");
+        List<String> words = FactGuard.reasonWords(text, "");
+        if (words.isEmpty()) {
+            return List.of();
+        }
+        return List.of("The opening line says " + quoted(words) + " before the AI knows it is speaking to the right "
+                + "person. Whoever answers may not be the customer, and the AI may then say " + (words.size() == 1
+                ? "it" : "these words") + " too before the identity check. Say only who is calling and ask for the "
+                + "person; the reason for the call comes after the check.");
+    }
+
+    /**
+     * The same for the identity questions: the AI asks for each "Ask to confirm" field by its label before the check
+     * has passed, so a label such as "Loan account number" tells whoever answers that there is a loan.
+     */
+    @Transactional(readOnly = true)
+    public List<String> identityWarnings() {
+        admin();
+        List<String> out = new ArrayList<>();
+        for (FieldDefinition f : facts.verificationFields()) {
+            List<String> words = FactGuard.reasonWords(f.getLabel(), "");
+            if (!words.isEmpty()) {
+                out.add("To check who it is speaking to, the AI asks for \"" + f.getLabel() + "\", so whoever answers"
+                        + " hears " + quoted(words) + " before the check has passed, and the AI may then say "
+                        + (words.size() == 1 ? "it" : "these words") + " too. Rename the field (Custom fields) to a"
+                        + " name that does not say why you are calling, such as \"Account number\".");
+            }
+        }
+        return out;
+    }
+
+    private static String quoted(List<String> words) {
+        return "\"" + String.join("\", \"", words) + "\"";
     }
 
     @Transactional(readOnly = true)
@@ -121,7 +167,7 @@ public class VoiceScriptService {
                 : users.findById(s.getApprovedBy()).map(u -> u.getFullName()).orElse(null);
         return new ScriptView(s.getId(), s.getName(), s.getKind(), s.getVersion(), s.getModel(), s.getSystemPrompt(),
                 s.getOpeningLine(), s.isActive(), s.getApprovedAt() != null, s.getApprovedAt(), approver,
-                s.getCreatedAt());
+                s.getCreatedAt(), openingWarnings(s.getOpeningLine()));
     }
 
     private static CurrentUser admin() {

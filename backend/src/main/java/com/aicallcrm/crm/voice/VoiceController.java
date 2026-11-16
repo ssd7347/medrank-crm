@@ -188,6 +188,13 @@ public class VoiceController {
         return scripts.all();
     }
 
+    /** Identity questions whose wording tells whoever answers why we are calling (checklist 2.5). */
+    @GetMapping("/voice/scripts/identity-warnings")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public List<String> identityWarnings() {
+        return scripts.identityWarnings();
+    }
+
     @PostMapping("/voice/scripts")
     @ResponseStatus(HttpStatus.CREATED)
     public ScriptView createScript(@Valid @RequestBody ScriptRequest req) {

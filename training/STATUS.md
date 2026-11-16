@@ -14,6 +14,32 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 16 November 2026: THE SCRIPTS PAGE FLAGS OPENINGS AND IDENTITY QUESTIONS THAT SAY WHY WE CALL (user: "continue the next task")
+
+What was left of compliance checklist 2.5: the guard stops our model naming the reason before the identity check, but
+the company's own opening line and the names of its "Ask to confirm" fields are said before the check too, and the
+guard lets the model repeat any reason word they contain (`LlmBrain.tooSoon` counts them as already said). Nothing
+told the admin. Now, with the guard's own word list (`FactGuard.reasonWords`):
+- `ScriptView.warnings` (`VoiceScriptService.openingWarnings`): under each version's opening line on the Scripts page,
+  e.g. 'The opening line says "policy", "renewal" before the AI knows it is speaking to the right person...'.
+  Placeholders are left out ({{company_name}} says who is calling). Approving a flagged version opens a check
+  ("Approve anyway"); nothing is blocked, the wording is the company's decision with its adviser.
+- `GET /voice/scripts/identity-warnings` (admin only): an amber "Identity question" note at the top of the page for each
+  active "Ask to confirm" field whose name gives a reason, telling them to rename it (Custom fields), e.g.
+  "Account number". The Custom fields form says the same when the box is ticked.
+The finance and insurance packs' "Loan account number" and "Policy number" are flagged, so the demo walkthrough
+shows the note (run sheet 3.4 now says so). Not renamed in the packs: the training kit's calls (scenarios.py) ask
+for "loan account number", so the model learned that wording; the client decides with their adviser. All starter
+openings come out clean.
+Test `VoiceAgentIntegrationTest.openingLinesAndIdentityQuestionsThatNameTheReasonAreFlagged`: the exact warning for
+"calling about your policy renewal and the premium"; none for the starter opening (with "Of course"); the list shows
+it; a "Loan Account No" field is flagged, "Customer Ref" is not, staff get 403; renamed "Account No" it is not
+flagged. With the opening check off it fails ("no item was ..."); with only the identity check off it fails ("was
+empty"). Checked in the browser on the in-memory test CRM (8093/3093): both notes, the approve check, approving
+anyway (version in use), the field-form hint. Backend 124/124, engine 87, training kit 80.
+Docs: compliance-checklist 2.5 (new tick box for flagged identity questions), voice-agent.md, handover-guide
+(Scripts, Custom fields), walkthrough-run-sheet 3.4.
+
 # 16 November 2026: THE TRAINING KIT NOW PROMISES THE CALL-BACK TIME THE CRM DOES (user: "continue the next task")
 
 Left over from the call-back time work (e683f40, 6dc7f7f): the CRM promises the time the caller asked for, but the
