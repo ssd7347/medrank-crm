@@ -605,6 +605,65 @@ class VoiceAgentIntegrationTest {
     }
 
     @Test
+    void markingAContactDoNotCallCancelsTheirCallBacks() throws Exception {
+        approve("Incoming calls");
+        String manager = login(user("MANAGER"), "StaffPass123!");
+        // The status menu on the contact page, by the admin, after the manager took the call-back: closed, and the
+        // manager is told; the admin, who made the change, is not.
+        String phone = phone();
+        long kavya = contact(admin, "Kavya Menon", phone, "\"customer_ref\":\"CR-88101\"");
+        long first = callBackFor(kavya, phone);
+        mvc.perform(auth(post("/api/voice/callbacks/" + first + "/assign"), manager).contentType(MediaType.APPLICATION_JSON)
+                .content("{}")).andExpect(status().isOk());
+        mvc.perform(auth(post("/api/contacts/" + kavya + "/status"), admin).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"DO_NOT_CALL\"}")).andExpect(status().isOk());
+        mvc.perform(auth(get("/api/voice/callbacks"), admin)).andExpect(jsonPath("$[?(@.contactId == " + kavya + ")]", Matchers.empty()));
+        mvc.perform(auth(get("/api/voice/callbacks").param("done", "true"), admin))
+                .andExpect(jsonPath("$[?(@.id == " + first + ")].doneNote").value(Matchers.contains(HandoffService.DO_NOT_CALL_NOTE)));
+        mvc.perform(auth(get("/api/notifications"), manager))
+                .andExpect(jsonPath("$[?(@.title == 'Call-back cancelled: Kavya Menon')]", Matchers.hasSize(1)));
+
+        // A bulk stage change: "Do not call" closes it; another stage leaves a call-back alone.
+        String p2 = phone();
+        long ravi = contact(admin, "Ravi Kumar", p2, "\"customer_ref\":\"CR-88102\"");
+        long second = callBackFor(ravi, p2);
+        String p3 = phone();
+        long meena = contact(admin, "Meena Iyer", p3, "\"customer_ref\":\"CR-88103\"");
+        long third = callBackFor(meena, p3);
+        bulkStage(ravi, "DO_NOT_CALL");
+        bulkStage(meena, "INTERESTED");
+        mvc.perform(auth(get("/api/voice/callbacks").param("done", "true"), admin))
+                .andExpect(jsonPath("$[?(@.id == " + second + ")].doneNote").value(Matchers.contains(HandoffService.DO_NOT_CALL_NOTE)));
+        mvc.perform(auth(get("/api/voice/callbacks"), admin)).andExpect(jsonPath("$[?(@.id == " + third + ")]", Matchers.hasSize(1)));
+
+        // The edit form, too.
+        String p4 = phone();
+        long arjun = contact(admin, "Arjun Das", p4, "\"customer_ref\":\"CR-88104\"");
+        long fourth = callBackFor(arjun, p4);
+        mvc.perform(auth(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/contacts/" + arjun), admin)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"fullName\":\"Arjun Das\",\"phone\":\"" + p4
+                        + "\",\"status\":\"DO_NOT_CALL\",\"fields\":{\"customer_ref\":\"CR-88104\"}}")).andExpect(status().isOk());
+        mvc.perform(auth(get("/api/voice/callbacks").param("done", "true"), admin))
+                .andExpect(jsonPath("$[?(@.id == " + fourth + ")].doneNote").value(Matchers.contains(HandoffService.DO_NOT_CALL_NOTE)));
+    }
+
+    /** The contact rings in and asks for a call-back: its id. */
+    private long callBackFor(long contact, String phone) throws Exception {
+        String call = JsonPath.read(hook("/inbound/lookup", "{\"caller_number\":\"" + phone + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.call_id");
+        tool(call, "schedule_callback", "{\"preferred_time_text\":\"tomorrow morning\"}").andExpect(jsonPath("$.ok").value(true));
+        List<Integer> ids = JsonPath.read(mvc.perform(auth(get("/api/voice/callbacks"), admin)).andReturn().getResponse()
+                .getContentAsString(), "$[?(@.contactId == " + contact + ")].id");
+        assertThat(ids).hasSize(1);
+        return ids.get(0);
+    }
+
+    private void bulkStage(long contact, String stage) throws Exception {
+        mvc.perform(auth(post("/api/contacts/bulk"), admin).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ids\":[" + contact + "],\"action\":\"STAGE\",\"stage\":\"" + stage + "\"}")).andExpect(status().isOk());
+    }
+
+    @Test
     void unknownCallerBecomesAContactOnCallback() throws Exception {
         approve("Incoming calls");
         String phone = phone();

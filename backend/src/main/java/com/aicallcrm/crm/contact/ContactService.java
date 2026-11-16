@@ -1,5 +1,6 @@
 package com.aicallcrm.crm.contact;
 
+import org.springframework.context.ApplicationEventPublisher;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -137,10 +138,13 @@ public class ContactService {
     private final StageService stages;
     private final TagService tags;
     private final AuditService audit;
+    private final ApplicationEventPublisher events;
 
     public ContactService(ContactRepository contacts, ContactActivityRepository activities,
                           FollowUpRepository followUps, FieldService fields, AppUserRepository users,
-                          BranchRepository branches, StageService stages, TagService tags, AuditService audit) {
+                          BranchRepository branches, StageService stages, TagService tags, AuditService audit,
+                          ApplicationEventPublisher events) {
+        this.events = events;
         this.tags = tags;
         this.contacts = contacts;
         this.activities = activities;
@@ -269,6 +273,7 @@ public class ContactService {
         if (!before.equals(c.getStatus())) {
             activities.save(new ContactActivity(c.getId(), ActivityType.STATUS_CHANGE,
                     label(before) + " → " + label(c.getStatus()), null, users.getReferenceById(me.id())));
+            announce(c, before, me.id());
         }
         audit.record(me.id(), "CONTACT_UPDATED", "CONTACT", c.getId(), null);
         return view(c);
@@ -313,8 +318,10 @@ public class ContactService {
             activities.save(new ContactActivity(c.getId(), ActivityType.STATUS_CHANGE,
                     label(c.getStatus()) + " → " + label(to), blankToNull(req.note()),
                     users.getReferenceById(me.id())));
+            String before = c.getStatus();
             c.setStatus(to);
             audit.record(me.id(), "CONTACT_STATUS", "CONTACT", c.getId(), to);
+            announce(c, before, me.id());
         }
         return view(c);
     }
@@ -325,8 +332,17 @@ public class ContactService {
         contacts.findById(contactId).filter(c -> !c.getStatus().equals(status)).ifPresent(c -> {
             activities.save(new ContactActivity(c.getId(), ActivityType.STATUS_CHANGE,
                     label(c.getStatus()) + " → " + label(status), why, null));
+            String before = c.getStatus();
             c.setStatus(status);
+            announce(c, before, null);
         });
+    }
+
+    /** Tells the rest of the CRM a contact has just become "Do not call" (its open call-backs are cancelled). */
+    private void announce(Contact c, String before, Long byUserId) {
+        if (ContactStatus.DO_NOT_CALL.equals(c.getStatus()) && !ContactStatus.DO_NOT_CALL.equals(before)) {
+            events.publishEvent(new ContactMarkedDoNotCall(c.getId(), byUserId));
+        }
     }
 
     /** Used by the voice agent to put a call on the contact's timeline. */
@@ -401,7 +417,9 @@ public class ContactService {
                     if (!c.getStatus().equals(stage)) {
                         activities.save(new ContactActivity(c.getId(), ActivityType.STATUS_CHANGE,
                                 label(c.getStatus()) + " → " + toLabel, null, by));
+                        String before = c.getStatus();
                         c.setStatus(stage);
+                        announce(c, before, me.id());
                         changed++;
                     }
                 }

@@ -14,6 +14,22 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 16 November 2026: MARKING A CONTACT "DO NOT CALL" CANCELS THEIR CALL-BACKS (user: "continue the next task")
+
+The gap left by the opt-out work: a contact marked "Do not call" by staff kept its open call-backs, and the call-backs
+page does not show the contact's status, so someone could still ring them. Now `ContactService` publishes
+`ContactMarkedDoNotCall` whenever a contact becomes "Do not call" (not when it already was): the edit form, the status
+menu, a bulk stage change, and `statusFromCall` (an AI call, or merging duplicates). `HandoffService.markedDoNotCall`
+listens inside the same transaction and closes every OPEN or ASSIGNED call-back for that contact with the done note
+"Cancelled by the CRM: the contact was marked "Do not call"." Whoever had taken one (if still active) gets
+"Call-back cancelled: <name>", unless they made the change themselves. Changing the status back does not reopen them.
+Test (`VoiceAgentIntegrationTest.markingAContactDoNotCallCancelsTheirCallBacks`): status menu → the task is DONE with
+the note and the manager holding it is told; bulk stage to INTERESTED → stays open, bulk to DO_NOT_CALL → closed;
+the PUT edit form → closed. It fails with the old `ContactService` ("Expected: an empty collection"). Backend 118/118,
+engine 87, training kit 77.
+Still not done: a caller who says "no need to call me back" after booking keeps the task.
+Docs: voice-agent.md (opt_out row), compliance-checklist (opt-out row).
+
 # 16 November 2026: AN OPT-OUT NOW REACHES THE CALLER'S BOOKED CALL-BACKS (user: "continue the next task and list all the works which we done today")
 
 Found while looking at call-backs: opting out never touched open call-back tasks. A caller who said "call me at 4",

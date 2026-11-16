@@ -11,12 +11,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.aicallcrm.crm.alert.AlertService;
 import com.aicallcrm.crm.alert.Priority;
 import com.aicallcrm.crm.contact.Contact;
+import com.aicallcrm.crm.contact.ContactMarkedDoNotCall;
 import com.aicallcrm.crm.contact.ContactRepository;
 import com.aicallcrm.crm.contact.ContactStatus;
 import com.aicallcrm.crm.user.AppUser;
@@ -281,6 +283,33 @@ public class HandoffService {
             }
         }
         return open.size();
+    }
+
+    static final String DO_NOT_CALL_NOTE = "Cancelled by the CRM: the contact was marked \"Do not call\".";
+
+    /**
+     * A contact became "Do not call" (staff on the contact page, a bulk change, a merge, an AI call): nobody may ring
+     * them, so their open call-backs are closed with a note. Whoever had taken one is told, unless they made the change.
+     * Changing the status back does not reopen them.
+     */
+    @EventListener
+    @Transactional
+    public void markedDoNotCall(ContactMarkedDoNotCall e) {
+        List<CallbackRequest> open = callbacks.findByContactIdAndStatusIn(e.contactId(),
+                List.of(Voice.CallbackStatus.OPEN, Voice.CallbackStatus.ASSIGNED));
+        if (open.isEmpty()) {
+            return;
+        }
+        String name = contacts.findById(e.contactId()).map(Contact::getFullName).orElse("A contact");
+        for (CallbackRequest cb : open) {
+            AppUser had = cb.getAssignedTo();
+            cb.complete(null, DO_NOT_CALL_NOTE);
+            if (had != null && had.isActive() && !had.getId().equals(e.byUserId())) {
+                alerts.notifyUser(had.getId(), e.contactId(), "VOICE_CALLBACK", Priority.NORMAL,
+                        "Call-back cancelled: " + name, name + " was marked \"Do not call\", so the call-back you "
+                                + "took is closed. Please do not call them.", "/voice/callbacks", "VDNC:" + cb.getId());
+            }
+        }
     }
 
     /** Tells the contact's owner (or the managers) something they should know about this call. */
