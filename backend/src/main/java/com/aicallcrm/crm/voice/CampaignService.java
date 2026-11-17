@@ -297,7 +297,10 @@ public class CampaignService {
         }
         return new CampaignView(c.getId(), c.getName(), c.getScriptName(), c.getStatus(),
                 List.copyOf(ContactFacts.statuses(c.getFilterStatuses())), c.getFilterTag(), c.getFilterImportId(), c.getFilterFieldKey(),
-                c.getFilterFieldOp(), c.getFilterFieldValue(), c.getWindowStart(), c.getWindowEnd(),
+                c.getFilterFieldOp(), c.getFilterFieldValue(),
+                // The hours it really calls in: a campaign saved with wider hours is still held to the CRM's own.
+                CallEligibility.later(c.getWindowStart(), props.windowStart()),
+                CallEligibility.earlier(c.getWindowEnd(), props.windowEnd()),
                 c.getMaxConcurrent(), c.getMaxAttempts(), c.getRetryGapMin(), c.getBranchId(), c.getCreatedAt(),
                 c.getStartedAt(), c.getFinishedAt(), new Counts(list.size(), pending, done, simulated, skipped, failed),
                 scripts.approved(c.getScriptName()).isPresent());

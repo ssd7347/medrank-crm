@@ -36,14 +36,16 @@ public class VoiceHooksController {
     private final VoiceCallService calls;
     private final ObjectMapper mapper;
     private final LiveCallService live;
+    private final RecordingService recordings;
 
     public VoiceHooksController(VoiceSignatures signatures, ToolExecutor executor, VoiceCallService calls,
-                                ObjectMapper mapper, LiveCallService live) {
+                                ObjectMapper mapper, LiveCallService live, RecordingService recordings) {
         this.signatures = signatures;
         this.executor = executor;
         this.calls = calls;
         this.mapper = mapper;
         this.live = live;
+        this.recordings = recordings;
     }
 
     /** {@code { "call_id": "...", "args": { } }}. The contact is never taken from the arguments. */
@@ -107,7 +109,9 @@ public class VoiceHooksController {
      * {@code {"call_id", "what"}} when the engine hit a fault, told the caller someone will call back and is hanging
      * up; replies {@code {"callback_booked": true|false}}. {@code last}: {@code {"call_id", "said"}}, what the caller said
      * that the engine had not passed on when the stream closed (they hung up mid-sentence); nothing is said back;
-     * replies {@code {"opted_out": true|false}}.
+     * replies {@code {"opted_out": true|false}}. {@code open} also replies {@code "record"}: whether the engine records
+     * this call. {@code recording}: {@code {"call_id", "audio"}}, the call's recording as base64 Ogg Opus, sent once
+     * the call has ended; replies {@code {"kept": true|false}} (RecordingService.receive).
      */
     @PostMapping("/live/{step}")
     public Map<String, Object> live(@PathVariable String step, @RequestBody(required = false) String raw,
@@ -127,6 +131,9 @@ public class VoiceHooksController {
                 if (r.hint() != null) {
                     out.put("hint", r.hint());
                 }
+                if ("open".equals(step)) {
+                    out.put("record", r.record());
+                }
             }
             case "end" -> {
                 LiveCallService.Ended e = live.end(callId);
@@ -135,6 +142,7 @@ public class VoiceHooksController {
             }
             case "trouble" -> out.put("callback_booked", live.trouble(callId, string(body.get("what"))));
             case "last" -> out.put("opted_out", live.lastWords(callId, string(body.get("said"))));
+            case "recording" -> out.put("kept", recordings.receive(callId, string(body.get("audio"))));
             default -> throw ApiException.notFound("Step");
         }
         return out;

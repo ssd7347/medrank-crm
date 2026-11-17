@@ -20,10 +20,12 @@ public record VoiceProperties(
         @DefaultValue("") String hmacSecret,
         @DefaultValue("2500") int toolTimeoutMs,
         @DefaultValue("09:00") LocalTime windowStart,
-        @DefaultValue("20:00") LocalTime windowEnd,
+        /** AI calls are placed only from windowStart to windowEnd, Indian time: 9 AM to 6 PM unless set otherwise. */
+        @DefaultValue("18:00") LocalTime windowEnd,
         @DefaultValue("2") int maxPerNumberPerDay,
         @DefaultValue("120") int minGapMinutes,
         @DefaultValue("24") int dndTtlHours,
+        /** Days transcripts and recordings are kept; never fewer than {@link #MIN_RETENTION_DAYS}. */
         @DefaultValue("365") int retentionDays,
         @DefaultValue("claude-sonnet-5-5") String defaultModel,
         @DefaultValue("claude-sonnet-5-5") String richModel,
@@ -33,7 +35,19 @@ public record VoiceProperties(
         @DefaultValue("18:30") LocalTime deskClose,
         /** Rough all-in cost of one connected minute, used only for the cost estimate. */
         @DefaultValue("15") BigDecimal costPerMinuteInr,
-        @DefaultValue("60000") BigDecimal monthlyCapInr) {
+        @DefaultValue("60000") BigDecimal monthlyCapInr,
+        /** Folder on this server for call recordings (one audio file per call). Back it up with the database. */
+        @DefaultValue("data/recordings") String recordingsDir) {
+
+    /** Recordings must be kept at least this long (decided 17 Nov 2026). */
+    public static final int MIN_RETENTION_DAYS = 120;
+
+    public VoiceProperties {
+        if (retentionDays < MIN_RETENTION_DAYS) {
+            throw new IllegalArgumentException("app.voice.retention-days (VOICE_RETENTION_DAYS) is " + retentionDays
+                    + ": transcripts and call recordings must be kept at least " + MIN_RETENTION_DAYS + " days");
+        }
+    }
 
     public boolean signingConfigured() {
         return hmacSecret != null && hmacSecret.length() >= 32;

@@ -68,20 +68,20 @@ public class VoiceScriptService {
                     ? "it" : "these words") + " too before the identity check. Say only who is calling and ask for the "
                     + "person; the reason for the call comes after the check.");
         }
-        if (RECORDED.matcher(text).find()) {
+        if (!RECORDED.matcher(text).find()) {
             out.add(RECORDING_WARNING);
         }
         return out;
     }
 
     /**
-     * Calls are not recorded (no platform starts a recording; only the transcript is kept), so an opening that says
-     * so is untrue (compliance checklist 2.2). Scripts approved before 15 November 2026 still say "This call may be
-     * recorded": V10 corrected only drafts.
+     * Real AI calls are recorded only when the opening line tells the person so (decided 17 Nov 2026; compliance
+     * checklist 2.2): a call is never recorded without being announced. Scripts approved before then may lack it (V10
+     * took it out of drafts while nothing was recorded); their calls are not recorded until a new version is approved.
      */
-    private static final Pattern RECORDED = Pattern.compile("\\brecord(?:ed|ing)\\b", Pattern.CASE_INSENSITIVE);
-    static final String RECORDING_WARNING = "The opening line says the call is recorded, but calls are not recorded"
-            + " (only the transcript is kept). Remove it; if recording is set up later, it goes back in.";
+    static final Pattern RECORDED = Pattern.compile("\\brecord(?:ed|ing)\\b", Pattern.CASE_INSENSITIVE);
+    static final String RECORDING_WARNING = "The opening line does not say the call may be recorded, so calls with this"
+            + " script are not recorded. Add \"This call may be recorded.\" to record them.";
 
     /**
      * The same for the identity questions: the AI asks for each "Ask to confirm" field by its label before the check

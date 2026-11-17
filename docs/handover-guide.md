@@ -45,7 +45,6 @@ It is made of these parts:
 | A GPU computer | The brain is too slow on an ordinary computer (6.5–21 s per reply); on a GPU about 1 s | **Yours** (paid, monthly or by the hour) |
 | Login codes by SMS or WhatsApp | Today the sign-in code is shown on the login page, so the CRM website must **never** be put on the internet as it is | Needs a provider (e.g. MSG91, Gupshup) |
 | Do-not-disturb (DND) checks | Numbers are not checked against the national DND register; only people who gave consent are called | Your telephony provider's scrubbing service |
-| Call recording | Off. The starter openings no longer say the call "may be recorded"; if you switch recording on, add that line back (compliance checklist, 2.2) | Decide with the developer |
 
 ## 3. Your decisions before going live
 
@@ -59,7 +58,7 @@ Tick these off with the developer:
 3. **Hosting**: where the CRM server and database run once they leave the developer's laptop.
 4. **SMS or WhatsApp provider** for login codes (see section 2).
 5. **Compliance**, with your adviser (the full list, with what the CRM already enforces: `docs/compliance-checklist.md`): that everyone you call agreed to be called and how (a form, a contract
-   clause); the legal calling hours (the CRM's default is 09:00–20:00 Indian time); DND; what the opening lines
+   clause); the legal calling hours (the CRM's default is 09:00–18:00 Indian time); DND; what the opening lines
    say. Nothing in the software assumes these answers.
 6. **Your desk**: the phone number of the staff desk for live transfers, and its hours (default 09:30–18:30,
    Monday to Saturday). Without a desk number every hand-over becomes a call-back task. The desk hours also decide
@@ -183,7 +182,9 @@ The settings that matter most for live calls:
 | `AI_BRAIN`, `LOCAL_LLM_MODEL` | `LOCAL` and `ourvoice8b-r4` |
 | `STT_MODEL` (speech engine) | `small.en` on the GPU computer (it hears Indian English much better than the default `base.en`) |
 | `VOICE_DESK_NUMBER`, `VOICE_DESK_OPEN`, `VOICE_DESK_CLOSE` | Your desk's number and hours |
-| `VOICE_WINDOW_START`, `VOICE_WINDOW_END` | Legal calling hours, Indian time (default 09:00 and 20:00) |
+| `VOICE_WINDOW_START`, `VOICE_WINDOW_END` | Legal calling hours, Indian time (default 09:00 and 18:00, that is 9 AM to 6 PM) |
+| `VOICE_RECORDINGS_DIR` | Folder on the CRM server for call recordings (default `data/recordings`) |
+| `VOICE_RETENTION_DAYS` | Days transcripts and recordings are kept (default 365; never fewer than 120) |
 | `OTP_SHOW_ON_SCREEN` | `true` only while nobody outside can reach the website |
 
 **Start order**: the database, the CRM server, the speech engine, the gateway; on the GPU computer the brain
@@ -191,8 +192,14 @@ The settings that matter most for live calls:
 `docs/first-real-call.md`. In that plan the CRM server reaches the brain through a private SSH tunnel; the brain
 is never put on the open internet.
 
-**Backups**: back up the database every day (your hosting's automatic backups are enough). Transcripts are deleted
-automatically after 365 days (`VOICE_RETENTION_DAYS`).
+**Backups**: back up the database every day (your hosting's automatic backups are enough), and the recordings folder
+(`VOICE_RECORDINGS_DIR`) with it. Transcripts and recordings are deleted automatically after 365 days
+(`VOICE_RETENTION_DAYS`, never fewer than 120).
+
+**Call recordings**: every real AI call whose opening line says "This call may be recorded" is recorded (both voices)
+and kept as one audio file on the CRM server. The admin can listen on the call's page (**Listen**); other staff only
+if the admin ticks "Can listen to call recordings" for them on **Staff users**, and then only for calls they can see.
+Every listen is in the audit log. Test-console calls are never recorded.
 
 ## 8. When something goes wrong
 

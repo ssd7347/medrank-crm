@@ -14,6 +14,50 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 17 November 2026: CALLS 9 AM TO 6 PM, AND CALLS ARE RECORDED (user: "the calling hours should be from 9 am to 6 pm / for 20, add the may be recorded line and store it in database or somewhere and keep it for atlease 120 days and only the admin and the authorized who we give access can access the recordings")
+
+The user's choices (asked): record every real call, the opening tells them; a folder on the CRM server, listed in
+the database; kept with transcripts (365 days, never under 120); desk hours stay 9:30 to 6:30.
+
+**Calling hours.** `app.voice.window-end` default 18:00 (application.properties and `VoiceProperties`), campaign
+form default 18:00. A campaign saved with wider hours (say 8 AM to 8 PM) now shows the hours it really calls in
+(`CampaignService` view: later start, earlier end), as `CallEligibility` already held it to them. Tests
+`CallingHoursDefaultTest` (the shipped file and the bare default are 09:00 to 18:00, desk 09:30 to 18:30; both fail
+on 20:00) and `CallingHoursIntegrationTest` (overview 09:00 to 18:00; a campaign 08:00 to 20:00 shows 09:00 to 18:00,
+10:00 to 13:00 stays; fails without the view change: 08:00). Docs: checklist, first-real-call, handover-guide,
+voice-agent, walkthrough-run-sheet.
+
+**Recording.** A real call is recorded only when its script's opening line says it may be (`RecordingService.announces`,
+"recorded"/"recording"), so nobody is recorded without being told; the per-number "agreed to recording" tick no
+longer decides it (now "for your records only" on the contact page and import). The starter openings say "This call
+may be recorded." again (packs, and V12 for draft scripts; approved scripts are left, and their calls are not
+recorded until a new version is approved). The Scripts page warning is reversed: it flags an opening that does NOT
+say it. Engine (`phone.Recorder`): both voices on one 8 kHz track as the caller heard them (caller audio is the clock;
+agent audio placed where it starts playing; audio cleared by a barge-in dropped), at most 3 hours, Ogg Opus 16 kbit/s
+(about 120 kB a minute) via PyAV; recorded from the start, dropped unless the CRM's `live/open` reply says
+`"record": true` (it does only for a real call marked for recording whose opening, as said, told them); sent once the
+stream closes to the signed hook `live/recording` (base64). CRM (`RecordingService`): keeps one file per call at
+`app.voice.recordings-dir` (`VOICE_RECORDINGS_DIR`, default `data/recordings`, gitignored) as `yyyy-MM/<call>.ogg`,
+`recording_ref` = `file:...`; refuses test calls, calls not to be recorded, a second copy, erased calls, calls past
+retention and non-Ogg data. `GET /api/voice/calls/{id}/recording`: the admin, or staff with the new
+`app_user.can_hear_recordings` (V12; Staff users: "Can listen to call recordings", read from the database each time
+so taking it away is immediate), and only for calls they can see; audited `RECORDING_PLAYED` ("Listened to a call
+recording"); no-store. The call page has **Listen** (fetched signed in, played from a blob) or says why there is none.
+Retention (`purgeOldConversations`) and erasure delete the files after the commit; `Erased.recordingsDeleted`; the
+data copy marks `recording_kept` per call. `VoiceProperties` refuses `retention-days` under 120 at startup.
+Tests: `RecordingIntegrationTest` (4: kept and played by the admin and allowed staff only, audit, other agent 404,
+taken away 403, erasure deletes it; test call, unannounced opening, opening said without it, past retention never
+kept, purge deletes; only files inside the folder; 119 days refused) with each of 7 safeguards shown to fail when
+removed (anyone may hear; record without the notice said; erasure or retention leaving the file; unrecorded calls
+kept; under 120 days; any file name); `StarterOpeningsIntegrationTest` (built-ins and packs say it; V12 changes drafts
+only, run on this test's rows only); `VoiceAgentIntegrationTest` warning test reversed. Engine `RecorderTest` and
+`RecordingCallTest` (10), each guard shown to fail when removed. In the browser on the in-memory test CRM: a call
+recorded through the real hooks with Piper voices (23 kB, 12.7 s) played on the call page, two listens in the audit
+log, a staff member added with the tick, the Recordings column, no amber notes on the scripts, phone width. Not
+tried: a real Plivo call (the recording path is the same stream), PostgreSQL. Backend 134/134, engine 97, kit 80.
+Docs: compliance-checklist 2.2 and a table row, handover-guide (settings, backups, who listens), voice-agent,
+walkthrough-run-sheet, first-real-call (step 7: listen).
+
 # 17 November 2026: THE ADMIN CAN READ THE AUDIT LOG (user: "continue")
 
 Every sensitive action has been recorded in `audit_log` since the start (sign-ins and failed ones, contact changes,

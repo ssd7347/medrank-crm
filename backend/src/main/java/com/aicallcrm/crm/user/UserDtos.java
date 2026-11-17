@@ -16,11 +16,13 @@ public final class UserDtos {
     private UserDtos() {
     }
 
+    /** {@code canHearRecordings}: may play AI call recordings (always true for the admin). */
     public record UserResponse(Long id, String fullName, String email, String phone, Role role,
-                               boolean active, BranchRef branch, Instant createdAt) {
+                               boolean active, BranchRef branch, Instant createdAt, boolean canHearRecordings) {
         public static UserResponse of(AppUser u) {
             return new UserResponse(u.getId(), u.getFullName(), u.getEmail(), u.getPhone(), u.getRole(),
-                    u.isActive(), BranchRef.of(u.getBranch()), u.getCreatedAt());
+                    u.isActive(), BranchRef.of(u.getBranch()), u.getCreatedAt(),
+                    u.getRole() == Role.SUPER_ADMIN || u.isCanHearRecordings());
         }
     }
 
@@ -38,7 +40,9 @@ public final class UserDtos {
             @NotNull Role role,
             /** No longer used to sign in (that is by mobile number and code); a random one is set if empty. */
             @Size(max = 72) String password,
-            Long branchId) {
+            Long branchId,
+            /** May play AI call recordings. Left out: no. */
+            Boolean canHearRecordings) {
     }
 
     public record UpdateUserRequest(
@@ -46,7 +50,9 @@ public final class UserDtos {
             @Pattern(regexp = "^[0-9+ -]{0,20}$", message = "invalid phone") String phone,
             @NotNull Role role,
             boolean active,
-            Long branchId) {
+            Long branchId,
+            /** May play AI call recordings. Left out: unchanged. */
+            Boolean canHearRecordings) {
     }
 
     public record ResetPasswordRequest(

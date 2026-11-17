@@ -100,11 +100,16 @@ class UtterancesTest(unittest.TestCase):
 
 
 class FakeCrm:
-    def __init__(self, replies):
+    def __init__(self, replies, record=False):
         self.replies, self.heard, self.ended, self.troubles, self.last = list(replies), [], 0, [], []
+        self.record, self.recordings = record, []
 
     def open(self, call_id):
-        return phone.Reply("Hello, this is Asha.", False)
+        return phone.Reply("Hello, this is Asha. This call may be recorded.", False, "", self.record)
+
+    def recording(self, call_id, ogg):
+        self.recordings.append((call_id, ogg))
+        return True
 
     def turn(self, call_id, said):
         self.heard.append(said)
@@ -146,6 +151,9 @@ class CallTest(unittest.TestCase):
             last = call.stop()
             if last is not None:
                 await last
+            recording = call.send_recording()
+            if recording is not None:
+                await recording
             return call
         call = asyncio.run(go())
         return sent, closed, call
@@ -517,6 +525,141 @@ class CrmTest(unittest.TestCase):
         # The same value is asserted for PlivoHooksController.streamToken in PlivoSignatureTest (Java).
         self.assertEqual(phone.stream_token("test-only-voice-secret-0123456789-abcdefgh", "6f1c2b8e-0000-4000-8000-000000000001"),
                          "c4af2d96e8c7c170948d98741c6e3201f8a57ae74c2642903899926cc2e7b5df")
+
+
+def decoded_seconds(ogg):
+    """How long an Ogg Opus file plays, decoded with PyAV."""
+    import io
+
+    import av
+    with av.open(io.BytesIO(ogg)) as box:
+        return sum(f.samples for f in box.decode(audio=0)) / box.streams.audio[0].rate
+
+
+class RecorderTest(unittest.TestCase):
+    """Both voices on one track, where the caller heard them."""
+
+    def test_the_agent_is_placed_when_it_starts_playing(self):
+        r = phone.Recorder()
+        r.hear(quiet(1.0))
+        r.say(tone(0.5))                    # sent after 1 s of the call: plays from 1 s
+        r.say(tone(0.25, 500))              # sent at once: plays after the first piece
+        mix = r.mix()
+        self.assertEqual(len(mix), int(1.75 * RATE))
+        self.assertLess(np.abs(mix[:RATE - 1]).max(), 200)                     # only the caller's quiet line
+        self.assertGreater(np.abs(mix[RATE:int(1.5 * RATE)]).max(), 7000)      # the first piece
+        self.assertGreater(np.abs(mix[int(1.5 * RATE):]).max(), 7000)          # then the second
+
+    def test_both_voices_are_heard_when_they_overlap(self):
+        r = phone.Recorder()
+        r.say(tone(1.0, 300, 4000))
+        r.hear(tone(1.0, 700, 4000))
+        mix = r.mix().astype(np.float64)
+        spectrum = np.abs(np.fft.rfft(mix))
+        freqs = np.fft.rfftfreq(len(mix), 1 / RATE)
+        self.assertGreater(spectrum[np.argmin(np.abs(freqs - 300))], spectrum.mean() * 50)
+        self.assertGreater(spectrum[np.argmin(np.abs(freqs - 700))], spectrum.mean() * 50)
+
+    def test_what_the_caller_talked_over_is_left_out(self):
+        r = phone.Recorder()
+        r.hear(quiet(1.0))
+        r.say(tone(2.0))                    # queued to play from 1 s to 3 s
+        r.hear(tone(0.5, 700))              # the caller talks over it at 1.5 s
+        r.cut()                             # the queued audio is cleared: the rest was never played
+        self.assertEqual(r.agent_end, int(1.5 * RATE))
+        self.assertEqual(len(r.mix()), int(1.5 * RATE))
+        r.say(tone(0.5))                    # the next reply plays from now
+        self.assertEqual(r.agent[-1][0], int(1.5 * RATE))
+
+    def test_it_is_kept_as_ogg_opus_of_the_same_length_and_small(self):
+        r = phone.Recorder()
+        r.say(tone(2.0, 500, 3000))         # the opening, from the start
+        r.hear(tone(6.0, 300, 3000))        # the caller, for 6 s
+        ogg = r.ogg()
+        self.assertEqual(ogg[:4], b"OggS")
+        self.assertAlmostEqual(decoded_seconds(ogg), 6.0, delta=0.1)
+        self.assertLess(len(ogg), 6 * 16000 / 8 * 1.5)      # about 16 kbit/s
+        self.assertEqual(phone.Recorder().ogg(), b"")
+
+    def test_at_most_three_hours_are_kept(self):
+        r = phone.Recorder()
+        r.MAX_S = 2
+        r.hear(quiet(1.5))
+        r.hear(quiet(1.0))                  # would pass 2 s: not kept
+        r.say(tone(0.5))
+        r.say(tone(0.5))                    # would end at 2.5 s: not kept
+        self.assertEqual((r.heard, r.agent_end), (int(1.5 * RATE), 2 * RATE))
+
+
+class RecordingCallTest(unittest.TestCase):
+    """A call is recorded only when the CRM's opening reply says so, and sent to it once the call is over."""
+
+    run_call = CallTest.run_call
+
+    SCRIPT = [{"event": "start", "start": {"streamId": "s1", "callId": "plivo-1"}}, "wait",
+              media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)])), "wait"]
+
+    def test_a_call_to_record_is_sent_to_the_crm_with_both_voices(self):
+        crm = FakeCrm([phone.Reply("Noted.", False)], record=True)
+        sent, closed, call = self.run_call(crm, self.SCRIPT)
+        self.assertEqual(len(crm.recordings), 1)
+        call_id, ogg = crm.recordings[0]
+        self.assertEqual((call_id, ogg[:4]), ("c1", b"OggS"))
+        # The caller's 2.2 s, and the two replies (0.5 s each) after it: the call lasted at least as long as both.
+        self.assertGreaterEqual(decoded_seconds(ogg), 2.2 - 0.05)
+        self.assertIsNone(call.recorder)    # sent once, then let go
+        self.assertIsNone(call.send_recording())
+
+    def test_a_call_not_to_record_keeps_and_sends_nothing(self):
+        crm = FakeCrm([phone.Reply("Noted.", False)])
+        sent, closed, call = self.run_call(crm, self.SCRIPT)
+        self.assertEqual(crm.recordings, [])
+        self.assertIsNone(call.recorder)    # dropped as soon as the CRM's opening reply said so
+
+    def test_a_call_whose_opening_failed_is_not_recorded(self):
+        crm = FakeCrm([phone.Reply("Noted.", False)], record=True)
+
+        def broken(call_id):
+            raise RuntimeError("CRM down")
+        crm.open = broken
+        sent, closed, call = self.run_call(crm, self.SCRIPT)
+        self.assertEqual(crm.recordings, [])
+        self.assertEqual(crm.troubles, ["opening failed: RuntimeError"])
+
+    def test_the_crm_gets_the_recording_signed_as_base64(self):
+        seen = []
+
+        class Res:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"kept": True}
+
+        def post(url, data, timeout, headers):
+            seen.append((url, json.loads(data), timeout, headers))
+            return Res()
+        crm = phone.Crm("http://crm.local:8082", "s" * 40, post=post)
+        self.assertTrue(crm.recording("c1", b"OggS-audio"))
+        url, body, timeout, headers = seen[0]
+        self.assertEqual(url, "http://crm.local:8082/api/voice/hooks/live/recording")
+        self.assertEqual(body, {"call_id": "c1", "audio": base64.b64encode(b"OggS-audio").decode()})
+        self.assertEqual(timeout, 120)
+        self.assertEqual(headers["X-Voice-Signature"],
+                         phone.sign("s" * 40, headers["X-Voice-Timestamp"], json.dumps(body, separators=(",", ":"))))
+
+    def test_only_an_explicit_yes_from_the_crm_records(self):
+        answers = [{"say": "Hi", "over": False, "record": True}, {"say": "Hi", "over": False},
+                   {"say": "Hi", "over": False, "record": "yes"}]
+
+        class Res:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return answers.pop(0)
+        crm = phone.Crm("http://crm.local:8082", "s" * 40, post=lambda url, data, timeout, headers: Res())
+        self.assertEqual([crm.open("c").record for _ in range(3)], [True, False, False])
 
 
 class EndpointTest(unittest.TestCase):

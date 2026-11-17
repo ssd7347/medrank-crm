@@ -34,6 +34,8 @@ export type User = {
   active: boolean;
   branch: BranchRef | null;
   createdAt: string;
+  /** May play AI call recordings (always true for the admin). */
+  canHearRecordings: boolean;
 };
 
 export type AuthResponse = { accessToken: string; expiresIn: number; user: User };

@@ -257,7 +257,7 @@ export function ConsentCard({ path, canEdit }: { path: string; canEdit: boolean 
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   <Badge tone={STATE_TONE[p.state]}>{STATE_TEXT[p.state]}</Badge>
-                  {p.state === "GRANTED" && <Badge tone={p.recording ? "teal" : "gray"}>{p.recording ? "Recording allowed" : "No recording"}</Badge>}
+                  {p.state === "GRANTED" && p.recording && <Badge tone="teal">Also agreed to recording</Badge>}
                 </div>
                 {(p.capturedAt || p.revokedAt || p.revokeNote) && (
                   <p className="mt-1 text-xs text-ink-faint">
@@ -286,7 +286,10 @@ export function ConsentCard({ path, canEdit }: { path: string; canEdit: boolean 
             phone, including automated/AI-assisted calls, and to call recording.&rdquo;
           </p>
           <Checkbox label="Agrees to AI-assisted calls" checked={ai} onChange={(e) => setAi(e.target.checked)} />
-          <Checkbox label="Agrees to calls being recorded" checked={ai && rec} disabled={!ai} onChange={(e) => setRec(e.target.checked)} />
+          <Checkbox label="Also agreed to calls being recorded" checked={ai && rec} disabled={!ai} onChange={(e) => setRec(e.target.checked)} />
+          <p className="-mt-2 pl-6 text-xs text-ink-faint">
+            For your records only. Every real AI call whose opening line says &ldquo;This call may be recorded&rdquo; is recorded, ticked or not.
+          </p>
           <Field label="How was this given?" required>
             {(id) => <Select id={id} value={source} options={SOURCES} onChange={(e) => setSource(e.target.value as ConsentSource)} />}
           </Field>

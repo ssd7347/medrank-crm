@@ -245,6 +245,6 @@ class VoiceRulesTest {
 
     private static VoiceProperties props(String secret) {
         return new VoiceProperties(true, "simulated", secret, 2500, NINE, EIGHT_PM, 2, 120, 24, 365, "m", "m", "",
-                LocalTime.of(9, 30), LocalTime.of(18, 30), BigDecimal.TEN, BigDecimal.valueOf(60000));
+                LocalTime.of(9, 30), LocalTime.of(18, 30), BigDecimal.TEN, BigDecimal.valueOf(60000), "data/recordings");
     }
 }

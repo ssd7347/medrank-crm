@@ -92,8 +92,10 @@ public class UserController {
         }
         u.setPasswordHash(passwordEncoder.encode(password));
         u.setBranch(branch(req.branchId()));
+        u.setCanHearRecordings(Boolean.TRUE.equals(req.canHearRecordings()));
         users.save(u);
-        audit.record(CurrentUser.get().id(), "USER_CREATED", "USER", u.getId(), "role=" + u.getRole());
+        audit.record(CurrentUser.get().id(), "USER_CREATED", "USER", u.getId(), "role=" + u.getRole()
+                + ", recordings=" + u.isCanHearRecordings());
         return UserResponse.of(u);
     }
 
@@ -110,17 +112,20 @@ public class UserController {
         if ((req.role() == Role.SUPER_ADMIN) != (u.getRole() == Role.SUPER_ADMIN)) {
             throw ApiException.badRequest(ONE_ADMIN);
         }
-        String before = "role=" + u.getRole() + ", active=" + u.isActive();
+        String before = "role=" + u.getRole() + ", active=" + u.isActive() + ", recordings=" + u.isCanHearRecordings();
         u.setFullName(req.fullName().trim());
         u.setPhone(phone(req.phone(), u.getId()));
         u.setRole(req.role());
         u.setActive(req.active());
         u.setBranch(branch(req.branchId()));
+        if (req.canHearRecordings() != null) {
+            u.setCanHearRecordings(req.canHearRecordings());
+        }
         if (!u.isActive()) {
             refreshTokens.revokeAllForUser(u.getId());
         }
         audit.record(me.id(), "USER_UPDATED", "USER", u.getId(),
-                before + " -> role=" + u.getRole() + ", active=" + u.isActive());
+                before + " -> role=" + u.getRole() + ", active=" + u.isActive() + ", recordings=" + u.isCanHearRecordings());
         return UserResponse.of(u);
     }
 

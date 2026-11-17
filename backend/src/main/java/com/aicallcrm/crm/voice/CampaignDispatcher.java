@@ -46,13 +46,14 @@ public class CampaignDispatcher {
     private final AlertService alerts;
     private final VoiceProperties props;
     private final TransactionTemplate tx;
+    private final RecordingService recordings;
     private final ReentrantLock lock = new ReentrantLock();
 
     public CampaignDispatcher(VoiceCampaignRepository campaigns, VoiceCampaignTargetRepository targets,
                               VoiceCallRepository calls, ContactConsentRepository consents,
                               CallEligibility eligibility, VoiceCallService callService,
                               VoiceQueryService queries, AppUserRepository users, AlertService alerts,
-                              VoiceProperties props, TransactionTemplate tx) {
+                              VoiceProperties props, TransactionTemplate tx, RecordingService recordings) {
         this.campaigns = campaigns;
         this.targets = targets;
         this.calls = calls;
@@ -64,6 +65,7 @@ public class CampaignDispatcher {
         this.alerts = alerts;
         this.props = props;
         this.tx = tx;
+        this.recordings = recordings;
     }
 
     @Scheduled(initialDelayString = "PT45S", fixedDelayString = "${app.voice.dispatch-interval:PT30S}")
@@ -157,6 +159,8 @@ public class CampaignDispatcher {
         while (true) {
             Integer n = tx.execute(s -> {
                 List<VoiceCall> old = calls.findWithContentBefore(before, PageRequest.of(0, 200));
+                // The audio files go once the database no longer points at them.
+                recordings.deleteAfterCommit(old.stream().map(VoiceCall::getRecordingRef).filter(r -> r != null).toList());
                 old.forEach(VoiceCall::purgeContent);
                 return old.size();
             });

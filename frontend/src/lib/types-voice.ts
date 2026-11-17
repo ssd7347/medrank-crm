@@ -67,8 +67,14 @@ export type VoiceCallDetail = {
   tools: { tool: string; status: string; latencyMs: number | null; at: string }[];
   outcomeNote: string | null;
   disconnectReason: string | null;
+  /** The call was to be recorded: its opening said it may be. */
   recordingAllowed: boolean;
+  /** An outside provider's link to its recording, only for those allowed to listen. */
   recordingRef: string | null;
+  /** A recording of this call is kept on the CRM server. */
+  recordingHeld: boolean;
+  /** This person may play recordings (the admin, or staff the admin allowed). */
+  canHearRecordings: boolean;
   flagNote: string | null;
   script: string | null;
   startedAt: string | null;

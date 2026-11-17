@@ -143,14 +143,7 @@ export async function openProtectedFile(path: string) {
 
 /** Downloads a protected file (e.g. a CSV export) under the given name. */
 export async function downloadProtected(path: string, fileName: string) {
-  const load = () => fetch(path, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}, credentials: "same-origin" });
-  let res = await load();
-  if (res.status === 401 && (await refreshSession())) res = await load();
-  if (!res.ok) {
-    const text = await res.text();
-    throw new ApiError(res.status, text ? safeJson(text) as ProblemBody : {});
-  }
-  const url = URL.createObjectURL(await res.blob());
+  const url = URL.createObjectURL(await getProtectedBlob(path));
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
@@ -158,6 +151,18 @@ export async function downloadProtected(path: string, fileName: string) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** GETs binary data (a file, a recording) from a protected endpoint, signed in. */
+export async function getProtectedBlob(path: string): Promise<Blob> {
+  const load = () => fetch(path, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}, credentials: "same-origin" });
+  let res = await load();
+  if (res.status === 401 && (await refreshSession())) res = await load();
+  if (!res.ok) {
+    const text = await res.text();
+    throw new ApiError(res.status, text ? safeJson(text) as ProblemBody : {});
+  }
+  return res.blob();
 }
 
 /** POSTs JSON to a protected endpoint that answers with binary data (e.g. synthesized speech) and returns it. */

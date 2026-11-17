@@ -19,10 +19,10 @@
   "scripts": [
     {"name": "EMI due reminder", "kind": "OUTBOUND",
      "purpose": "Remind the customer that their EMI is due soon. After verification, use get_contact_details for the EMI amount and due date. If they say when they will pay, log WILL_ACT with that date in the note. This is a courtesy reminder: never threaten, never mention penalties or legal action, and never call anyone except the customer about the loan.",
-     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. Am I speaking with {{first_name}}?"},
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"},
     {"name": "Overdue follow-up", "kind": "OUTBOUND",
      "purpose": "The customer's EMI is overdue. After verification, share the overdue amount from get_contact_details and ask, politely, when they expect to pay. Log WILL_ACT with the date if given. If they are in difficulty, dispute the amount or ask about restructuring, hand off to a person. Never threaten, shame or pressure.",
-     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. Am I speaking with {{first_name}}?"}
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"}
   ],
   "faqs": [
     {"question": "How can I pay my EMI?", "answer": "You can pay through [UPI ID / payment link / branch / app]. Please keep your loan account number ready.", "keywords": "pay, payment, upi, how, link"},

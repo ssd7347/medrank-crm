@@ -19,10 +19,10 @@
   "scripts": [
     {"name": "Admission enquiry follow-up", "kind": "OUTBOUND",
      "purpose": "Follow up an admission enquiry. Ask which course they are interested in and whether they would like to attend a free demo class or speak to a counsellor. If yes, log INTERESTED and schedule a call-back. Answer course questions only from search_faq. If you are speaking with a minor, ask to speak with a parent.",
-     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. Am I speaking with {{first_name}}?"},
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"},
     {"name": "Fee reminder", "kind": "OUTBOUND",
      "purpose": "Remind the student or parent that a fee is due. After verification, share the amount and date from get_contact_details. If they say when they will pay, log WILL_ACT with the date. Never threaten or mention exclusion from classes.",
-     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. Am I speaking with {{first_name}}?"}
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"}
   ],
   "faqs": [
     {"question": "What courses do you offer?", "answer": "We offer [courses]. Our counsellor can explain which suits you best.", "keywords": "course, program, subject, offer"},

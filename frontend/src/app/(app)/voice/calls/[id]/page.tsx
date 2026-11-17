@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Alert, Badge, Button, Card, DescList, Field, Loading, Modal, Table, Td, Textarea } from "@/components/ui";
 import { CallStatusBadge, OutcomeBadge, Transcript } from "@/components/voice";
-import { api, errorMessage } from "@/lib/api";
+import { api, errorMessage, getProtectedBlob } from "@/lib/api";
 import { formatDateTime, label } from "@/lib/format";
 import type { VoiceCallDetail } from "@/lib/types-voice";
 import { useApi } from "@/lib/use-api";
@@ -81,9 +81,14 @@ export default function VoiceCallPage() {
                 ["How it ended", data.disconnectReason ? label(data.disconnectReason) : null],
                 ["Script", data.script],
                 ["Platform", c.provider],
-                ["Recording", data.recordingRef ? <a href={data.recordingRef} target="_blank" rel="noreferrer" className="text-brand-800 hover:underline">Open recording</a> : data.recordingAllowed ? "None received" : "Not allowed (no recording consent)"],
               ]}
             />
+            <div className="mt-4">
+              <p className="eyebrow text-ink-faint">Recording</p>
+              <div className="mt-1 text-sm text-ink">
+                <Recording id={id} data={data} />
+              </div>
+            </div>
             {c.summary && <p className="mt-4 rounded-lg bg-muted p-3 text-sm whitespace-pre-wrap">{c.summary}</p>}
             {data.outcomeNote && <p className="mt-2 text-sm text-ink-soft">Note: {data.outcomeNote}</p>}
             {data.flagNote && <p className="mt-2 text-sm text-red-700">Flagged: {data.flagNote}</p>}
@@ -141,4 +146,53 @@ export default function VoiceCallPage() {
       </Modal>
     </div>
   );
+}
+
+/** The call's recording: played here by the admin and staff allowed to listen (each play is in the audit log). */
+function Recording({ id, data }: { id: string; data: VoiceCallDetail }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => () => {
+    if (src) URL.revokeObjectURL(src);
+  }, [src]);
+
+  if (data.recordingHeld && data.canHearRecordings) {
+    const listen = async () => {
+      setBusy(true);
+      setProblem(null);
+      try {
+        setSrc(URL.createObjectURL(await getProtectedBlob(`/api/voice/calls/${id}/recording`)));
+      } catch (e) {
+        setProblem(errorMessage(e));
+      } finally {
+        setBusy(false);
+      }
+    };
+    return (
+      <div className="space-y-1">
+        {src ? (
+          // Both voices, as the caller heard them.
+          <audio controls autoPlay src={src} className="w-full" aria-label="Call recording" />
+        ) : (
+          <Button size="sm" variant="secondary" loading={busy} onClick={listen}>
+            Listen
+          </Button>
+        )}
+        {problem && <p className="text-xs text-red-700">{problem}</p>}
+      </div>
+    );
+  }
+  if (data.recordingHeld) return "Kept. Only the admin, and staff the admin allows, can listen.";
+  if (data.recordingRef) {
+    return (
+      <a href={data.recordingRef} target="_blank" rel="noreferrer" className="text-brand-800 hover:underline">
+        Open recording
+      </a>
+    );
+  }
+  if (data.call.testCall) return "Test calls are never recorded";
+  if (data.call.status === "SIMULATED") return "Not dialled";
+  if (data.recordingAllowed) return "None received (yet, or it has passed the retention period)";
+  return "Not recorded: the script's opening line does not say the call may be recorded";
 }

@@ -24,6 +24,7 @@ import com.aicallcrm.crm.contact.ContactStatus;
 import com.aicallcrm.crm.security.CurrentUser;
 import com.aicallcrm.crm.voice.ConsentService;
 import com.aicallcrm.crm.voice.ConsentService.State;
+import com.aicallcrm.crm.voice.RecordingService;
 import com.aicallcrm.crm.voice.Voice.CallStatus;
 
 import jakarta.persistence.EntityManager;
@@ -57,7 +58,7 @@ public class ErasureService {
     /** What was removed. {@code numbersKeptAsHash}: how many of the person's numbers stay blocked (see above). */
     public record Erased(int timelineEntries, int followUps, int callLogs, int aiCallsAnonymised, int consentRecords,
                          int callbacks, int alerts, int campaignPlaces, int importReportsCleaned,
-                         int numbersKeptAsHash) {
+                         int numbersKeptAsHash, int recordingsDeleted) {
     }
 
     private final ContactService contacts;
@@ -66,15 +67,17 @@ public class ErasureService {
     private final AuditService audit;
     private final EntityManager em;
     private final ObjectMapper mapper;
+    private final RecordingService recordings;
 
     public ErasureService(ContactService contacts, ConsentService consent, ErasedNumberRepository erased,
-                          AuditService audit, EntityManager em, ObjectMapper mapper) {
+                          AuditService audit, EntityManager em, ObjectMapper mapper, RecordingService recordings) {
         this.contacts = contacts;
         this.consent = consent;
         this.erased = erased;
         this.audit = audit;
         this.em = em;
         this.mapper = mapper;
+        this.recordings = recordings;
     }
 
     @Transactional
@@ -122,6 +125,12 @@ public class ErasureService {
                         + " where v.id in :calls and v.providerCallId is not null", String.class)
                 .setParameter("calls", calls).getResultList();
 
+        // Their call recordings: the files are deleted once this erasure has been saved.
+        List<String> recordingRefs = calls.isEmpty() ? List.of() : em.createQuery("select v.recordingRef from VoiceCall v"
+                        + " where v.id in :calls and v.recordingRef is not null", String.class)
+                .setParameter("calls", calls).getResultList();
+        recordings.deleteAfterCommit(recordingRefs);
+
         em.flush();
         int alerts = update("delete from notification where contact_id = :id or link = :contactLink"
                 + (callLinks.isEmpty() ? "" : " or link in (:callLinks)"), q -> {
@@ -166,7 +175,7 @@ public class ErasureService {
             }
         }
         Erased result = new Erased(timeline, followUps, callLogs, anonymised, consents, callbacks, alerts, places,
-                imports, keep.size());
+                imports, keep.size(), recordingRefs.size());
         audit.record(me.id(), "CONTACT_ERASED", "CONTACT", id, "reason=" + req.reason().trim() + "; " + result);
         return result;
     }

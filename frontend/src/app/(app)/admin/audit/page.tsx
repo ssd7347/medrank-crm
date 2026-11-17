@@ -65,6 +65,7 @@ const ACTIONS: Record<string, string> = {
   VOICE_RESUMED_ALL: "Resumed AI calls",
   VOICE_CALL_VIEWED: "Opened an AI call",
   VOICE_CALL_FLAGGED: "Flagged an AI call as wrong",
+  RECORDING_PLAYED: "Listened to a call recording",
   VOICE_CALLBACK_ASSIGNED: "Assigned a call-back",
   VOICE_CALLBACK_DONE: "Closed a call-back",
 };

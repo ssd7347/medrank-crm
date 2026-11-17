@@ -42,7 +42,7 @@ export default function UsersPage() {
           ) : !data?.length ? (
             <EmptyState title="No users" />
           ) : (
-            <Table head={["Staff ID", "Name", "Mobile (login)", "Email", "Role", "Branch", "Status", "Since", ""]}>
+            <Table head={["Staff ID", "Name", "Mobile (login)", "Email", "Role", "Branch", "Status", "Recordings", "Since", ""]}>
               {data.map((u) => (
                 <tr key={u.id}>
                   <Td className="font-mono text-xs">STF-{String(u.id).padStart(4, "0")}</Td>
@@ -55,6 +55,7 @@ export default function UsersPage() {
                   <Td>{label(u.role)}</Td>
                   <Td>{u.branch?.name ?? <span className="text-ink-faint">Head office</span>}</Td>
                   <Td>{u.active ? <Badge tone="green">Active</Badge> : <Badge>Deactivated</Badge>}</Td>
+                  <Td>{u.canHearRecordings ? <Badge tone="teal">Can listen</Badge> : <span className="text-ink-faint">No</span>}</Td>
                   <Td className="whitespace-nowrap text-ink-soft">{formatDate(u.createdAt)}</Td>
                   <Td className="text-right whitespace-nowrap">
                     <Button size="sm" variant="ghost" onClick={() => setEditing(u)}>
@@ -93,6 +94,7 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
     role: (user?.role ?? "AGENT") as Role,
     active: user?.active ?? true,
     branchId: user?.branch?.id.toString() ?? "",
+    canHearRecordings: user?.canHearRecordings ?? false,
   });
   const branches = useApi<Branch[]>("/api/branches");
   const [saving, setSaving] = useState(false);
@@ -106,10 +108,10 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
     setFieldErrors({});
     try {
       if (user) {
-        await api(`/api/users/${user.id}`, { method: "PUT", body: { fullName: v.fullName, phone: v.phone, role: v.role, active: v.active, branchId: v.branchId ? Number(v.branchId) : null } });
+        await api(`/api/users/${user.id}`, { method: "PUT", body: { fullName: v.fullName, phone: v.phone, role: v.role, active: v.active, branchId: v.branchId ? Number(v.branchId) : null, canHearRecordings: v.canHearRecordings } });
         onDone(`Saved ${v.fullName}.`);
       } else {
-        await api("/api/users", { body: { fullName: v.fullName, email: v.email, phone: v.phone, role: v.role, branchId: v.branchId ? Number(v.branchId) : null } });
+        await api("/api/users", { body: { fullName: v.fullName, email: v.email, phone: v.phone, role: v.role, branchId: v.branchId ? Number(v.branchId) : null, canHearRecordings: v.canHearRecordings } });
         onDone(`Created ${v.fullName}. They can now log in with ${v.phone}.`);
       }
     } catch (err) {
@@ -149,6 +151,14 @@ function UserForm({ user, isSelf, onDone }: { user?: User; isSelf: boolean; onDo
         </Field>
       )}
       {user && !isSelf && <Checkbox label="Active (can log in)" checked={v.active} onChange={(e) => setV({ ...v, active: e.target.checked })} />}
+      {v.role !== "SUPER_ADMIN" && (
+        <div>
+          <Checkbox label="Can listen to call recordings" checked={v.canHearRecordings} onChange={(e) => setV({ ...v, canHearRecordings: e.target.checked })} />
+          <p className="mt-1 text-xs text-ink-faint">
+            Recordings of the AI calls this person can see (their own contacts&rsquo;). Each time they listen it goes in the audit log. The admin can always listen.
+          </p>
+        </div>
+      )}
       <Button type="submit" loading={saving}>
         {user ? "Save" : "Create ID"}
       </Button>

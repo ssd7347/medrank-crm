@@ -238,6 +238,7 @@ export default function ImportPage() {
                 {consent && (
                   <div className="mt-3 space-y-3 pl-6">
                     <Checkbox label="They also agreed to calls being recorded" checked={recording} onChange={(e) => setRecording(e.target.checked)} />
+                    <p className="-mt-2 pl-6 text-xs text-ink-faint">For your records only: real AI calls whose opening line says they may be recorded are recorded either way.</p>
                     <Field label="How did they agree?" required hint="For example: the sign-up form they filled in, with its wording. This is kept as proof.">
                       {(id) => <Input id={id} maxLength={400} value={evidence} onChange={(e) => setEvidence(e.target.value)} />}
                     </Field>

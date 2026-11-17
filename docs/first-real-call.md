@@ -106,7 +106,7 @@ Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
 3. The tunnel up (to :8099 only); settings filled in; CRM restarted. From mobile data, open
    `https://<tunnel>/api/auth/me`: it must say 404.
 4. In the CRM: one contact (the developer's own number) with AI-call consent recorded, an approved script, a one-contact
-   campaign. Start it during the calling window (09:00–20:00 IST).
+   campaign. Start it during the calling window (09:00–18:00 IST).
 5. On the call, try: answering normally, the identity check with the right details, "call me back at 4", a question
    from the FAQ, "stop calling me". Note any long silences. During desk hours (not Sundays), also ask for a person
    once: you should hear the whole "I am connecting you to a member of our team now. Please stay on the line." and
@@ -114,4 +114,5 @@ Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
 6. Afterwards: read the transcript and tool trail on `/voice/calls`; write down what Whisper heard against what was
    said, and the reply times. Then take the tunnel down and stop the GPU machine.
 
-Known limit that stays for now: no call recording (the starter openings no longer say "may be recorded").
+7. The recording: on the call's page, **Recording: Listen** plays both voices (the script's opening must say "This
+   call may be recorded"; otherwise it says why it was not recorded). The file is in the CRM's recordings folder.

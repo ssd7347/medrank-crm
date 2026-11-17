@@ -31,16 +31,16 @@ public class LiveCallService {
      * on opening only: the registered name of the person called, which the engine gives Whisper so it spells that
      * name as registered (ear check, 11 Nov 2026: every name right with small.en). Never said to the caller.
      */
-    public record Reply(String say, boolean over, String hint) {
+    public record Reply(String say, boolean over, String hint, boolean record) {
         Reply(String say, boolean over) {
-            this(say, over, null);
+            this(say, over, null, false);
         }
     }
 
     /** Longest name sent as a hint: a name, not a paragraph (Whisper keeps at most half its context for hints). */
     static final int MAX_HINT = 100;
 
-    private record Opening(String line, String name) {
+    private record Opening(String line, String name, boolean recorded) {
     }
 
     private final VoiceCallRepository calls;
@@ -74,7 +74,7 @@ public class LiveCallService {
             Contact contact = call.getContactId() == null ? null : contacts.findById(call.getContactId()).orElse(null);
             VoiceScript script = call.getScriptId() == null ? null : scriptRepo.findById(call.getScriptId()).orElse(null);
             return new Opening(script == null ? "" : VoiceScriptService.render(script.getOpeningLine(),
-                    callService.variables(contact)), hint(contact));
+                    callService.variables(contact)), hint(contact), call.isRecordingAllowed() && !call.isTestCall());
         });
         String opening = opened.line();
         List<Line> added;
@@ -92,7 +92,10 @@ public class LiveCallService {
             return new Reply(said(added), true);
         }
         append(callId, added);
-        return new Reply(said(added), brains.of(callId).over(callId), opened.name());
+        // The engine records only a call that is to be recorded and whose opening, as said, told them so.
+        String said = said(added);
+        return new Reply(said, brains.of(callId).over(callId), opened.name(),
+                opened.recorded() && RecordingService.announces(said));
     }
 
     /** The contact's registered name for the engine's ear, or null for an unknown caller. */

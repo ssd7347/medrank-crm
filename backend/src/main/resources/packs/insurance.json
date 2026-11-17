@@ -18,7 +18,7 @@
   "scripts": [
     {"name": "Policy renewal reminder", "kind": "OUTBOUND",
      "purpose": "Remind the policyholder that their policy is due for renewal. After verification, share the policy type, premium and renewal date from get_contact_details. If they want to renew or have questions about cover, log INTERESTED and schedule a call-back from an advisor. Never advise on which policy to buy or explain claim eligibility.",
-     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. Am I speaking with {{first_name}}?"}
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"}
   ],
   "faqs": [
     {"question": "How do I renew my policy?", "answer": "You can renew through [payment link / app / branch]. Please keep your policy number ready.", "keywords": "renew, renewal, pay, how"},

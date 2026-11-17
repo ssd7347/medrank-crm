@@ -152,8 +152,9 @@ public class VoiceCallService {
         VoiceCall call = new VoiceCall(Direction.OUTBOUND, campaign.getScriptName(), target.getContactId(),
                 target.getPhone(), platforms.current().name().toUpperCase(Locale.ROOT));
         call.setCampaignId(campaign.getId());
-        call.setRecordingAllowed(consent.allowsRecording(target.getPhone()));
         VoiceScript script = scripts.approved(campaign.getScriptName()).orElse(null);
+        // Recorded when the opening line tells them it may be (RecordingService); never without telling them.
+        call.setRecordingAllowed(script != null && RecordingService.announces(script.getOpeningLine()));
         Map<String, String> vars = variables(contact);
         String opening = script == null ? "" : VoiceScriptService.render(script.getOpeningLine(), vars);
         if (script != null) {
@@ -240,7 +241,7 @@ public class VoiceCallService {
         call.setProviderCallId(providerCallId);
         call.setStatus(CallStatus.CONNECTED);
         call.setStartedAt(Instant.now());
-        call.setRecordingAllowed(consent.allowsRecording(phone));
+        call.setRecordingAllowed(RecordingService.announces(script.getOpeningLine()));
         call.setScriptId(script.getId());
         calls.save(call);
         return describe(call);
@@ -301,7 +302,7 @@ public class VoiceCallService {
         if (e.transcript() != null && !e.transcript().isEmpty()) {
             call.setTranscript(toJson(e.transcript()));
         }
-        // A recording is kept only when this number agreed to be recorded.
+        // A provider's recording is kept only for a call whose opening said it may be recorded.
         if (call.isRecordingAllowed() && e.recordingUrl() != null && !e.recordingUrl().isBlank()) {
             call.setRecordingRef(cut(e.recordingUrl(), 500));
         }

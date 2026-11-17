@@ -47,8 +47,16 @@ own account is for demos and test calls to your team.
 6. Make one test call to your own phone and read its transcript before anything else (the plan for it, with what
    is still missing: `docs/first-real-call.md`).
 
-Known limits: Plivo's recording is not switched on, so calls keep a transcript but no recording; the starter
-openings do not say the call may be recorded (add that line if recording is switched on). The speech engine loads
+Recording (17 Nov 2026): the engine records a call when the CRM's `live/open` reply says `"record": true`, which it
+does only for a real call whose script's opening announces it (`RecordingService.announces`) and whose opening, as
+said, did (`LiveCallService.open`). Both voices go on one 8 kHz track as the caller heard them (`phone.Recorder`: the
+caller's audio is the clock, the agent's audio is placed where it starts playing, and audio cleared when the caller
+talks over it is dropped), encoded as Ogg Opus at 16 kbit/s, and sent once the stream closes to `live/recording`
+(`{"call_id", "audio": base64}`, signed like the other hooks). The CRM keeps one copy per call in
+`app.voice.recordings-dir` (`voice_call.recording_ref` = `file:yyyy-MM/<call id>.ogg`), refuses test calls, calls not
+to be recorded, erased ones, ones past retention and anything that is not Ogg, and serves it at
+`GET /api/voice/calls/{id}/recording` to the admin and staff with `app_user.can_hear_recordings` who can see the call
+(audited as `RECORDING_PLAYED`). Retention and erasure delete the file after the database change commits. The speech engine loads
 and runs both its models as it starts (`WARM_UP`, on by default), so the first caller does not wait for them; the
 brain is warmed by the CRM while each call's opening line plays.
 
@@ -99,9 +107,10 @@ A DND scrubbing service plugs in the same way: a bean implementing `DndProvider`
 | `VOICE_HMAC_SECRET` | 32+ random characters, also entered in the platform. Empty = every hook request is refused. |
 | `VOICE_DESK_NUMBER` | Staff desk number (+91...) for live transfers. Empty = callbacks only. |
 | `VOICE_DESK_OPEN` / `VOICE_DESK_CLOSE` | Desk hours, IST (default 09:30–18:30, Monday–Saturday). |
-| `VOICE_WINDOW_START` / `VOICE_WINDOW_END` | Legal calling window, IST (default 09:00–20:00). Confirm with your compliance adviser. |
+| `VOICE_WINDOW_START` / `VOICE_WINDOW_END` | Legal calling window, IST (default 09:00–18:00). Confirm with your compliance adviser. |
 | `VOICE_COST_PER_MINUTE_INR`, `VOICE_MONTHLY_CAP_INR` | For the cost estimate and the monthly warning. |
-| `VOICE_RETENTION_DAYS` | Transcripts and recordings are deleted after this (default 365). |
+| `VOICE_RETENTION_DAYS` | Transcripts and recordings are deleted after this (default 365; the CRM refuses to start below 120). |
+| `VOICE_RECORDINGS_DIR` | Folder for call recordings on the CRM server (default `data/recordings`, relative to where the CRM runs). |
 | `VOICE_ENABLED` | `false` switches the whole feature off. |
 
 ### 3. Platform configuration
@@ -153,8 +162,8 @@ the model says. **The opening line is the customer's own**, and so are the names
 "loan account number" hints at a loan. The Scripts page flags both with the same word list
 (`VoiceScriptService.openingWarnings` under each version's opening line, and approving one asks again;
 `identityWarnings` at the top of the page, from `/voice/scripts/identity-warnings`), but a word outside the list is not
-flagged. An opening that says the call is recorded or being recorded is flagged too: no platform records calls
-(compliance checklist 2.2), and scripts approved before 15 November 2026 still say "This call may be recorded". Review these with the
+flagged. An opening that does not say the call may be recorded is flagged too: its calls are not recorded
+(compliance checklist 2.2; scripts approved between 15 and 17 November 2026 lack it). Review these with the
 customer's compliance adviser before going live.
 
 ## When the model gets stuck

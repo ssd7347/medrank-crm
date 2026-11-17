@@ -85,7 +85,8 @@ public class PersonalDataService {
         about.put("exported_at", time(Instant.now()));
         about.put("exported_by", staff(me.id()));
         about.put("not_included", "Copies outside the CRM: database backups, server logs, the phone company's own"
-                + " records of the calls, and spreadsheets exported earlier.");
+                + " records of the calls, spreadsheets exported earlier, and the audio of recorded AI calls (each call"
+                + " below says whether a recording is kept; the admin can play it and give a copy on request).");
         out.put("about_this_copy", about);
 
         Map<String, Object> contact = one(rows("select c.full_name, c.phone, c.alt_phone, c.email, c.status, c.source,"
@@ -118,11 +119,12 @@ public class PersonalDataService {
                 q -> q.setParameter("id", id).setParameter("phones", phones)));
         out.put("ai_calls", calls.isEmpty() ? List.of() : rows("select v.created_at, v.started_at, v.ended_at,"
                         + " v.direction, v.phone, v.script_name, v.status, v.test_call, v.duration_sec, v.outcome,"
-                        + " v.outcome_note, v.handoff_reason, v.summary, v.transcript, v.flagged_wrong, v.flag_note"
+                        + " v.outcome_note, v.handoff_reason, v.summary, v.transcript, v.flagged_wrong, v.flag_note,"
+                        + " case when v.recording_ref is null then false else true end"
                         + " from voice_call v where v.id in (:calls) order by v.created_at",
                 List.of("created_at", "started_at", "ended_at", "direction", "phone", "about", "status", "test_call",
                         "duration_seconds", "outcome", "outcome_note", "handed_to_a_person_because", "summary",
-                        "transcript", "flagged_wrong", "flag_note"),
+                        "transcript", "flagged_wrong", "flag_note", "recording_kept"),
                 q -> q.setParameter("calls", calls)));
         out.put("call_backs", rows("select r.created_at, r.reason, r.preferred_time_text, r.summary, r.priority, r.status,"
                         + " u.full_name, r.due_at, r.done_at, r.done_note from callback_request r"

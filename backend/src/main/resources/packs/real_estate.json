@@ -20,10 +20,10 @@
   "scripts": [
     {"name": "Property enquiry follow-up", "kind": "OUTBOUND",
      "purpose": "The lead enquired about a property. Ask whether they are still looking, what type of property and location they prefer, and whether they would like a site visit. If interested, log INTERESTED and schedule a call-back from the sales team to fix the visit. Never quote prices or availability unless search_faq returns them.",
-     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. Am I speaking with {{first_name}}?"},
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"},
     {"name": "Site visit reminder", "kind": "OUTBOUND",
      "purpose": "Remind the lead of their site visit. After verification, use get_contact_details for the project and date and confirm they are coming. If they want to change it, schedule a call-back.",
-     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. Am I speaking with {{first_name}}?"}
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"}
   ],
   "faqs": [
     {"question": "Where is the project?", "answer": "[Project name] is at [address], near [landmark].", "keywords": "where, location, address, project"},

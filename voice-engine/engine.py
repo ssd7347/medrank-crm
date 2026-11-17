@@ -247,5 +247,7 @@ async def call(ws: WebSocket, call_id: str = "", token: str = ""):
         pass                    # the caller hung up, or the call was transferred to the desk
     finally:
         last = session.stop()   # hears and sends whatever the caller said that the CRM has not had yet
-        if last is not None:
-            await asyncio.shield(last)  # and it goes on even if this handler is cancelled
+        recording = session.send_recording()    # and the call's recording, if the CRM said to record it
+        for task in (last, recording):
+            if task is not None:
+                await asyncio.shield(task)  # each goes on even if this handler is cancelled

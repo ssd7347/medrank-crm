@@ -16,6 +16,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,7 +69,8 @@ public class VoiceQueryService {
     }
 
     public record CallDetail(CallRow call, List<Line> transcript, List<ToolRow> tools, String outcomeNote,
-                             String disconnectReason, boolean recordingAllowed, String recordingRef, String flagNote,
+                             String disconnectReason, boolean recordingAllowed, String recordingRef,
+                             boolean recordingHeld, boolean canHearRecordings, String flagNote,
                              String script, Instant startedAt, Instant endedAt, List<CallbackView> callbacks) {
     }
 
@@ -104,6 +107,7 @@ public class VoiceQueryService {
     private final ContactService contactService;
     private final AppUserRepository users;
     private final AuditService audit;
+    private final RecordingService recordings;
 
     public VoiceQueryService(VoiceCallRepository calls, VoiceToolAuditRepository toolAudits,
                              CallbackRequestRepository callbacks, VoiceCampaignRepository campaigns,
@@ -111,7 +115,7 @@ public class VoiceQueryService {
                              VoiceCallService callService, VoicePlatforms platforms, DndService dnd,
                              VoiceProperties props, ContactRepository contacts, ContactService contactService,
                              AppUserRepository users,
-                             AuditService audit) {
+                             AuditService audit, RecordingService recordings) {
         this.calls = calls;
         this.toolAudits = toolAudits;
         this.callbacks = callbacks;
@@ -126,6 +130,7 @@ public class VoiceQueryService {
         this.contactService = contactService;
         this.users = users;
         this.audit = audit;
+        this.recordings = recordings;
     }
 
     // ------------------------------------------------------------------ overview and the kill switch
@@ -206,10 +211,23 @@ public class VoiceQueryService {
         String script = call.getScriptId() == null ? null : scripts.findById(call.getScriptId())
                 .map(s -> s.getName() + ", version " + s.getVersion()).orElse(null);
         Instant now = Instant.now();
+        // A recording is played through /recording by those allowed; an outside provider's link only goes to them.
+        boolean hear = recordings.canHear(me);
+        String ref = call.getRecordingRef();
         return new CallDetail(row(call), callService.lines(call), tools, call.getOutcomeNote(),
-                call.getDisconnectReason(), call.isRecordingAllowed(), call.getRecordingRef(), call.getFlagNote(),
+                call.getDisconnectReason(), call.isRecordingAllowed(),
+                hear && ref != null && !RecordingService.held(ref) ? ref : null, RecordingService.held(ref), hear,
+                call.getFlagNote(),
                 script, call.getStartedAt(), call.getEndedAt(),
                 callbacks.findByVoiceCallId(id).stream().map(c -> callbackView(c, now)).toList());
+    }
+
+    /** The call's recording, for the admin and staff allowed to listen who can see the call. */
+    @Transactional
+    public ResponseEntity<Resource> recording(UUID id) {
+        CurrentUser me = CurrentUser.get();
+        recordings.mayHear(me);
+        return recordings.play(me, visibleCall(me, id));
     }
 
     /** "This was wrong": feeds the list the admin works through to improve the script. */

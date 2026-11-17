@@ -7,6 +7,8 @@ brains, tools and rules as the test console), and Piper speaks it back into the 
   * The caller can talk over the agent: the agent's queued audio is cleared and it listens.
   * After the agent's goodbye has been heard (Plivo's "playedStream" for our checkpoint), the CRM hangs up.
   * When the stream closes, what the caller said that the CRM has not had yet is sent as their last words (live/last).
+  * A call the CRM says to record (its opening told the person it may be recorded) is recorded, both voices as the
+    caller heard them, and sent to the CRM as Ogg Opus once the call is over (live/recording; Recorder).
 
 Pure numpy (no audioop: it is gone from Python 3.13), so it is tested without a phone line: test_phone.py.
 """
@@ -56,6 +58,73 @@ def ulaw_encode(pcm: np.ndarray) -> bytes:
     exponent = np.where(top > 0, np.floor(np.log2(np.maximum(top, 1))), 0).astype(np.int32)
     mantissa = (s >> (exponent + 3)) & 0x0F
     return (~(sign | (exponent << 4) | mantissa) & 0xFF).astype(np.uint8).tobytes()
+
+
+# ---------------------------------------------------------------------------------------------- recording
+
+class Recorder:
+    """Both sides of one call, as the caller heard them. The caller's audio arrives in real time and is the call's
+    clock; the agent's audio is sent ahead of time and Plivo plays it in order, so each piece is placed where it starts
+    playing: when it was sent, or when the piece before it ends. When the caller talks over the agent, the queued
+    audio is cleared (``cut``): what had not been played yet is dropped. At most MAX_S seconds are kept."""
+
+    MAX_S = 3 * 3600
+    BIT_RATE = 16000            # Opus: clear speech at about 120 kB a minute
+
+    def __init__(self) -> None:
+        self.caller: list[np.ndarray] = []
+        self.heard = 0                                  # caller samples so far: now, on the call's clock
+        self.agent: list[tuple[int, np.ndarray]] = []   # (where it starts playing, samples)
+        self.agent_end = 0                              # where the agent's queued audio ends
+
+    def hear(self, pcm: np.ndarray) -> None:
+        if self.heard + len(pcm) <= self.MAX_S * RATE:
+            self.caller.append(pcm.astype(np.int16))
+            self.heard += len(pcm)
+
+    def say(self, pcm: np.ndarray) -> None:
+        start = max(self.agent_end, self.heard)
+        if start + len(pcm) <= self.MAX_S * RATE:
+            self.agent.append((start, pcm.astype(np.int16)))
+            self.agent_end = start + len(pcm)
+
+    def cut(self) -> None:
+        kept = []
+        for start, pcm in self.agent:
+            if start < self.heard:
+                kept.append((start, pcm[:self.heard - start]))
+        self.agent = kept
+        self.agent_end = min(self.agent_end, self.heard)
+
+    def mix(self) -> np.ndarray:
+        """One 8 kHz track with both voices, int16."""
+        caller = np.concatenate(self.caller) if self.caller else np.zeros(0, np.int16)
+        out = np.zeros(max(len(caller), self.agent_end), np.int32)
+        out[:len(caller)] += caller
+        for start, pcm in self.agent:
+            out[start:start + len(pcm)] += pcm
+        return np.clip(out, -32768, 32767).astype(np.int16)
+
+    def ogg(self) -> bytes:
+        """The mix as Ogg Opus (what the CRM keeps), or b"" when nothing was recorded."""
+        pcm = self.mix()
+        if not len(pcm):
+            return b""
+        import io
+
+        import av
+
+        buf = io.BytesIO()
+        with av.open(buf, "w", format="ogg") as box:
+            stream = box.add_stream("libopus", rate=RATE, layout="mono")
+            stream.bit_rate = self.BIT_RATE
+            frame = av.AudioFrame.from_ndarray(pcm.reshape(1, -1), format="s16", layout="mono")
+            frame.sample_rate = RATE
+            for packet in stream.encode(frame):
+                box.mux(packet)
+            for packet in stream.encode(None):
+                box.mux(packet)
+        return buf.getvalue()
 
 
 # ---------------------------------------------------------------------------------------------- resampling
@@ -181,6 +250,7 @@ class Reply:
     say: str
     over: bool
     hint: str = ""              # on opening: the called contact's name, given to Whisper on every turn (never said)
+    record: bool = False        # on opening: record this call (its opening told the person it may be recorded)
 
 
 def stream_token(secret: str, call_id: str) -> str:
@@ -202,10 +272,10 @@ class Crm:
         self.base, self.secret = base_url.rstrip("/"), secret
         self.post = post or requests.post
 
-    def _call(self, step: str, payload: dict) -> dict:
+    def _call(self, step: str, payload: dict, timeout: float = 20) -> dict:
         body = json.dumps(payload, separators=(",", ":"))
         ts = str(int(time.time()))
-        r = self.post(f"{self.base}/api/voice/hooks/live/{step}", data=body.encode(), timeout=20,
+        r = self.post(f"{self.base}/api/voice/hooks/live/{step}", data=body.encode(), timeout=timeout,
                       headers={"Content-Type": "application/json", "X-Voice-Timestamp": ts,
                                "X-Voice-Signature": sign(self.secret, ts, body)})
         r.raise_for_status()
@@ -213,7 +283,8 @@ class Crm:
 
     def open(self, call_id: str) -> Reply:
         d = self._call("open", {"call_id": call_id})
-        return Reply(d.get("say") or "", bool(d.get("over")), str(d.get("hint") or "").strip()[:100])
+        return Reply(d.get("say") or "", bool(d.get("over")), str(d.get("hint") or "").strip()[:100],
+                     d.get("record") is True)
 
     def turn(self, call_id: str, said: str) -> Reply:
         d = self._call("turn", {"call_id": call_id, "said": said})
@@ -233,6 +304,11 @@ class Crm:
         """The call broke on our side and the caller was told someone will call back: the CRM books that call-back.
         True if it booked one (none is needed when one is already arranged or the caller asked not to be called)."""
         return bool(self._call("trouble", {"call_id": call_id, "what": what[:200]}).get("callback_booked"))
+
+    def recording(self, call_id: str, ogg: bytes) -> bool:
+        """The call's recording, once it is over. True if the CRM kept it (it keeps only calls it said to record)."""
+        return bool(self._call("recording", {"call_id": call_id, "audio": base64.b64encode(ogg).decode()},
+                               timeout=120).get("kept"))
 
 
 # ---------------------------------------------------------------------------------------------- one call
@@ -288,6 +364,9 @@ class Call:
         self.late: list[np.ndarray] = []        # what the caller said while the goodbye played
         self.done = False
         self.transferred = False    # the CRM sent the call to the desk: Plivo closes the stream (await_transfer)
+        # Records from the start; kept and sent only if the CRM's opening reply says to record (send_recording).
+        self.recorder: Recorder | None = Recorder()
+        self.record = False
 
     async def handle(self, msg: dict) -> None:
         event = msg.get("event")
@@ -299,7 +378,10 @@ class Call:
             media = msg.get("media") or {}
             if media.get("track", "inbound") != "inbound":
                 return
-            for utterance in self.ears.feed(ulaw_decode(base64.b64decode(media.get("payload") or ""))):
+            pcm = ulaw_decode(base64.b64decode(media.get("payload") or ""))
+            if self.recorder:
+                self.recorder.hear(pcm)
+            for utterance in self.ears.feed(pcm):
                 if not self.ending:
                     await self.jobs.put(("turn", utterance))
                 else:
@@ -308,6 +390,8 @@ class Call:
                 # The caller talks over the agent: stop speaking and listen.
                 self.speaking = ""
                 await self.send({"event": "clearAudio", "streamId": self.stream_id})
+                if self.recorder:
+                    self.recorder.cut()
         elif event == "playedStream":
             name = msg.get("name", "")
             if name == self.speaking:
@@ -322,6 +406,9 @@ class Call:
                 if kind == "open":
                     reply = await asyncio.to_thread(self.crm.open, self.call_id)
                     self.hint = reply.hint
+                    self.record = reply.record
+                    if not reply.record:
+                        self.recorder = None    # not to be recorded: nothing kept from here on
                 else:
                     self.unsent = audio
                     text = await self.hear(audio)
@@ -342,6 +429,8 @@ class Call:
                 log.warning("call %s: %s failed: %s", self.call_id, kind, e)
                 self.report(f"{'opening' if kind == 'open' else 'turn'} failed: {type(e).__name__}")
                 reply = Reply(TROUBLE, True)
+                if kind == "open":
+                    self.recorder = None        # the CRM never said to record it
             try:
                 await self.speak(reply)
             except Exception as e:     # the voice failed: nothing can be said, so hang up rather than leave silence
@@ -399,6 +488,8 @@ class Call:
             for i in range(0, len(audio), 4000):           # half a second per message
                 await self.send({"event": "playAudio", "media": {"contentType": "audio/x-mulaw", "sampleRate": RATE,
                                                                  "payload": base64.b64encode(audio[i:i + 4000]).decode()}})
+            if self.recorder:
+                self.recorder.say(ulaw_decode(audio))       # exactly what the caller is sent
             self.speaking = mark
             await self.send({"event": "checkpoint", "streamId": self.stream_id, "name": mark})
         if reply.over:
@@ -447,6 +538,27 @@ class Call:
         _LAST_WORDS.add(task)
         task.add_done_callback(_LAST_WORDS.discard)
         return task
+
+    def send_recording(self) -> asyncio.Task | None:
+        """Once the call is over (after stop): sends the recording to the CRM if it said to record this call. Runs as
+        its own task, kept until it is done (like the last words); returned so it can be awaited (None when there is
+        nothing to send)."""
+        recorder, self.recorder = self.recorder, None
+        if not self.record or recorder is None or not recorder.heard:
+            return None
+        task = asyncio.get_running_loop().create_task(self._send_recording(recorder))
+        _LAST_WORDS.add(task)
+        task.add_done_callback(_LAST_WORDS.discard)
+        return task
+
+    async def _send_recording(self, recorder: Recorder) -> None:
+        try:
+            ogg = await asyncio.to_thread(recorder.ogg)
+            if ogg:
+                kept = await asyncio.to_thread(self.crm.recording, self.call_id, ogg)
+                log.info("call %s: recording sent (%d kB), kept: %s", self.call_id, len(ogg) // 1024, kept)
+        except Exception as e:
+            log.warning("call %s: could not send the recording: %s", self.call_id, e)
 
     async def _send_last_words(self, audio: np.ndarray) -> None:
         try:

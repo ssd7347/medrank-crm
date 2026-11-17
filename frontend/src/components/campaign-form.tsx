@@ -47,7 +47,7 @@ export function CampaignForm({ existing, onSaved, onCancel }: { existing?: Campa
   const [fieldOp, setFieldOp] = useState<FieldOp>(existing?.fieldOp ?? "NOT_EMPTY");
   const [fieldValue, setFieldValue] = useState(existing?.fieldValue ?? "");
   const [windowStart, setWindowStart] = useState(existing?.windowStart.slice(0, 5) ?? "09:00");
-  const [windowEnd, setWindowEnd] = useState(existing?.windowEnd.slice(0, 5) ?? "20:00");
+  const [windowEnd, setWindowEnd] = useState(existing?.windowEnd.slice(0, 5) ?? "18:00");
   const [attempts, setAttempts] = useState(String(existing?.maxAttempts ?? 3));
   const [gap, setGap] = useState(String(existing?.retryGapMin ?? 240));
   const [concurrent, setConcurrent] = useState(String(existing?.maxConcurrent ?? 3));

@@ -44,6 +44,9 @@ public class AppUser {
 
     private boolean active = true;
 
+    /** May play AI call recordings (the admin always can). Given and taken away by the admin. */
+    private boolean canHearRecordings;
+
     /** Null for head-office staff, who are not confined to one branch. */
     @ManyToOne
     @JoinColumn(name = "branch_id")
@@ -75,6 +78,8 @@ public class AppUser {
     public void setRole(Role role) { this.role = role; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public boolean isCanHearRecordings() { return canHearRecordings; }
+    public void setCanHearRecordings(boolean canHearRecordings) { this.canHearRecordings = canHearRecordings; }
     public Branch getBranch() { return branch; }
     public void setBranch(Branch branch) { this.branch = branch; }
     public Instant getCreatedAt() { return createdAt; }

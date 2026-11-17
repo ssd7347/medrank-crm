@@ -10,7 +10,7 @@ rings, no paid AI can be reached, and the sign-in code is shown on the screen. R
 
 - [ ] Pull the latest code and run through section 3 once, start to finish.
 - [ ] Read `docs/handover-guide.md` and `docs/compliance-checklist.md`; print the checklist for the client.
-- [ ] Plan the meeting between **09:00 and 20:00 Indian time**: outside the calling hours the campaign in step 3.5
+- [ ] Plan the meeting between **09:00 and 18:00 Indian time**: outside the calling hours the campaign in step 3.5
   waits for the morning instead of placing its calls.
 - [ ] Charge the laptop. No internet is needed for the demo itself.
 
@@ -73,8 +73,7 @@ Vikram Rao marked *Do not call*); and the campaign *EMI due this week*, not star
 ### 3.1 What it is and where it stands (5 min)
 
 Use section 1 and 2 of `docs/handover-guide.md`. Say plainly what is not done: no real phone call has been made yet
-(it needs their Plivo account and the GPU computer), login codes are not sent by SMS yet, there is no DND scrubbing
-and no call recording.
+(it needs their Plivo account and the GPU computer), login codes are not sent by SMS yet, there is no DND scrubbing.
 
 ### 3.2 Signing in and branding (3 min)
 
@@ -98,9 +97,9 @@ and no call recording.
 - At the top of the page an amber **Identity question** note says that asking for the "Loan account number" tells
   whoever answers there is a loan. This is expected in the demo: it is the CRM checking the company's own wording.
   Their decision, with their adviser: keep it, or rename the field (e.g. "Account number").
-- Point out what the opening does not say: why it is calling (that comes only after the identity check), and that
-  the call may be recorded (calls are not recorded; if they want recording, the line goes back in; compliance
-  checklist, 2.2).
+- Point out what the opening says: that it is an AI assistant and that the call may be recorded (real calls are
+  recorded only when the opening says so; compliance checklist, 2.2). And what it does not say: why it is calling,
+  which comes only after the identity check.
 - **Admin → AI knowledge base**: the only answers the agent gives to questions.
 
 ### 3.5 A campaign (7 min)
@@ -111,7 +110,7 @@ and no call recording.
 - Press **Start**, then **Run now**. Within seconds people turn *Simulated* (two at a time, the campaign's limit;
   press Run now again for the rest, or wait for the next round, every 30 seconds). Numbers are masked.
 - Open one with **Last call**: in simulated mode nothing is dialled, so there is no conversation; the page shows the
-  opening line the agent would have said, with the name filled in, and "Recording: not allowed (no recording consent)".
+  opening line the agent would have said, with the name filled in, and "Recording: Not dialled".
 
 ### 3.6 The test console (12 min)
 
@@ -147,7 +146,7 @@ agent's voice (a US English voice for now; the ear on this laptop is the smaller
 
 ### 3.7 The Overview and "Pause all" (3 min)
 
-**AI voice agent → Overview**: calling mode (Simulated), calling hours 09:00–20:00, call-backs waiting and overdue,
+**AI voice agent → Overview**: calling mode (Simulated), calling hours 09:00–18:00, call-backs waiting and overdue,
 outcomes, why calls were handed over, "Asked to stop", the cost estimate against the monthly limit (₹60,000 by
 default; the alert does not stop calls). **Pause all** stops every campaign at once: press it, confirm, and *Calling*
 shows **Paused** ("Incoming callers hear the normal greeting instead of the AI agent"); then **Resume calling**.
@@ -174,7 +173,7 @@ call. Nothing goes to their customers before a pilot of 20 to 50 people with eve
 | Can a customer's data be deleted? | Yes. The admin opens the customer, presses **Erase this person** and types their number: everything about them is deleted at once, and their AI calls stay only as numbers for the reports. If they had said stop, their number stays blocked even if a list brings it back. Backups, server logs and Plivo's own call records are outside the CRM (compliance checklist, 2.1). |
 | Can we see who did what? | Yes. Administration, **Audit log** (admin only): every sign-in and failed sign-in, change to a contact, consent, script approval, campaign, data download and erasure, with who and when, filtered by action, person and dates. Nobody can change or remove an entry. |
 | Can a customer get a copy of their data? | Yes. The admin opens the customer and presses **Download their data**: one file with everything the CRM holds about them, including AI call transcripts and staff notes, to read before sending. Each download is in the audit log. |
-| Are calls recorded? | No, only transcripts. Recording can be added if you decide to. |
+| Are calls recorded? | Yes: every real AI call whose opening says "This call may be recorded", both voices, kept on your own server with the transcript (365 days, never under 120). Only the admin, and staff the admin allows on **Staff users**, can listen, and every listen is in the audit log. Test calls are never recorded. |
 | Will it call someone who said stop? | No. Their consent is withdrawn, even if they say it as they hang up, and no campaign calls them again. A list uploaded later saying "everyone agreed" does not change that; only a new consent recorded by hand on their page does. |
 | The scripts say "claude-sonnet-5-5": does it use Claude? | No. That name is only passed to a hosted voice platform if one is ever connected. Our own brain ignores it, and the Claude option stays off unless you add an Anthropic key. |
 | When can we go live? | After your Plivo account and GPU computer, a first test call to our own phones, then a pilot of 20 to 50 contacts. |

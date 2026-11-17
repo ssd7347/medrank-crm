@@ -20,10 +20,10 @@
   "scripts": [
     {"name": "Clinic appointment reminder", "kind": "OUTBOUND",
      "purpose": "Remind the patient of their appointment. After verification, use get_contact_details for the doctor, date and time and confirm they can attend. If they cannot, offer a call-back from the front desk to rebook. Never discuss symptoms, test results, diagnoses or medicines; for any health question, say a member of staff will call back.",
-     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. Am I speaking with {{first_name}}?"},
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"},
     {"name": "Check-up recall", "kind": "OUTBOUND",
      "purpose": "Let the patient know their routine check-up is due and ask whether they would like the front desk to call back and book it. If yes, log INTERESTED and schedule a call-back. Never discuss health details.",
-     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. Am I speaking with {{first_name}}?"}
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"}
   ],
   "faqs": [
     {"question": "What are your timings?", "answer": "We are open [days] from [opening time] to [closing time].", "keywords": "timing, hours, open, close, time"},
