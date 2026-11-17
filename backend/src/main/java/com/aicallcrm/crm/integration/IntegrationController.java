@@ -62,13 +62,16 @@ public class IntegrationController {
 
     /** Connected only when codes really reach the phone; hiding them from the screen alone sends nothing. */
     static Integration loginCodes(boolean sent, boolean onScreen) {
-        String today = sent ? "Codes are sent to the staff member's phone."
+        String today = sent ? "Codes are sent by SMS through MSG91. If one does not arrive, MSG91's SMS log says why."
+                        + (onScreen ? " They are also shown on the login page: set OTP_SHOW_ON_SCREEN=false." : "")
                 : onScreen ? "The one-time login code is shown on the login page. Anyone who knows a staff number can "
                         + "sign in, so do not put the site online like this."
-                : "Codes are neither shown on the login page nor sent to the phone, so nobody can sign in. Until a "
-                        + "provider is connected, OTP_SHOW_ON_SCREEN=true (only while the site is not on the internet).";
-        return new Integration("LOGIN_CODES", "SMS / WhatsApp for login codes", "Sign-in",
+                : "Codes are neither shown on the login page nor sent to the phone, so nobody can sign in. Until SMS "
+                        + "is connected, OTP_SHOW_ON_SCREEN=true (only while the site is not on the internet).";
+        return new Integration("LOGIN_CODES", "SMS for login codes", "Sign-in",
                 sent ? State.CONNECTED : State.NOT_CONNECTED, today,
-                "An SMS or WhatsApp provider (e.g. MSG91, Gupshup) to send the code to the phone.");
+                "This company's own MSG91 account with a DLT-registered sender ID and an approved sign-in template, "
+                        + "then OTP_SMS_PROVIDER=msg91, MSG91_AUTH_KEY and MSG91_OTP_TEMPLATE_ID "
+                        + "(docs/new-customer-setup.md).");
     }
 }

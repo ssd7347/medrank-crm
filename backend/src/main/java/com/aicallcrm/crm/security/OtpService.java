@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.aicallcrm.crm.common.ApiException;
 import com.aicallcrm.crm.security.LoginOtp.Subject;
@@ -17,10 +19,10 @@ import com.aicallcrm.crm.user.AppUserRepository;
 /**
  * One-time codes for the login: a staff member (the admin included) signs in with their mobile number.
  *
- * There is no WhatsApp/SMS provider yet, so while {@code app.otp.show-on-screen} is true the code is handed
- * back to the login page and shown there. That is a stand-in for delivery, NOT security: anyone who knows a
- * registered mobile number can sign in. Set OTP_SHOW_ON_SCREEN=false the moment codes are delivered to the
- * phone instead (send the code from {@link #deliver}), and never expose the site publicly before that.
+ * The code is sent by SMS once MSG91 is set up ({@link Msg91Sms}, OTP_SMS_PROVIDER=msg91). Until then, while
+ * {@code app.otp.show-on-screen} is true, the code is handed back to the login page and shown there. That is a
+ * stand-in for delivery, NOT security: anyone who knows a registered mobile number can sign in. Never expose the site
+ * publicly with OTP_SHOW_ON_SCREEN=true.
  */
 @Service
 public class OtpService {
@@ -33,13 +35,15 @@ public class OtpService {
     private final AppUserRepository users;
     private final PasswordEncoder encoder;
     private final boolean showOnScreen;
+    private final Msg91Sms sms;
 
-    public OtpService(LoginOtpRepository otps, AppUserRepository users,
-                      PasswordEncoder encoder, @Value("${app.otp.show-on-screen:false}") boolean showOnScreen) {
+    public OtpService(LoginOtpRepository otps, AppUserRepository users, PasswordEncoder encoder,
+                      @Value("${app.otp.show-on-screen:false}") boolean showOnScreen, Msg91Sms sms) {
         this.otps = otps;
         this.users = users;
         this.encoder = encoder;
         this.showOnScreen = showOnScreen;
+        this.sms = sms;
     }
 
     public boolean showsOnScreen() {
@@ -67,14 +71,26 @@ public class OtpService {
         return showOnScreen ? code : null;
     }
 
-    /** Where the WhatsApp/SMS send goes once a provider is connected. */
+    /**
+     * Sends the code by SMS once it is saved, so a code that was never stored is never sent, and the provider is not
+     * called while the database transaction is open. In the background: the reply to the login page is the same, and
+     * as quick, whether or not the number is registered or MSG91 accepted it; a failure is in the log.
+     */
     private void deliver(String phone, String code) {
-        // Intentionally empty: no provider is connected. See the class comment.
+        if (!sms.configured()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                sms.sendCodeInBackground(phone, code);
+            }
+        });
     }
 
-    /** Whether {@link #deliver} really sends the code to the phone. Make it true together with the send. */
+    /** Whether {@link #deliver} really sends the code to the phone. */
     public boolean sendsCodes() {
-        return false;
+        return sms.configured();
     }
 
     /** Who signed in, if the code is right; otherwise null. Wrong tries are counted against the code. */

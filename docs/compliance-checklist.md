@@ -85,10 +85,12 @@ do-not-disturb register. The code has a place to plug one in (`DndProvider`); th
 - [ ] Adviser says whether each kind of call (reminder, follow-up, collection, enquiry) must be scrubbed against DND
 - [ ] If yes: a DND service chosen and connected before those campaigns start
 
-**2.4 Sending sign-in codes.** Staff sign-in codes are shown on the screen; sending them by SMS or WhatsApp is not
-built. The CRM must not be put on the internet until codes are really sent (see `docs/handover-guide.md`).
+**2.4 Sending sign-in codes.** Staff sign-in codes are sent by SMS through the company's own MSG91 account
+(`docs/new-customer-setup.md`); until that is set up they are shown on the screen, and the CRM must not be put on the
+internet. The code is never written to the log; the log shows only the last four digits of the number.
 
-- [ ] SMS or WhatsApp provider for sign-in codes chosen
+- [ ] MSG91 account, DLT sender ID and sign-in template registered in the company's name
+- [ ] A real sign-in code received by SMS, then `OTP_SHOW_ON_SCREEN=false`
 
 **2.5 The reason for the call in opening lines.** The starter openings no longer name the reason (they used to say
 "your check-up is due", "your upcoming appointment", "your site visit", "your policy renewal", "you recently

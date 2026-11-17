@@ -23,13 +23,37 @@ Agree with the customer, in writing:
    - `JWT_SECRET`: 32+ random characters, different for every customer
    - `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`, `ADMIN_PHONE`: the customer's admin
    - `COOKIE_SECURE=true`
-   - `OTP_SHOW_ON_SCREEN=false`, and connect an SMS/WhatsApp provider for login codes before going live
-     (until then, anyone who knows a staff number can sign in)
+   - `OTP_SHOW_ON_SCREEN=false`, and sign-in codes by SMS (below) before going live (until then, anyone who
+     knows a staff number can sign in)
    - `VOICE_HMAC_SECRET`: 32+ random characters, different for every customer
    - `FEATURES`: the modules this customer has paid for (`ALL`, or for example `IMPORT,EXPORT` for a plan
      without AI calls). Switched-off modules disappear from the menu and their API refuses requests, so the
      customer cannot turn them on themselves.
 4. Set `BACKEND_URL` on the frontend to the backend's address.
+
+### Sign-in codes by SMS (MSG91)
+
+Staff sign in with their mobile number and a 6-digit code, sent by SMS through the customer's own MSG91 account.
+Plivo is not used for this: Plivo's documentation says it no longer sends domestic India SMS, and its India route
+needs a large monthly commitment.
+
+1. The customer opens an MSG91 account in the company's name and registers on DLT: the company (principal entity),
+   a sender ID (header) and a sign-in template. In the template, the code is a variable. For example: "Your sign-in
+   code for <Brand> CRM is {#var#}. It works once, for 5 minutes. Do not share it."
+2. In MSG91 under SMS → Templates, add that template with its DLT template ID and the sender ID, writing the code's
+   variable as `##OTP##`. Note MSG91's template id. Use the SMS section, not the OTP section: the CRM sends through
+   MSG91's Flow API, which uses SMS-section templates.
+3. On the backend, set `OTP_SMS_PROVIDER=msg91`, `MSG91_AUTH_KEY` (MSG91 → API key, only on the server) and
+   `MSG91_OTP_TEMPLATE_ID`. If the variable is not `OTP`, also set `MSG91_OTP_VARIABLE`. A mistyped provider or
+   variable name stops the CRM from starting.
+4. Restart, then sign in with the admin's number. The SMS should arrive within a minute. The CRM log says "accepted
+   by MSG91" or why not. MSG91's SMS log says whether the operator delivered it. "Connected services" shows SMS for
+   login codes as connected.
+5. Only then set `OTP_SHOW_ON_SCREEN=false` (if it was true) and put the site online.
+
+The CRM has been tested against a stand-in for MSG91, not a real MSG91 account, so step 4 is the first real test.
+The login page's reply is the same, and just as quick, whether or not the number has an account. So a code that
+does not arrive shows up only in the logs.
 
 ## 3. Brand it (no code needed)
 

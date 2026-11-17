@@ -100,12 +100,12 @@ function LoginForm() {
             <div className="rounded-md border border-brand-300 bg-brand-50 px-4 py-3.5 text-sm text-ink-soft" role="status">
               <p className="eyebrow text-brand-700">Your one-time code</p>
               <p className="my-2 font-mono text-3xl font-semibold tracking-[0.35em] text-brand-800">{sent.codeOnScreen}</p>
-              <p className="text-xs leading-relaxed text-ink-faint">Shown here only until SMS or WhatsApp delivery is connected. It works once, for {Math.round(sent.validForSeconds / 60)} minutes.</p>
+              <p className="text-xs leading-relaxed text-ink-faint">Shown here only until SMS delivery is connected. It works once, for {Math.round(sent.validForSeconds / 60)} minutes.</p>
             </div>
           ) : sent.shownOnScreen ? (
             <Alert tone="amber">There is no account for this number. Ask the admin to create one for you.</Alert>
           ) : (
-            <Alert tone="blue">If this number has an ID, a one-time code has been sent to it.</Alert>
+            <Alert tone="blue">If this number has an ID, a one-time code has been sent to it by SMS. It works once, for {Math.round(sent.validForSeconds / 60)} minutes.</Alert>
           )}
           <Field label="One-time code" required>
             {(id) => (

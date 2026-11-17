@@ -14,6 +14,51 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 17 November 2026: SIGN-IN CODES BY SMS THROUGH MSG91 (user: "continue the next task"; chose "Indian SMS provider")
+
+The last engineering item that kept the CRM off the internet was the login code, which was only shown on the login
+page. I first offered SMS through the client's Plivo account. Plivo's own docs say it no longer sends domestic India
+SMS (international routes only, from USD 0.08 a message, with India listed under a USD 1,000/month commitment). I
+told the user, and they chose an Indian SMS provider.
+
+**Built.**
+- `Msg91Sms` sends the code through MSG91's Flow API (`POST .../api/v5/flow`, `authkey` header) with the client's
+  DLT-approved SMS-section template, as `{"template_id", "short_url":"0", "recipients":[{"mobiles":"91<10 digits>",
+  "OTP":"<code>"}]}`. Only a `type: "success"` reply counts as sent: MSG91 can answer HTTP 200 with an error inside.
+  The log has the last four digits of the number and MSG91's request id, never the code.
+- `OtpService` sends the code after the code is saved, on a background thread. So the login page's reply is the
+  same, and just as quick, for a registered and an unknown number.
+- `sendsCodes()` is true once MSG91 is set up, so "Connected services" shows SMS as connected.
+- Settings: `OTP_SMS_PROVIDER=msg91`, `MSG91_AUTH_KEY`, `MSG91_OTP_TEMPLATE_ID`, `MSG91_OTP_VARIABLE` (default
+  OTP), `MSG91_API_BASE`. A mistyped provider or variable name stops the start.
+- The login page says the code "has been sent to it by SMS".
+
+**Tests.**
+- `Msg91SmsTest` (6) uses a fake MSG91 for the exact request, the template's own variable name, the error-in-200 /
+  401 / non-JSON replies, nothing sent without settings or for a bad number, the start check, and the background
+  send.
+- `OtpSmsIntegrationTest`: the code is not on the page, it arrives by SMS for 919000000000 and signs the admin in, an
+  unknown number gets no SMS, and Connected services shows CONNECTED.
+- `IntegrationControllerTest` covers the new wording.
+
+**Shown failing without the code.**
+- With delivery removed from `OtpService`, the SMS test sees no SMS.
+- With any 2xx counted as sent, the error-in-200 test fails.
+- With the whole number logged, the log test fails.
+- With a blocking send, the timing test takes 2.0 s and fails.
+
+**Browser check.** The in-memory test CRM ran with codes not on screen and MSG91 pointed at a local stand-in. The page
+said "sent to it by SMS" and showed no code. The stand-in got the template with 919000000000 and the code, and the log
+showed only `******0000`. That code signed the admin in, and Connected services showed "SMS for login codes:
+Connected". The CRM log had 0 errors. Backend 143/143 on H2; frontend tsc and eslint clean.
+
+**Not tested on a real MSG91 account.** MSG91's docs pages could not be read here (they load by script), so the
+request follows MSG91's help-centre examples and working code; the first real sign-in is the test
+(`docs/new-customer-setup.md` "Sign-in codes by SMS").
+
+Docs: new-customer-setup (steps), handover-guide (the table, decision 4, settings), compliance-checklist 2.4,
+first-real-call, `.env.example`, `application.properties`.
+
 # 17 November 2026: THE TESTS PASS ON REAL POSTGRESQL, AND TESTS CANNOT TOUCH A REAL DATABASE (user: "comtinue the next task" / "continue")
 
 Until now every backend test had run only on H2, while the client's CRM runs on PostgreSQL. **All 136 backend tests

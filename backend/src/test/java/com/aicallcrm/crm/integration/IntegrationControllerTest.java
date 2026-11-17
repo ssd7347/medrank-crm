@@ -23,5 +23,9 @@ class IntegrationControllerTest {
         Integration sent = IntegrationController.loginCodes(true, false);
         assertThat(sent.state()).isEqualTo(State.CONNECTED);
         assertThat(sent.key()).isEqualTo("LOGIN_CODES");
+        assertThat(sent.today()).contains("MSG91").doesNotContain("OTP_SHOW_ON_SCREEN");
+
+        // Sent and still shown on screen: connected, but it says to stop showing them.
+        assertThat(IntegrationController.loginCodes(true, true).today()).contains("OTP_SHOW_ON_SCREEN=false");
     }
 }

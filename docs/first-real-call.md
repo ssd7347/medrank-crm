@@ -30,6 +30,7 @@ until that call and a pilot (20–50 consenting contacts, every transcript read)
    against the real CRM and engine: a correctly signed Plivo callback is accepted through it, a wrongly signed one is
    refused, a wrong stream token is refused. Staff keep using the CRM on `localhost`. Before the CRM itself goes on a
    public address (hosting), real OTP delivery and `OTP_SHOW_ON_SCREEN=false`, `COOKIE_SECURE=true` are required.
+   (17 Nov: SMS codes through MSG91 are built; they need the client's MSG91 account, `docs/new-customer-setup.md`.)
 4. **Indian English on an 8 kHz phone line (free; being checked).** The ear is Whisper `base.en` and the voice is
    Piper's US `en_US-lessac-medium`. The tool is built: `voice-engine/ear_check.py` (README: "Checking the ears").
    **Baseline (11 Nov, Piper's own voice reading the 24 test sentences):** ordinary words and numbers are fine, about

@@ -43,7 +43,7 @@ It is made of these parts:
 | A real test call on a real phone line | Nothing has been tried on a real line yet; the first call is to the developer's own phone | Needs the next two |
 | Your Plivo account | The phone line; your own KYC, number and (in India) DLT registration | **Yours** |
 | A GPU computer | The brain is too slow on an ordinary computer (6.5–21 s per reply); on a GPU about 1 s | **Yours** (paid, monthly or by the hour) |
-| Login codes by SMS or WhatsApp | Today the sign-in code is shown on the login page, so the CRM website must **never** be put on the internet as it is | Needs a provider (e.g. MSG91, Gupshup) |
+| Your MSG91 account for login codes | The CRM sends sign-in codes by SMS through MSG91 (built, tested against a stand-in). Until your account, DLT sender ID and template are set up, the code is shown on the login page, so the CRM website must **never** be put on the internet before that | **Yours** (`docs/new-customer-setup.md`) |
 | Do-not-disturb (DND) checks | Numbers are not checked against the national DND register; only people who gave consent are called | Your telephony provider's scrubbing service |
 
 ## 3. Your decisions before going live
@@ -56,7 +56,8 @@ Tick these off with the developer:
 2. **The GPU computer**: a T4-class GPU, in India if possible (every extra delay on the line is heard). By the hour
    for the first test calls, monthly once live.
 3. **Hosting**: where the CRM server and database run once they leave the developer's laptop.
-4. **SMS or WhatsApp provider** for login codes (see section 2).
+4. **MSG91 account** for login codes by SMS, with DLT registration of a sender ID and a sign-in template
+   (see section 2). Plivo does not send SMS within India.
 5. **Compliance**, with your adviser (the full list, with what the CRM already enforces: `docs/compliance-checklist.md`): that everyone you call agreed to be called and how (a form, a contract
    clause); the legal calling hours (the CRM's default is 09:00–18:00 Indian time); DND; what the opening lines
    say. Nothing in the software assumes these answers.
@@ -186,6 +187,7 @@ The settings that matter most for live calls:
 | `VOICE_RECORDINGS_DIR` | Folder on the CRM server for call recordings (default `data/recordings`) |
 | `VOICE_RETENTION_DAYS` | Days transcripts and recordings are kept (default 365; never fewer than 120) |
 | `OTP_SHOW_ON_SCREEN` | `true` only while nobody outside can reach the website |
+| `OTP_SMS_PROVIDER`, `MSG91_AUTH_KEY`, `MSG91_OTP_TEMPLATE_ID` | `msg91`, your MSG91 key and sign-in template id (`docs/new-customer-setup.md`) |
 
 **Start order**: the database, the CRM server, the speech engine, the gateway; on the GPU computer the brain
 (loaded and given one warm-up message). The step-by-step for the first call, with the checks at each step, is in

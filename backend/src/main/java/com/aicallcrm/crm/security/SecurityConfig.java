@@ -29,7 +29,7 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(AppProperties.class)
+@EnableConfigurationProperties({AppProperties.class, SmsProperties.class})
 public class SecurityConfig {
 
     private static final String[] STAFF_ROLES = java.util.Arrays.stream(com.aicallcrm.crm.common.Role.values())
