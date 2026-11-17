@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,15 +60,28 @@ public class VoiceScriptService {
      */
     static List<String> openingWarnings(String openingLine) {
         String text = openingLine == null ? "" : openingLine.replaceAll("\\{\\{[a-z_]+}}", " ");
+        List<String> out = new ArrayList<>();
         List<String> words = FactGuard.reasonWords(text, "");
-        if (words.isEmpty()) {
-            return List.of();
+        if (!words.isEmpty()) {
+            out.add("The opening line says " + quoted(words) + " before the AI knows it is speaking to the right "
+                    + "person. Whoever answers may not be the customer, and the AI may then say " + (words.size() == 1
+                    ? "it" : "these words") + " too before the identity check. Say only who is calling and ask for the "
+                    + "person; the reason for the call comes after the check.");
         }
-        return List.of("The opening line says " + quoted(words) + " before the AI knows it is speaking to the right "
-                + "person. Whoever answers may not be the customer, and the AI may then say " + (words.size() == 1
-                ? "it" : "these words") + " too before the identity check. Say only who is calling and ask for the "
-                + "person; the reason for the call comes after the check.");
+        if (RECORDED.matcher(text).find()) {
+            out.add(RECORDING_WARNING);
+        }
+        return out;
     }
+
+    /**
+     * Calls are not recorded (no platform starts a recording; only the transcript is kept), so an opening that says
+     * so is untrue (compliance checklist 2.2). Scripts approved before 15 November 2026 still say "This call may be
+     * recorded": V10 corrected only drafts.
+     */
+    private static final Pattern RECORDED = Pattern.compile("\\brecord(?:ed|ing)\\b", Pattern.CASE_INSENSITIVE);
+    static final String RECORDING_WARNING = "The opening line says the call is recorded, but calls are not recorded"
+            + " (only the transcript is kept). Remove it; if recording is set up later, it goes back in.";
 
     /**
      * The same for the identity questions: the AI asks for each "Ask to confirm" field by its label before the check

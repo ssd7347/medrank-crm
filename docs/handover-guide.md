@@ -105,7 +105,8 @@ Tick these off with the developer:
   - *Scripts* (admin): what the agent is calling about and how it opens. Every save makes a new version, and a
     version is used on calls only after the admin approves it (approving retires the previous one). An amber note
     under an opening line means it says why you are calling (for example "your policy renewal") before the AI knows
-    it is talking to the right person; an amber "Identity question" note at the top means the same of a field's name.
+    it is talking to the right person, or that the call is recorded (it is not); an amber "Identity question" note at
+    the top means a field's name says why you are calling.
     Change them, or approve only if your compliance adviser agrees.
   - *Test console* (admin): talk to the agent as if you were the contact, with no effect on the contact at all.
 - **Admin** pages: Staff users, Branches, Custom fields, Stages, AI knowledge base (the only answers the agent

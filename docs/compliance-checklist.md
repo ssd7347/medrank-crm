@@ -48,9 +48,12 @@ the contact page.
 
 **2.2 Call recording.** Calls are not recorded; only the transcript is kept. The starter opening lines no longer say
 "This call may be recorded" (changed on 15 November 2026: new installations get the new wording, and draft scripts in an
-existing CRM were corrected; a script already approved keeps its wording until the admin changes it).
+existing CRM were corrected; a script already approved keeps its wording until the admin changes it). Since 17
+November 2026 the Scripts page flags any opening line that says the call is recorded or being recorded, including
+one already approved, and approving such a version asks again.
 
-- [ ] Any script approved before that date: its opening line checked, and "This call may be recorded" removed
+- [ ] Any script approved before that date: its opening line checked (the Scripts page shows an amber note under it),
+  and "This call may be recorded" removed
 - [ ] If recording is switched on later: that line added back to every opening, and decided where recordings are
   kept, for how long, and who may listen
 

@@ -14,6 +14,22 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 17 November 2026: AN OPENING THAT SAYS THE CALL IS RECORDED IS FLAGGED (user: "continue the next task")
+
+Compliance checklist 2.2: calls are not recorded (PlivoClient starts no recording; only the transcript is kept), and
+the V10 migration took "This call may be recorded" out of draft scripts only, so a script approved before 15 November
+still tells every caller something untrue. `VoiceScriptService.openingWarnings` now also flags an opening with
+"recorded" or "recording" (not "records": "Our records show..." is fine): "The opening line says the call is recorded,
+but calls are not recorded (only the transcript is kept). Remove it; if recording is set up later, it goes back in."
+It shows under the opening on the Scripts page, approved versions included, and approving asks again, through
+yesterday's notes and check; no screen changed. Test
+`VoiceAgentIntegrationTest.anOpeningThatSaysTheCallIsRecordedIsFlagged`: the old starter wording gets exactly that
+warning, still there once approved; "about your EMI, and this call is being recorded" gets both warnings, the reason
+first; "Our records show..." gets none. With the check off it fails ("no item was ..."). Not rechecked in the
+browser: the page draws whatever warnings come back, as checked on 16 November. Backend 125/125, engine 87, training
+kit 80.
+Docs: compliance-checklist 2.2, voice-agent.md, handover-guide (Scripts).
+
 # 16 November 2026: THE SCRIPTS PAGE FLAGS OPENINGS AND IDENTITY QUESTIONS THAT SAY WHY WE CALL (user: "continue the next task")
 
 What was left of compliance checklist 2.5: the guard stops our model naming the reason before the identity check, but

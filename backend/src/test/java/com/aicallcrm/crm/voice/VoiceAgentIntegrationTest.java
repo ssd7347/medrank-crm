@@ -763,6 +763,34 @@ class VoiceAgentIntegrationTest {
         mvc.perform(auth(get("/api/voice/script-names"), admin)).andExpect(jsonPath("$").value(Matchers.hasItem("Renewal call")));
     }
 
+    /** Checklist 2.2: calls are not recorded, so an opening that says they may be is flagged (old approved scripts do). */
+    @Test
+    void anOpeningThatSaysTheCallIsRecordedIsFlagged() throws Exception {
+        String old = "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be"
+                + " recorded. Am I speaking with {{first_name}}?";
+        String body = "{\"name\":\"Old reminder\",\"kind\":\"OUTBOUND\",\"model\":\"claude-haiku-4-5\",\"systemPrompt\":"
+                + "\"Rules...\",\"openingLine\":\"" + old + "\"}";
+        long id = id(mvc.perform(auth(post("/api/voice/scripts"), admin).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.warnings").value(Matchers.contains("The opening line says the call is recorded, but"
+                        + " calls are not recorded (only the transcript is kept). Remove it; if recording is set up later,"
+                        + " it goes back in."))).andReturn());
+        // Approved anyway (as scripts approved before 15 November 2026 were): still flagged on the list.
+        mvc.perform(auth(post("/api/voice/scripts/" + id + "/approve"), admin)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.warnings.length()").value(1));
+        // Both problems at once: the reason first, then the recording.
+        mvc.perform(auth(post("/api/voice/scripts"), admin).contentType(MediaType.APPLICATION_JSON).content(body.replace(
+                        "This call may be recorded.", "I am calling about your EMI, and this call is being recorded.")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.warnings.length()").value(2))
+                .andExpect(jsonPath("$.warnings[0]").value(Matchers.startsWith("The opening line says \"emi\" before")))
+                .andExpect(jsonPath("$.warnings[1]").value(Matchers.startsWith("The opening line says the call is recorded")));
+        // "Our records" is not about recording.
+        mvc.perform(auth(post("/api/voice/scripts"), admin).contentType(MediaType.APPLICATION_JSON).content(body.replace(
+                        "This call may be recorded.", "Our records show you asked us to call.")))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.warnings").isEmpty());
+    }
+
     /** Checklist 2.5: the company's own opening line and identity questions are said before the identity check. */
     @Test
     void openingLinesAndIdentityQuestionsThatNameTheReasonAreFlagged() throws Exception {

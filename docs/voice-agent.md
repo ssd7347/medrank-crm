@@ -153,7 +153,8 @@ the model says. **The opening line is the customer's own**, and so are the names
 "loan account number" hints at a loan. The Scripts page flags both with the same word list
 (`VoiceScriptService.openingWarnings` under each version's opening line, and approving one asks again;
 `identityWarnings` at the top of the page, from `/voice/scripts/identity-warnings`), but a word outside the list is not
-flagged. Review these with the
+flagged. An opening that says the call is recorded or being recorded is flagged too: no platform records calls
+(compliance checklist 2.2), and scripts approved before 15 November 2026 still say "This call may be recorded". Review these with the
 customer's compliance adviser before going live.
 
 ## When the model gets stuck
