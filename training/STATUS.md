@@ -14,6 +14,26 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 17 November 2026: THE TESTS PASS ON REAL POSTGRESQL, AND TESTS CANNOT TOUCH A REAL DATABASE (user: "comtinue the next task" / "continue")
+
+Until now every backend test had run only on H2, while the client's CRM runs on PostgreSQL. **All 136 backend tests
+pass on PostgreSQL 17.10** on the local server. Each run used a new, empty database. Flyway applied all 12 migrations,
+and the log has no H2 lines. Nothing needed changing for PostgreSQL. The throwaway databases were dropped afterwards,
+and the dev database `ai_call_crm` was never used.
+
+**Guard.** `TestDatabaseGuard` (test sources, registered in `src/test/resources/META-INF/spring.factories`) covers
+anything started with the test classes: the tests, the in-memory test CRM, and the demo. It stops the start, before
+anything connects, unless the database is in-memory H2 or a PostgreSQL database whose name ends in `_test`. The
+password and URL options are left out of its message.
+
+Proof:
+- A test started on `ai_call_crm_pgcheck` was refused, with 0 connection or Flyway lines in the log.
+- `TestDatabaseGuardTest` (2 tests) fails both tests without the name check.
+- The PostgreSQL run itself found a flaw in my own test: the "no database" case read the machine's
+  `SPRING_DATASOURCE_URL`. Fixed by testing on an empty environment.
+
+The README "Tests" section has the commands.
+
 # 17 November 2026: CALLS 9 AM TO 6 PM, AND CALLS ARE RECORDED (user: "the calling hours should be from 9 am to 6 pm / for 20, add the may be recorded line and store it in database or somewhere and keep it for atlease 120 days and only the admin and the authorized who we give access can access the recordings")
 
 The user's choices (asked): record every real call, the opening tells them; a folder on the CRM server, listed in

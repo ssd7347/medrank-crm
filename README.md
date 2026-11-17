@@ -81,6 +81,17 @@ Prerequisites: JDK 21, Maven, Node 20+, PostgreSQL.
 custom fields, Excel/CSV import and export, white-label settings, and the AI agent (Tool API, verification,
 hand-overs, opt-out, campaigns, the kill switch, scripted and red-team conversations, and a fake provider plugged in).
 
+The same tests also run on PostgreSQL (all pass on PostgreSQL 17). Use a new, empty database for each run. The tests
+write data, so anything started with the test classes refuses any database except in-memory H2 or one whose name ends
+in `_test` (`TestDatabaseGuard`). It checks before connecting, so the real CRM database is never touched by mistake.
+
+```bash
+createdb -U postgres ai_call_crm_test
+cd backend
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/ai_call_crm_test SPRING_DATASOURCE_USERNAME=postgres SPRING_DATASOURCE_PASSWORD=<password> mvn test
+dropdb -U postgres ai_call_crm_test
+```
+
 ## Selling it to a new customer
 
 See [docs/new-customer-setup.md](docs/new-customer-setup.md). For the company taking it over (what it is, what is
