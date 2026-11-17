@@ -85,7 +85,9 @@ Tick these off with the developer:
   (assign, change stage, add or remove a tag). Each contact's page has their details, timeline, follow-ups, AI
   calls and **consent for AI calls**. Nobody is called by the AI without consent recorded. When someone asks for
   their data to be deleted, the admin presses **Erase this person** at the bottom of their page (it cannot be undone;
-  see `docs/compliance-checklist.md`, section 1 and 2.1).
+  see `docs/compliance-checklist.md`, section 1 and 2.1). When someone asks what you keep about them, the admin
+  presses **Download their data** just above it: one file with everything the CRM holds about them. Read it before
+  sending it, as it includes staff notes and alerts.
 - **My follow-ups**: your reminders; the bell shows one when it falls due.
 - **Import from Excel** (managers and admin): upload your file, check the guessed columns, import. A number already
   in the CRM updates that contact instead of adding it twice; bad rows are listed by row number. You can record
@@ -200,6 +202,7 @@ automatically after 365 days (`VOICE_RETENTION_DAYS`).
 | Call-backs pile up as overdue | Someone must call those people; the Overview shows the count in red |
 | Cannot sign in | Codes expire; ask for a new one. Being signed out after 3 idle minutes is normal |
 | A number keeps getting called that should not | Open the contact: record "Do not call" or withdraw consent; the agent never calls it again |
+| Someone asks what data you keep about them | Admin: open the contact, **Download their data**. Read the file, remove anything your adviser says not to send, and send it to them safely (compliance checklist, 2.1) |
 | Someone asks for their data to be deleted | Admin: open the contact, **Erase this person**, type their number and a reason (not their name). Then deal with backups, exports and Plivo as agreed with your adviser (compliance checklist, 2.1) |
 
 ## 9. Where the details are

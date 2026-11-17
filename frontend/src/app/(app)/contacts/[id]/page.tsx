@@ -10,7 +10,7 @@ import { ContactForm } from "@/components/contact-form";
 import { TagEditor } from "@/components/tags";
 import { Alert, Badge, Button, Card, DescList, EmptyState, Field, Input, Loading, Modal, PageHeader, Select, Textarea, cx } from "@/components/ui";
 import { ConsentCard, VoiceCallList } from "@/components/voice";
-import { api, errorMessage } from "@/lib/api";
+import { api, downloadProtected, errorMessage } from "@/lib/api";
 import { MANAGER_ROLES, useAuth } from "@/lib/auth";
 import { useBranding } from "@/lib/branding";
 import { useStages } from "@/lib/stages";
@@ -178,6 +178,7 @@ export default function ContactPage() {
                 <VoiceCallList path={`/api/contacts/${c.id}/voice-calls`} />
               </>
             )}
+            {admin && <PersonalDataCard contact={c} />}
             {admin && <EraseCard contact={c} />}
           </div>
         </div>
@@ -344,6 +345,43 @@ const count = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? on
 const digits = (s: string) => s.replace(/\D/g, "");
 
 /** Admin only: erase a person who asked for their data to be deleted. */
+/** A copy of everything the CRM holds about this person, for when they ask for it. Admin only; each download is audited. */
+function PersonalDataCard({ contact }: { contact: Contact }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function download() {
+    setBusy(true);
+    setError(null);
+    try {
+      await downloadProtected(`/api/contacts/${contact.id}/personal-data`, `personal-data-${contact.id}.json`);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title="Their data">
+      <p className="text-sm text-ink-soft">
+        If they ask what you keep about them: everything in the CRM, in one file. It includes staff notes and alerts, so read it before sending it to
+        them. Each download is in the audit log.
+      </p>
+      {error && (
+        <div className="mt-3">
+          <Alert>{error}</Alert>
+        </div>
+      )}
+      <div className="mt-3">
+        <Button variant="secondary" size="sm" loading={busy} onClick={download}>
+          Download their data
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 function EraseCard({ contact }: { contact: Contact }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);

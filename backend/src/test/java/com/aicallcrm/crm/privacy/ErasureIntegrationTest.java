@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -67,7 +68,7 @@ class ErasureIntegrationTest {
     }
 
     @Test
-    void everythingAboutThePersonGoesAndTheirAiCallsStayOnlyAsNumbers() throws Exception {
+    void everythingAboutThePersonIsCopiedThenGoesAndTheirAiCallsStayOnlyAsNumbers() throws Exception {
         String name = "Zubin Erasewala";
         String main = phone();
         String earlier = phone();
@@ -125,6 +126,53 @@ class ErasureIntegrationTest {
         erase(admin, id, "").andExpect(status().isBadRequest());
         mvc.perform(auth(get("/api/contacts/" + id), admin)).andExpect(status().isOk());
 
+        // Before he goes, a copy of everything about him (an access request): only the admin can download it.
+        mvc.perform(auth(get("/api/contacts/" + id + "/personal-data"), manager)).andExpect(status().isForbidden());
+        String json = mvc.perform(auth(get("/api/contacts/" + id + "/personal-data"), admin)).andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"personal-data-" + id + ".json\""))
+                .andExpect(jsonPath("$.contact.full_name").value(name))
+                .andExpect(jsonPath("$.contact.alt_phone").value(earlier))
+                .andExpect(jsonPath("$.contact.custom_fields." + tagKey).value(tag))
+                .andExpect(jsonPath("$.contact.tags").value(Matchers.contains("VIP")))
+                .andExpect(jsonPath("$.timeline[*].notes").value(Matchers.hasItem("Zubin says his brother handles the loan")))
+                .andExpect(jsonPath("$.follow_ups[0].purpose").value("Call Zubin about the papers"))
+                .andExpect(jsonPath("$.follow_ups[0].assigned_to").isString())
+                .andExpect(jsonPath("$.call_log[*].notes").value(Matchers.hasItem("Spoke to Zubin")))
+                .andExpect(jsonPath("$.consent_records.length()").value(1))
+                // Both AI calls, the one from before he was a contact first.
+                .andExpect(jsonPath("$.ai_calls[*].phone").value(Matchers.contains(earlier, main)))
+                .andExpect(jsonPath("$.call_backs[*].summary").value(Matchers.hasItem(Matchers.containsString("disputes the bill"))))
+                .andExpect(jsonPath("$.campaigns[0].campaign").value("Erase test"))
+                .andExpect(jsonPath("$.staff_alerts").isNotEmpty())
+                .andExpect(jsonPath("$.about_this_copy.exported_at").value(Matchers.endsWith("+05:30")))
+                .andReturn().getResponse().getContentAsString();
+        // Every table that holds his name, numbers, email or notes is in the copy, so a table added later and
+        // forgotten here fails this test. Left out on purpose: upload reports (they name him only as a row that was
+        // skipped) and the phone company's call ids (webhook events).
+        Map<String, String> sections = Map.ofEntries(Map.entry("contact", "contact"), Map.entry("contact_tag", "contact"),
+                Map.entry("contact_activity", "timeline"), Map.entry("follow_up", "follow_ups"),
+                Map.entry("call_log", "call_log"), Map.entry("contact_consent", "consent_records"),
+                Map.entry("voice_call", "ai_calls"), Map.entry("callback_request", "call_backs"),
+                Map.entry("voice_campaign_target", "campaigns"), Map.entry("notification", "staff_alerts"),
+                Map.entry("audit_log", "changes_to_their_record"));
+        List<String> notCopied = List.of("import_batch", "voice_webhook_event");
+        for (String needle : List.of(name, main, earlier, email, "old mill")) {
+            assertThat(json).as(needle).contains(needle);
+            for (String cell : cellsContaining(needle)) {
+                String table = cell.substring(0, cell.indexOf('.')).toLowerCase(java.util.Locale.ROOT);
+                if (notCopied.contains(table)) {
+                    continue;
+                }
+                assertThat(sections).as(cell + " holds \"" + needle + "\" but is in no part of the copy").containsKey(table);
+                Object part = JsonPath.read(json, "$." + sections.get(table));
+                assertThat(part instanceof Map<?, ?> m ? m.isEmpty() : ((List<?>) part).isEmpty())
+                        .as(cell + " holds \"" + needle + "\" but its part of the copy is empty").isFalse();
+            }
+        }
+        assertThat(jdbc.queryForObject("select count(*) from audit_log where action = 'CONTACT_DATA_EXPORTED'"
+                + " and entity_id = ?", Integer.class, id)).isEqualTo(1);
+
         erase(admin, id, "+91 " + main.substring(0, 5) + " " + main.substring(5)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.followUps").value(1))
                 .andExpect(jsonPath("$.callLogs").value(Matchers.greaterThanOrEqualTo(1)))
@@ -138,6 +186,7 @@ class ErasureIntegrationTest {
 
         mvc.perform(auth(get("/api/contacts/" + id), admin)).andExpect(status().isNotFound());
         erase(admin, id, main).andExpect(status().isNotFound());
+        mvc.perform(auth(get("/api/contacts/" + id + "/personal-data"), admin)).andExpect(status().isNotFound());
         // Nowhere in the database: not his name, numbers, email, or anything he or staff said about him.
         for (String needle : List.of(name, "Zubin", main, earlier, email, "old mill")) {
             assertThat(cellsContaining(needle)).as(needle).isEmpty();

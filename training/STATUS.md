@@ -14,6 +14,32 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 17 November 2026: A COPY OF EVERYTHING ABOUT ONE PERSON, FOR AN ACCESS REQUEST (user: "continue")
+
+Compliance checklist 2.1 said: "There is no one-click copy of everything about one person for an access request;
+staff read it from the contact page" (the DPDP Act lets a person ask what is kept about them). Now
+`privacy/PersonalDataService` (`GET /api/contacts/{id}/personal-data`, admin only, downloaded as
+personal-data-<id>.json, `CONTACT_DATA_EXPORTED` in the audit log) reads from the same places and finds the person the
+same way as `ErasureService` (their contact, and AI calls and call-backs from their numbers before they were one):
+contact with custom fields and tags, timeline, follow-ups, call log, consent records, AI calls with transcripts,
+call-backs, campaign places, do-not-disturb results, staff alerts (each once, not once per recipient), and the
+record's change history. Staff by name, times in Indian time to the second, stored JSON kept as JSON. The contact
+page has a "Their data" card above "Erase this person" with **Download their data**, saying it includes staff notes
+and alerts, so read it before sending. Not included: backups, logs, Plivo's records, upload reports, notes on other
+contacts.
+Test: `ErasureIntegrationTest`'s main test (renamed `everythingAboutThePersonIsCopiedThenGoesAndTheirAiCallsStayOnlyAsNumbers`)
+downloads Zubin's copy before erasing him: a manager gets 403; the file name; his details, custom field, tag, note,
+follow-up, call log, the one consent record, both AI calls (the one from before he was a contact first), the dispute
+call-back, the campaign, alerts; and every table holding his name, numbers, email or "old mill" has a non-empty part
+of the copy (except import_batch and voice_webhook_event, left out on purpose), so a table added later and forgotten
+fails it. After the erasure the download is 404. With the endpoint off it fails (403 expected, 404); with consent
+records left out of the copy and the test's direct check of them removed, the table scan alone fails it ("No results
+for path: $['consent_records']"). In the browser on the in-memory test CRM: the card shows on the contact page, and
+the copy fetched through the website's address comes back as personal-data-1.json. The button was not clicked:
+that would have saved a file on the computer. Backend 125/125, engine 87, training kit 80.
+Docs: compliance-checklist 2.1 (new tick box: what of the file is sent, and how), handover-guide (contacts, the
+"Someone asks" table), walkthrough-run-sheet (questions).
+
 # 17 November 2026: AN OPENING THAT SAYS THE CALL IS RECORDED IS FLAGGED (user: "continue the next task")
 
 Compliance checklist 2.2: calls are not recorded (PlivoClient starts no recording; only the transcript is kept), and

@@ -40,11 +40,19 @@ Each item here needs a decision, a service or a change before going live.
 copies kept elsewhere: database backups, server logs, the phone company's own records of the calls (Plivo keeps the
 number, time and length of each call), spreadsheets exported earlier, and anything staff wrote about the person on
 another contact. An upload report keeps a name only if it was spelled differently from the contact's name at the time
-of the erasure. There is no one-click copy of everything about one person for an access request; staff read it from
-the contact page.
+of the erasure.
+
+A person who asks what is kept about them (an access request): since 17 November 2026 the admin presses **Download
+their data** on the contact's page and gets one file with everything the CRM holds about them, from the same places
+an erasure deletes from (details, custom fields, tags, timeline, follow-ups, call log, consent records, AI calls with
+transcripts, call-backs, campaign places, do-not-disturb results, staff alerts, changes to their record). Staff
+notes and alerts are in it, so the admin reads it before sending it; each download is in the audit log. Not in it:
+the copies outside the CRM listed above, upload reports, and what staff wrote about them on another contact.
 
 - [ ] Decided with the adviser: how long backups and server logs are kept, and how an erasure request also reaches
   Plivo and anyone holding exported spreadsheets
+- [ ] Decided with the adviser: what of the downloaded file is sent to a person who asks (staff notes, alerts), and
+  how it is sent to them safely
 
 **2.2 Call recording.** Calls are not recorded; only the transcript is kept. The starter opening lines no longer say
 "This call may be recorded" (changed on 15 November 2026: new installations get the new wording, and draft scripts in an
