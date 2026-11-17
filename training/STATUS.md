@@ -14,6 +14,29 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 17 November 2026: THE ADMIN CAN READ THE AUDIT LOG (user: "continue")
+
+Every sensitive action has been recorded in `audit_log` since the start (sign-ins and failed ones, contact changes,
+consent, script approvals, campaigns, call-backs, data downloads, erasures), and the docs and the walkthrough tell the
+client "it is in the audit log", but no screen showed it: only someone with database access could read it. Now
+`audit/AuditQueryService` (`GET /api/audit`, admin only) returns it newest first, 50 a page (at most 200), filtered
+by action, staff member (`by`), contact and Indian dates; `GET /api/audit/actions` lists the actions present. The
+query is built from the filters given rather than "(:x is null or ...)", which PostgreSQL cannot type for a null.
+Staff are named; a link goes to a contact that still exists, or to an AI call that was opened or flagged (its id is
+in the details). Administration, **Audit log** (`/admin/audit`): each action in words ("Downloaded a person's data",
+"Erased a person"...), "The CRM itself" when no staff member acted, and a failed sign-in reads "Someone, on <name>'s
+account", because it is recorded under the account tried, not under whoever tried. Each contact's "Their data" card
+links to `/admin/audit?contact=<id>`.
+Test `AuditLogIntegrationTest`: a manager gets 403 for both; one contact's entries newest first (tagged, then
+created) with the admin's name and the link; by staff member and action; her sign-in and the failed try on her
+account; actions list; today has entries and yesterday none; an end before the start and size 201 are refused; pages
+of one in order; opening an AI call links to it; after the contact is erased its entries stay, with no links. With
+the endpoints off it fails (403 expected, 404). In the browser on the in-memory test CRM: the list, the "Failed
+sign-in" filter, the contact page's link to its own history, and phone width (no sideways scrolling). Not tried on
+PostgreSQL: the tests use the in-memory database, and the dev database is not used for tests. Backend 126/126,
+engine 87, training kit 80.
+Docs: handover-guide (Admin pages), compliance-checklist (approved scripts row), walkthrough-run-sheet (questions).
+
 # 17 November 2026: A COPY OF EVERYTHING ABOUT ONE PERSON, FOR AN ACCESS REQUEST (user: "continue")
 
 Compliance checklist 2.1 said: "There is no one-click copy of everything about one person for an access request;

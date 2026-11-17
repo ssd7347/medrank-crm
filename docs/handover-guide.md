@@ -112,7 +112,10 @@ Tick these off with the developer:
     Change them, or approve only if your compliance adviser agrees.
   - *Test console* (admin): talk to the agent as if you were the contact, with no effect on the contact at all.
 - **Admin** pages: Staff users, Branches, Custom fields, Stages, AI knowledge base (the only answers the agent
-  gives to questions), Company settings, Industry starter packs, Connected services.
+  gives to questions), Company settings, Industry starter packs, Connected services, and the **Audit log**: who
+  did what and when (sign-ins and failed ones, changes to contacts, consent, scripts, campaigns, data downloads and
+  erasures), filtered by action, staff member and dates. Entries cannot be changed or removed. Each contact's
+  "Their data" card links to that contact's own history.
 
 **Custom fields and privacy.** For each field you choose what the agent may say: *Never read out* (anything used
 only to check identity, such as customer ID or date of birth), *Only after the caller is verified* (amount due,

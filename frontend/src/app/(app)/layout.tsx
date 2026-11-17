@@ -11,6 +11,7 @@ import {
   Menu,
   PhoneCall,
   Plug,
+  ScrollText,
   Settings2,
   SlidersHorizontal,
   Sparkles,
@@ -60,6 +61,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { href: "/admin/settings", label: "Company settings", icon: Settings2, roles: ["SUPER_ADMIN"] },
       { href: "/admin/starter-packs", label: "Industry starter packs", icon: Sparkles, roles: ["SUPER_ADMIN"] },
       { href: "/admin/integrations", label: "Connected services", icon: Plug, roles: ["SUPER_ADMIN"] },
+      { href: "/admin/audit", label: "Audit log", icon: ScrollText, roles: ["SUPER_ADMIN"] },
     ],
   },
 ];

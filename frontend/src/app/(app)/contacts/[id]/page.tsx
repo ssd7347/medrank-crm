@@ -378,6 +378,11 @@ function PersonalDataCard({ contact }: { contact: Contact }) {
           Download their data
         </Button>
       </div>
+      <p className="mt-3 text-xs text-ink-faint">
+        <Link href={`/admin/audit?contact=${contact.id}`} className="text-brand-700 hover:underline">
+          Who changed this record, and when
+        </Link>
+      </p>
     </Card>
   );
 }
