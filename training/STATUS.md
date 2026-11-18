@@ -14,6 +14,41 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 18 November 2026: PRODUCTION REHEARSAL ON THE LAPTOP, AND WHAT IT FOUND (user: "continue")
+
+Until now the CRM and website had only run in development mode. This was the first run as a server would run them:
+- the built jar, started from a folder with no `.env`, on a fresh PostgreSQL 17 database `ai_call_crm_rehearsal`
+  (dropped afterwards);
+- the website as `next build` + `next start`;
+- the live-site settings: new secrets, `COOKIE_SECURE=true`, codes not on screen, SMS to a stand-in MSG91.
+
+No Docker or WSL on this laptop, so container files were not written (they could not be tested).
+
+**Worked.**
+- 12 migrations applied, and the first admin was created.
+- Signed in with the code from the stand-in SMS; an unknown number got no SMS.
+- All 24 fixed pages loaded; every API call was 200, with a session refresh on each full page load.
+- Loaded the clinic starter pack ("Patients" in the menu) and added a patient (its page opened).
+- The session cookie was `Secure; HttpOnly; SameSite=Strict`, path `/api/auth`.
+- The CRM log had 0 warnings or errors.
+
+**Found and fixed.**
+1. **`DB_URL` defaulted to `jdbc:postgresql://localhost:5432/mbbs_crm`, the MedRank CRM's database** (left from
+   that project). Now there is no default.
+   - A new start check (`DatabaseSettingCheck`, main `META-INF/spring.factories`) stops the start with "DB_URL is
+     not set. Set it to this CRM's PostgreSQL database, ...". Before, the error was `'url' must start with "jdbc"` in
+     a long stack trace.
+   - Run for real without `DB_URL`: exit 1, 26 log lines, that sentence, no connection.
+   - Tests (`ProductionSettingsTest`, 3) fail without each fix.
+2. **The sign-in token's issuer was `mbbs-crm`**, visible to anyone who decodes a token of this white-label CRM. It
+   is now `ai-call-crm` (checked in a real token). Nothing checks the issuer, so nobody is signed out by the change.
+3. **No HSTS.** The website now sends `Strict-Transport-Security: max-age=31536000` (checked on the rebuilt site).
+4. **`BACKEND_URL` is fixed into the website at build time.** Built with 8095 and started with 8096 (where nothing
+   listened), the site still reached 8095. Documented: set it before `npm run build`.
+
+Docs: new-customer-setup "Building and starting on a server" (only the steps the rehearsal checked; the speech engine
+and Plivo were not part of it). Backend 146/146 on H2; frontend tsc and eslint clean; both production builds succeed.
+
 # 17 November 2026: SIGN-IN CODES BY SMS THROUGH MSG91 (user: "continue the next task"; chose "Indian SMS provider")
 
 The last engineering item that kept the CRM off the internet was the login code, which was only shown on the login

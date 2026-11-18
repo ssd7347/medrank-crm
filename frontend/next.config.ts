@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" },
+          // Browsers use HTTPS only for this site for a year once they have seen it over HTTPS (ignored over
+          // plain HTTP, so local development is unaffected).
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
         ],
       },
     ];

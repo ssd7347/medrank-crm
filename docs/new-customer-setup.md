@@ -17,7 +17,8 @@ Agree with the customer, in writing:
 ## 2. Install
 
 1. Create a PostgreSQL database for this customer (a managed one such as Neon, Supabase or AWS RDS is easiest).
-2. Deploy the backend and the frontend (for example Render, Railway or a small VPS) with HTTPS.
+2. Deploy the backend and the frontend (for example Render, Railway or a small VPS) with HTTPS: see "Building and
+   starting on a server" below.
 3. Set the backend settings (see `backend/.env.example`), all as real environment variables:
    - `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
    - `JWT_SECRET`: 32+ random characters, different for every customer
@@ -29,7 +30,46 @@ Agree with the customer, in writing:
    - `FEATURES`: the modules this customer has paid for (`ALL`, or for example `IMPORT,EXPORT` for a plan
      without AI calls). Switched-off modules disappear from the menu and their API refuses requests, so the
      customer cannot turn them on themselves.
-4. Set `BACKEND_URL` on the frontend to the backend's address.
+4. Set `BACKEND_URL` on the frontend to the backend's address **before building it** (see below).
+
+### Building and starting on a server
+
+These are the steps rehearsed on 18 Nov 2026: the built jar and the production website, with the live-site settings,
+on an empty PostgreSQL 17 database. The speech engine and Plivo were not part of that rehearsal.
+
+**CRM server** (Java 21):
+
+```bash
+cd backend
+./mvnw -DskipTests package
+java -jar target/ai-call-crm-backend-0.0.1-SNAPSHOT.jar
+```
+
+- **Settings are real environment variables.** The CRM also reads a `.env` file from the folder it starts in, so
+  don't start it from a folder holding a developer's `.env`.
+- **`DB_URL` is required.** Without it the CRM stops at start instead of guessing a database.
+- **On an empty database, the first start creates all the tables** (Flyway, 12 steps) and the admin from
+  `ADMIN_EMAIL` / `ADMIN_PHONE`.
+- **`PORT` sets its port** (default 8080). It should not be reachable from the internet; the website passes `/api`
+  on to it.
+
+**Website** (Node.js):
+
+```bash
+cd frontend
+npm ci
+BACKEND_URL=http://localhost:8080 npm run build
+npm run start -- --port 3000
+```
+
+- **`BACKEND_URL` is fixed into the website when it is built.** Setting it only when starting has no effect. If
+  the CRM server's address changes, build again.
+- **Only the website's port is put on the internet, behind HTTPS** (the hosting's, or a reverse proxy such as Caddy
+  or nginx). It passes every `/api/...` request to the CRM server.
+- **The sign-in cookie is `Secure`**, so on a real address the site works only over HTTPS. On `localhost` browsers
+  allow it without HTTPS.
+- **The website tells browsers to use HTTPS only** (`Strict-Transport-Security`, one year), and to never show it
+  inside another site.
 
 ### Sign-in codes by SMS (MSG91)
 

@@ -18,7 +18,7 @@ public class TokenService {
     public static final String ROLE_CLAIM = "role";
     public static final String NAME_CLAIM = "name";
     public static final String BRANCH_CLAIM = "branch";
-    private static final String ISSUER = "mbbs-crm";
+    private static final String ISSUER = "ai-call-crm";
 
     private final JwtEncoder encoder;
     private final AppProperties props;
