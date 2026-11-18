@@ -92,6 +92,18 @@ public class PlivoClient implements VoicePlatformClient {
         return res != null && res.statusCode() / 100 == 2;
     }
 
+    /**
+     * Reads this Plivo account (GET .../Account/{auth_id}/), which changes nothing: the HTTP status Plivo answered
+     * (2xx when it accepts the keys), or null if Plivo could not be reached or the keys are not set.
+     */
+    public Integer accountStatus() {
+        if (blank(props.authId()) || blank(props.authToken()) || !props.authId().matches("[A-Za-z0-9]+")) {
+            return null;
+        }
+        HttpResponse<String> res = send("GET", "/", null);
+        return res == null ? null : res.statusCode();
+    }
+
     private HttpResponse<String> send(String method, String path, Map<String, Object> body) {
         String auth = Base64.getEncoder().encodeToString((props.authId() + ":" + props.authToken())
                 .getBytes(StandardCharsets.UTF_8));
@@ -104,7 +116,8 @@ public class PlivoClient implements VoicePlatformClient {
         try {
             return http.send(req.build(), HttpResponse.BodyHandlers.ofString());
         } catch (java.io.IOException e) {
-            log.warn("Plivo {} {} failed: {}", method, path, e.getMessage());
+            log.warn("Plivo {} {} failed: {}", method, path, e.getMessage() == null ? e.getClass().getSimpleName()
+                    : e.getMessage());
             return null;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

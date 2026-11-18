@@ -14,6 +14,55 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 18 November 2026: "READY FOR A REAL CALL?" CHECK IN THE CRM (user: "continue the next task")
+
+The first-call checks in `docs/first-real-call.md` were all by hand: open URLs from mobile data, read `/health`,
+compare settings. Now the admin runs them with one button: **AI voice agent → Provider setup → Ready for a real call?**
+(`GET /api/voice/readiness`, super admin only). It places no call and changes nothing.
+
+**What it checks.**
+- Phone line and Plivo:
+  - `VOICE_PLATFORM=plivo`, every `PLIVO_*` setting, and the from-number with its country code.
+  - `PLIVO_API_BASE` must be Plivo's own address. Left pointing at a rehearsal, no real call would reach Plivo.
+  - Plivo accepts the keys: one read, `GET .../Account/{id}/` (new `PlivoClient.accountStatus()`).
+- The public address:
+  - It is https, with `wss://.../call` on the same host.
+  - `/api/auth/me` from outside must answer 404, which means only the gateway is public. A 401 means the CRM itself
+    is public; that passes only when codes go by SMS and are not shown on screen.
+  - An unsigned `POST /api/voice/hooks/plivo/hangup` must answer 401. That proves Plivo's callbacks reach this CRM
+    through the gateway. A test proves the real CRM answers that request 401.
+- The rest:
+  - `VOICE_HMAC_SECRET`.
+  - The speech engine says `"warmed": true` with no warm-up error. `SpeechStatus` now carries both fields; an engine
+    that does not say is not taken as ready.
+  - `AI_BRAIN` is not `SIMULATED`, and its model answers.
+  - Calling hours (open or closed, as a "Check" line).
+  - `VOICE_ENABLED` and "Pause all".
+  - The desk number ("Check" if blank).
+  - An approved script whose opening says the call may be recorded ("Check" if none says it).
+- "Ready" means no red line.
+
+**Tests.**
+- `ReadinessJudgeTest` (8): every rule, one thing wrong at a time.
+- `ReadinessIntegrationTest` (4): one stand-in server plays Plivo, the gateway, the engine and the model server.
+  - It checks the exact requests made: only reads, plus the refused callback.
+  - It checks that Plivo got the right basic auth.
+  - It checks that a manager gets 403 and nothing is probed.
+- Shown failing without each part:
+  - 11 rule breaks were each caught by `ReadinessJudgeTest`.
+  - 6 wiring breaks were each caught by `ReadinessIntegrationTest`: account not read, account read by POST, warmed
+    not parsed, sign-in not probed, callback probed by GET, and the admin-only rule removed.
+
+**Seen in the browser** (in-memory test CRM, Plivo settings with made-up values and a dead API address):
+- All 14 lines showed. "Not ready: 7 things to fix first" matched the red lines.
+- "Check again" re-ran the check, and the layout works at phone width.
+- The only CRM warnings were the expected "Plivo could not be reached" lines. Their text said "failed: null", so they
+  now name the error.
+
+The "To connect a provider" card still described Retell/Vapi/Exotel. It is now "To connect the phone line", with the
+Plivo steps. Docs: `first-real-call.md` step 3 and `voice-agent.md` point to the check. Backend 158/158 on H2;
+frontend tsc and eslint clean.
+
 # 18 November 2026: PRODUCTION REHEARSAL ON THE LAPTOP, AND WHAT IT FOUND (user: "continue")
 
 Until now the CRM and website had only run in development mode. This was the first run as a server would run them:

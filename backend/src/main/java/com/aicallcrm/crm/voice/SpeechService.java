@@ -38,7 +38,9 @@ public class SpeechService {
 
     public static final int MAX_AUDIO_BYTES = 5 * 1024 * 1024;
 
-    public record SpeechStatus(boolean available, String detail, String sttModel, String voice) {
+    /** {@code warmed}: both speech models loaded and run once (the engine's /health); null if it did not say. */
+    public record SpeechStatus(boolean available, String detail, String sttModel, String voice, Boolean warmed,
+                               String warmUpError) {
     }
 
     public record Heard(String text, Integer ms) {
@@ -63,15 +65,18 @@ public class SpeechService {
             HttpResponse<String> res = HTTP.send(request("/health").timeout(Duration.ofSeconds(3)).GET().build(),
                     HttpResponse.BodyHandlers.ofString());
             if (res.statusCode() != 200) {
-                return new SpeechStatus(false, "The speech engine answered " + res.statusCode() + ".", null, null);
+                return new SpeechStatus(false, "The speech engine answered " + res.statusCode() + ".", null, null,
+                        null, null);
             }
             Map<String, Object> h = mapper.readValue(res.body(), Map.class);
-            return new SpeechStatus(true, "Ready", str(h.get("stt_model")), str(h.get("voice")));
+            return new SpeechStatus(true, "Ready", str(h.get("stt_model")), str(h.get("voice")),
+                    h.get("warmed") instanceof Boolean b ? b : null, str(h.get("warm_up_error")));
         } catch (Exception e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            return new SpeechStatus(false, "The speech engine is not running at " + props.speechUrl() + ".", null, null);
+            return new SpeechStatus(false, "The speech engine is not running at " + props.speechUrl() + ".", null, null,
+                    null, null);
         }
     }
 

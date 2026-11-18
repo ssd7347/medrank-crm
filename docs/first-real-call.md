@@ -106,6 +106,20 @@ Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
 2. GPU machine: model loaded and warmed; SSH tunnel up; the CRM's test console with "Our own model" answers in ~1 s.
 3. The tunnel up (to :8099 only); settings filled in; CRM restarted. From mobile data, open
    `https://<tunnel>/api/auth/me`: it must say 404.
+   Then, as the admin, open **AI voice agent → Provider setup → Ready for a real call?** (`GET /api/voice/readiness`).
+   It repeats steps 1–3 and the settings table itself, and says what to fix for each red line:
+   - the Plivo settings, and that `PLIVO_API_BASE` is not left pointing at a rehearsal;
+   - that Plivo accepts the keys (one read of the account; nothing changes);
+   - that the public address is https, with `wss://.../call` on the same host;
+   - what the internet reaches: 404 at `/api/auth/me` (only the gateway). If the CRM itself answers (401), that is
+     refused unless codes go by SMS and are not shown on screen;
+   - that an unsigned test callback reaches this CRM and is refused (401), so `CRM_URL` on the gateway is right;
+   - `VOICE_HMAC_SECRET`; the engine `"warmed": true`; `AI_BRAIN` not `SIMULATED`, with the model answering;
+   - calling hours, `VOICE_ENABLED` and "Pause all", the desk number, and an approved script whose opening says the
+     call may be recorded.
+
+   It places no call. Fix every "Fix first" line and press **Check again**. "Check" lines (calling hours closed, no
+   desk number, no recording line) do not block a call, but read them. Steps 1–3 by hand remain the fallback.
 4. In the CRM: one contact (the developer's own number) with AI-call consent recorded, an approved script, a one-contact
    campaign. Start it during the calling window (09:00–18:00 IST).
 5. On the call, try: answering normally, the identity check with the right details, "call me back at 4", a question

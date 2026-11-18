@@ -116,7 +116,9 @@ A DND scrubbing service plugs in the same way: a bean implementing `DndProvider`
 ### 3. Platform configuration
 
 The admin page **AI voice agent → Provider setup** lists the exact URLs and every tool with its JSON Schema
-(copy button). The CRM must be on a public HTTPS address.
+(copy button). The CRM must be on a public HTTPS address. For the Plivo line, the same page starts with **Ready for a
+real call?**, which checks the settings, Plivo, the public address, the speech engine and the brain (see
+`docs/first-real-call.md`, "Order on the day").
 
 - Tools: `POST /api/voice/hooks/tools/{tool}` with body `{"call_id": "...", "args": {...}}`.
 - Incoming calls: `POST /api/voice/hooks/inbound/lookup` with `{"caller_number": "...", "provider_call_id": "..."}`.

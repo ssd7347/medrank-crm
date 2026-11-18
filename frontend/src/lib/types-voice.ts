@@ -237,10 +237,23 @@ export type TestCall = {
 export type BrainKind = "SIMULATED" | "LOCAL" | "CLAUDE";
 export type BrainOption = { kind: BrainKind; label: string; available: boolean; detail: string };
 export type AiStatus = {
-  speech: { available: boolean; detail: string; sttModel: string | null; voice: string | null };
+  speech: {
+    available: boolean;
+    detail: string;
+    sttModel: string | null;
+    voice: string | null;
+    /** Both speech models loaded and run once; null when the engine did not say. */
+    warmed: boolean | null;
+    warmUpError: string | null;
+  };
   brains: BrainOption[];
   defaultBrain: BrainKind;
 };
+
+/** "Ready for a real call?" (GET /api/voice/readiness, admin only): reads and asks, never places a call. */
+export type ReadinessState = "OK" | "WARN" | "FAIL";
+export type ReadinessCheck = { key: string; title: string; state: ReadinessState; detail: string };
+export type Readiness = { ready: boolean; checkedAt: string; checks: ReadinessCheck[] };
 
 export type ProviderSetup = {
   platform: string;
