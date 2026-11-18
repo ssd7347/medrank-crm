@@ -41,7 +41,9 @@ Each item here needs a decision, a service or a change before going live.
 copies kept elsewhere: database backups, server logs, the phone company's own records of the calls (Plivo keeps the
 number, time and length of each call), spreadsheets exported earlier, and anything staff wrote about the person on
 another contact. An upload report keeps a name only if it was spelled differently from the contact's name at the time
-of the erasure.
+of the erasure. The speech engine's outbox (`voice-engine/README.md`, "The outbox") holds a caller's last words only
+while the CRM cannot be reached, at most 7 days, and deletes each as soon as the CRM has it; one that arrives after
+the person was erased is refused by the CRM and deleted, so nothing about them is written back.
 
 A person who asks what is kept about them (an access request): since 17 November 2026 the admin presses **Download
 their data** on the contact's page and gets one file with everything the CRM holds about them, from the same places

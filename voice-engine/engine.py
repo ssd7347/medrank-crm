@@ -6,7 +6,8 @@ machine, with no per-minute fees.
   * Voice: Piper (fast open text-to-speech that runs on a CPU). Default voice: en_US-lessac-medium.
 
 The CRM backend calls it; browsers never do. Endpoints:
-  GET  /health -> {"ok": true, "stt_model": ..., "voice": ..., "warmed": true|false, "warm_up_error": null|"..."}
+  GET  /health -> {"ok": true, "stt_model": ..., "voice": ..., "warmed": true|false, "warm_up_error": null|"...",
+                   "undelivered": 0}     (requests waiting in the outbox for the CRM; see OUTBOX_DIR)
   POST /stt    body: audio bytes (WebM/Opus, WAV, MP3...)        -> {"text": "...", "ms": 412}
   POST /tts    body: {"text": "..."}                               -> audio/wav
   WS   /call?call_id=...&token=...                                  a real phone call streamed by Plivo (phone.py)
@@ -24,6 +25,10 @@ Settings (environment variables):
   NAME_HINTS     on / off / auto (default). On a call to a known contact, tell Whisper the contact's name so it spells
                  it as registered. auto: on for small.en and larger, off for tiny and base, which in the ear check
                  (11 Nov 2026) sometimes wrote the expected name over the one said (told Rajesh, heard Ramesh: "Rajesh").
+  OUTBOX_DIR     Folder for the call-backs callers were promised and their last words while the CRM cannot be reached
+                 (phone.Outbox). Sent again every 30 s and at start-up, and deleted once the CRM has them. Default
+                 outbox/ next to this file. Before switching this machine off for good, /health must say
+                 "undelivered": 0.
 
 Run:  uvicorn engine:app --host 127.0.0.1 --port 8090
 """
@@ -60,9 +65,27 @@ CRM_URL = os.environ.get("CRM_URL", "http://127.0.0.1:8082")
 VOICE_HMAC_SECRET = os.environ.get("VOICE_HMAC_SECRET", "")
 NAME_HINTS = os.environ.get("NAME_HINTS", "auto")
 WARM_UP = os.environ.get("WARM_UP", "on")
+OUTBOX = phone.Outbox(os.environ.get("OUTBOX_DIR", str(HERE / "outbox")))
 MAX_AUDIO_BYTES = 5 * 1024 * 1024
 
 log = logging.getLogger("uvicorn.error")     # uvicorn's own log, so start-up notes show beside its "Started server"
+
+
+def crm() -> phone.Crm:
+    return phone.Crm(CRM_URL, VOICE_HMAC_SECRET, outbox=OUTBOX)
+
+
+async def resend_outbox(every: float = phone.Outbox.RETRY_S) -> None:
+    """Sends what waits in the outbox now (it may be left from before a restart), then every ``every`` seconds."""
+    while True:
+        try:
+            if OUTBOX.waiting():
+                await asyncio.to_thread(OUTBOX.deliver_all, crm())
+            if OUTBOX.waiting():
+                log.warning("%d request(s) for the CRM still waiting in the outbox (%s)", OUTBOX.waiting(), OUTBOX.folder)
+        except Exception as e:      # never let the retries stop for good
+            log.warning("Outbox retry failed: %s", e)
+        await asyncio.sleep(every)
 
 
 @asynccontextmanager
@@ -71,7 +94,9 @@ async def lifespan(_app: FastAPI):
         # In the background: the engine answers /health at once, and a call that comes in meanwhile simply waits for
         # the model being loaded (the locks below), as it would have without the warm-up.
         threading.Thread(target=warm_up, name="warm-up", daemon=True).start()
+    retries = asyncio.create_task(resend_outbox())
     yield
+    retries.cancel()
 
 
 app = FastAPI(title="AI Call CRM speech engine", docs_url=None, redoc_url=None, lifespan=lifespan)
@@ -137,7 +162,7 @@ def check_token(x_speech_token: str | None = Header(default=None)):
 @app.get("/health")
 def health():
     return {"ok": True, "stt_model": STT_MODEL, "voice": Path(PIPER_VOICE).stem, "warmed": _warm["warmed"],
-            "warm_up_error": _warm["error"]}
+            "warm_up_error": _warm["error"], "undelivered": OUTBOX.waiting()}
 
 
 @app.post("/stt", dependencies=[Depends(check_token)])
@@ -237,7 +262,7 @@ async def call(ws: WebSocket, call_id: str = "", token: str = ""):
     def hear(audio: np.ndarray, hint: str = "") -> str:
         return stt_pcm(audio, hint=hint) if hint and hints_on(STT_MODEL, NAME_HINTS) else stt_pcm(audio)
 
-    session = phone.Call(call_id, send, phone.Crm(CRM_URL, VOICE_HMAC_SECRET), hear, tts_pcm, close)
+    session = phone.Call(call_id, send, crm(), hear, tts_pcm, close)
     try:
         while not session.done:
             await session.handle(json.loads(await ws.receive_text()))

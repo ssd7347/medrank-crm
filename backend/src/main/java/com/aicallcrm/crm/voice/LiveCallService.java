@@ -148,7 +148,9 @@ public class LiveCallService {
     /**
      * The engine hit a fault it could not get past (hearing, speaking, or a request to this CRM failed), told the caller
      * "A member of our team will call you back" and is hanging up: book that call-back ({@link HandoffService#cutOff})
-     * and note it in the transcript. True if a task was booked. The call may already have ended by now.
+     * and note it in the transcript. True if a task was booked. The call may already have ended by now. The engine
+     * sends this again from its outbox when the CRM did not answer, so it may arrive twice: the second time it changes
+     * nothing.
      */
     public boolean trouble(UUID callId, String what) {
         String detail = what == null ? "" : what.strip();
@@ -160,11 +162,14 @@ public class LiveCallService {
                 + ". The caller was told a member of the team would call back.";
         return Boolean.TRUE.equals(tx.execute(s -> {
             VoiceCall call = callId == null ? null : calls.findById(callId).orElse(null);
-            if (call == null || call.isTestCall()) {
+            if (call == null || call.isTestCall() || erased(call)) {
                 throw ApiException.notFound("Call");
             }
-            boolean booked = handoffs.cutOff(call, summary) != null;
             List<Line> all = new ArrayList<>(callService.lines(call));
+            if (all.stream().anyMatch(l -> "call_cut_off".equals(l.tool()))) {
+                return false;       // already reported (a repeat from the engine's outbox)
+            }
+            boolean booked = handoffs.cutOff(call, summary) != null;
             all.add(Line.tool("call_cut_off", booked ? "CALLBACK_BOOKED" : "NO_CALLBACK_NEEDED", note));
             call.setTranscript(callService.toJson(all));
             return booked;
@@ -176,22 +181,27 @@ public class LiveCallService {
      * mid-sentence, or before the 0.7 s of quiet that ends a turn), heard afterwards. Nothing is said back. The words
      * go into the transcript, and if they asked to stop, the opt-out is recorded at once ({@link
      * VoiceCallService#optOutIfAsked}), whether or not the end of the call has been recorded yet: "Stop calling me"
-     * followed by a hang-up must never be rung again. True if this opted them out.
+     * followed by a hang-up must never be rung again. True if this opted them out. Sent again from the engine's outbox
+     * when the CRM did not answer, so the same words may arrive twice: words already in the transcript as the caller's
+     * are not written again.
      */
     public boolean lastWords(UUID callId, String said) {
         String text = said == null ? "" : said.strip();
         String words = text.length() > 500 ? text.substring(0, 500) : text;
         return Boolean.TRUE.equals(tx.execute(s -> {
             VoiceCall call = callId == null ? null : calls.findById(callId).orElse(null);
-            if (call == null || call.isTestCall()) {
+            if (call == null || call.isTestCall() || erased(call)) {
                 throw ApiException.notFound("Call");
             }
             if (words.isEmpty()) {
                 return false;
             }
             List<Line> all = new ArrayList<>(callService.lines(call));
-            all.add(Line.caller(words));
-            call.setTranscript(callService.toJson(all));
+            // A repeat is spotted by its words: an opt-out note may have been written after them the first time.
+            if (all.stream().noneMatch(l -> "caller".equals(l.role()) && words.equals(l.text()))) {
+                all.add(Line.caller(words));
+                call.setTranscript(callService.toJson(all));
+            }
             boolean optedOut = callService.optOutIfAsked(call);
             if (call.getEndedAt() != null) {
                 callService.callbackWithdrawnIfSaid(call);   // the call is over, so these really are the last words
@@ -217,6 +227,15 @@ public class LiveCallService {
             all.addAll(added);
             call.setTranscript(callService.toJson(all));
         });
+    }
+
+    /**
+     * The person on this call was erased (ErasureService: the number is blanked; a withheld number is "unknown",
+     * never blank). Nothing about them may be written to it again, such as last words the engine re-sends from its
+     * outbox, so it is answered as "no such call" and the engine drops the request.
+     */
+    private static boolean erased(VoiceCall call) {
+        return call.getPhone() == null || call.getPhone().isBlank();
     }
 
     private VoiceCall live(UUID callId) {

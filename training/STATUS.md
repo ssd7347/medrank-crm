@@ -14,6 +14,47 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 18 November 2026: A PROMISED CALL-BACK OR A "STOP" IS NO LONGER LOST WHEN THE CRM IS DOWN (user: "continue the next task")
+
+The hand-over guide admitted a gap. When a call breaks, the caller hears "A member of our team will call you back".
+The engine then asks the CRM to book that call-back. If the CRM could not be reached at that moment, nothing was
+booked, and staff were told to find such callers themselves. The same was true of a caller's last words, which may be
+"stop calling me".
+
+**Built.**
+- In the engine (`phone.Outbox`): when the CRM does not take one of these two requests, it waits as a file in
+  `OUTBOX_DIR` (default `voice-engine/outbox/`, gitignored).
+  - It is sent again at start-up and every 30 s, oldest first and freshly signed, then deleted.
+  - A 400 or 404 means it is never taken: dropped. A 401 (the secrets differ) or a 5xx: kept.
+  - It is kept at most 7 days; then it is deleted with an error saying to act on that call by hand.
+  - `/health` shows `"undelivered"`.
+  - Recordings are not kept there: losing one breaks no promise, and it keeps callers' voices off the engine's
+    machine.
+- In the CRM: a repeat writes its transcript line only once. Before, a second fault report added a second
+  "NO_CALLBACK_NEEDED" note, and repeated last words were written twice.
+- Erased people: an erased call keeps its row with the number blanked, so last words arriving after an erasure would
+  have written the person's words back. The CRM now answers 404 for an erased call (a withheld number is stored as
+  "unknown", never blank), and the engine drops the request.
+
+**Tests.**
+- Engine: 10 new tests. Among them: the outbox survives a restart; a whole call while the CRM is down; the engine's
+  retry loop and `/health`.
+  - 10 separate breaks were each caught: nothing kept, 404 kept, 401/5xx dropped, delivery past a CRM that is down,
+    kept for ever, newest first, damaged files sent, calls without the outbox, no retries, and the count hidden.
+  - Windows' coarse clock gave two files the same name prefix, so the order was random. Found by the tests; a counter
+    now orders files within one clock tick.
+- CRM: the repeat rules and the erasure refusal each fail their test when removed.
+- Suites: engine 107/107; backend 158/158 (run again after the erasure change).
+
+**Seen live**, with the real engine (port 8091) and the in-memory test CRM:
+- A call where the engine's `CRM_URL` pointed at nothing: the engine spoke the trouble line and hung up.
+  `/health` said `undelivered: 1`, and the CRM had no call-back.
+- The engine was restarted pointed at the CRM. At start-up it delivered the request. The CRM booked the TOOL_FAILURE
+  call-back ("opening failed: ConnectionError") with one `CALLBACK_BOOKED` note, and the outbox was empty.
+
+Docs: the engine README ("The outbox"), the hand-over guide's "having trouble" row, first-real-call step 6 (don't
+switch the GPU machine off while `undelivered` is above 0), and compliance checklist 2.1.
+
 # 18 November 2026: "READY FOR A REAL CALL?" CHECK IN THE CRM (user: "continue the next task")
 
 The first-call checks in `docs/first-real-call.md` were all by hand: open URLs from mobile data, read `/health`,

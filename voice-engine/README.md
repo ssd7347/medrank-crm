@@ -81,8 +81,8 @@ If hearing, the voice or a request to the CRM fails, the engine says "Sorry, I a
 member of our team will call you back. Goodbye." and ends the call, and tells the CRM (`POST
 /api/voice/hooks/live/trouble`), which books that call-back (never for a caller who opted out or one who already has
 a call-back) and notes `call_cut_off` in the transcript. The report runs alongside the goodbye, so a CRM that is down
-does not keep the caller waiting; then nothing can be booked, and the engine's log says so. If the voice itself
-fails, nothing can be said, so the engine reports the fault and hangs up instead of leaving the caller in silence.
+does not keep the caller waiting. If the voice itself fails, nothing can be said, so the engine reports the fault and
+hangs up instead of leaving the caller in silence.
 
 When the stream closes (the caller hung up, or the call went to the desk), whatever the caller said that the CRM has
 not had yet (the turn being heard, turns waiting, what they said over the goodbye, and speech still going because the
@@ -90,6 +90,23 @@ not had yet (the turn being heard, turns waiting, what they said over the goodby
 `Call.stop`). Nothing is said back; the CRM adds them to the transcript and, if they asked to stop, opts them out at
 once: "Stop calling me" followed by a click is never rung again. This runs as its own task, so it finishes even if the
 handler is cancelled.
+
+**The outbox: when the CRM cannot be reached.** These two requests carry a promise (the call-back) and maybe a
+"stop". If the CRM does not take one (not reachable, timed out, 5xx, or 401 while the two `VOICE_HMAC_SECRET`s
+differ), the engine writes it to a folder (`OUTBOX_DIR`, default `outbox/` here, not committed; `phone.Outbox`)
+and sends it again at start-up and every 30 seconds, oldest first and freshly signed, until the CRM takes it. Then the
+file is deleted, since it holds what the caller said. The CRM writes a repeat into the transcript only once.
+- A request the CRM refuses for good (400, or 404: no such call, for example a test call or one erased since) is
+  dropped.
+- Nothing is kept longer than 7 days; one that old is deleted with an error in the log saying to read that call's
+  transcript and act on it by hand.
+- `/health` says how many are waiting (`"undelivered"`). **Do not switch the engine's machine off for good while that
+  is above 0.**
+- Checked live on 18 Nov 2026: a call while `CRM_URL` pointed at nothing, an engine restart pointed at the in-memory
+  test CRM, and the call-back was booked at start-up.
+
+Recordings are not kept in the outbox. A recording the CRM could not take is lost, which breaks no promise; it also
+keeps copies of callers' voices off the engine's machine.
 
 A turn ends after 0.7 s of quiet. A caller who stops to remember something ("My date of birth is ... fifteenth
 August") pauses longer, so when what was heard looks cut off (it trails off with "...", a comma or a dash, or stops
@@ -100,7 +117,7 @@ once; if not, the turn goes on as it was. Finished sentences are not delayed. Th
 pauses still make two turns.
 
 The engine needs two more settings: `VOICE_HMAC_SECRET` (the CRM's, it checks each call's stream token and signs the
-CRM requests; blank refuses every call) and `CRM_URL`.
+CRM requests; blank refuses every call) and `CRM_URL`. `OUTBOX_DIR` is optional (above).
 
 **Name hints.** When the call is to (or from) a contact the CRM knows, its `open` reply carries `"hint"`, the contact's
 registered name (unknown callers get none). The engine gives that name to Whisper on every turn of the call

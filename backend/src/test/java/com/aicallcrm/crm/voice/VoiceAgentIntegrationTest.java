@@ -458,14 +458,14 @@ class VoiceAgentIntegrationTest {
                 .andExpect(jsonPath("$[?(@.contactId == " + contact + ")].voiceCallId").value(Matchers.contains(call)))
                 .andExpect(jsonPath("$[?(@.contactId == " + contact + ")].summary")
                         .value(Matchers.contains(Matchers.containsString("turn failed: RuntimeError"))));
-        // Reported again (or once a call-back is already arranged): still one task.
-        hook("/live/trouble", id + ",\"what\":\"speaking failed: OSError\"}").andExpect(jsonPath("$.callback_booked").value(false));
+        // Reported again (the engine re-sends from its outbox when it got no answer): still one task, one note.
+        hook("/live/trouble", id + ",\"what\":\"turn failed: RuntimeError\"}").andExpect(jsonPath("$.callback_booked").value(false));
         mvc.perform(auth(get("/api/voice/callbacks"), admin))
                 .andExpect(jsonPath("$[?(@.contactId == " + contact + ")]", Matchers.hasSize(1)));
         mvc.perform(auth(get("/api/voice/calls/" + call), admin))
                 .andExpect(jsonPath("$.call.outcome").value("HANDED_OFF"))
                 .andExpect(jsonPath("$.transcript[?(@.tool == 'call_cut_off')].status")
-                        .value(Matchers.contains("CALLBACK_BOOKED", "NO_CALLBACK_NEEDED")));
+                        .value(Matchers.contains("CALLBACK_BOOKED")));
 
         // The report can arrive after the hang-up was recorded: still booked.
         String phone2 = phone();
@@ -564,6 +564,11 @@ class VoiceAgentIntegrationTest {
         mvc.perform(auth(get("/api/voice/calls/" + call), admin))
                 .andExpect(jsonPath("$.call.outcome").value("OPTED_OUT"))
                 .andExpect(jsonPath("$.transcript[?(@.role == 'caller')].text").value(Matchers.hasItem("No, please stop calling me.")))
+                .andExpect(jsonPath("$.transcript[?(@.tool == 'opt_out')]", Matchers.hasSize(1)));
+        // The engine sends the same words again from its outbox (it got no answer the first time): written once.
+        hook("/live/last", id + ",\"said\":\"No, please stop calling me.\"}").andExpect(jsonPath("$.opted_out").value(false));
+        mvc.perform(auth(get("/api/voice/calls/" + call), admin))
+                .andExpect(jsonPath("$.transcript[?(@.text == 'No, please stop calling me.')]", Matchers.hasSize(1)))
                 .andExpect(jsonPath("$.transcript[?(@.tool == 'opt_out')]", Matchers.hasSize(1)));
 
         // After the hang-up was recorded (the words arrive a moment later): still opted out.

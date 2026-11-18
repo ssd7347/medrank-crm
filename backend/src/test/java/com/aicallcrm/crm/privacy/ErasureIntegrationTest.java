@@ -212,6 +212,14 @@ class ErasureIntegrationTest {
                 .andExpect(jsonPath("$.call.outcome").value("HANDED_OFF"))
                 .andReturn().getResponse().getContentAsString();
         assertThat(page).doesNotContain(main).doesNotContain("Zubin");
+        // Words or a fault report the engine re-sends from its outbox after the erasure: refused, so nothing about him
+        // is written back (the engine drops a request answered 404).
+        hook("/live/last", "{\"call_id\":\"" + call + "\",\"said\":\"This is Zubin, my bill near the old mill is wrong\"}")
+                .andExpect(status().isNotFound());
+        hook("/live/trouble", "{\"call_id\":\"" + call + "\",\"what\":\"turn failed\"}").andExpect(status().isNotFound());
+        for (String needle : List.of("Zubin", "old mill")) {
+            assertThat(cellsContaining(needle)).as(needle).isEmpty();
+        }
 
         // The erasure itself is on record, without the person.
         mvc.perform(auth(get("/api/voice/overview"), admin)).andExpect(status().isOk());

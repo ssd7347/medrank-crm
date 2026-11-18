@@ -127,7 +127,9 @@ Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
    once: you should hear the whole "I am connecting you to a member of our team now. Please stay on the line." and
    then the desk phone rings. If the transfer fails, an urgent call-back appears on `/voice/callbacks`.
 6. Afterwards: read the transcript and tool trail on `/voice/calls`; write down what Whisper heard against what was
-   said, and the reply times. Then take the tunnel down and stop the GPU machine.
+   said, and the reply times. Then take the tunnel down and stop the GPU machine, but only once the engine's
+   `/health` says `"undelivered": 0` (a call-back or a "stop calling me" the CRM has not received yet waits in the
+   engine's outbox; README, "Real phone calls").
 
 7. The recording: on the call's page, **Recording: Listen** plays both voices (the script's opening must say "This
    call may be recorded"; otherwise it says why it was not recorded). The file is in the CRM's recordings folder.

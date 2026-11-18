@@ -406,6 +406,150 @@ class CallTest(unittest.TestCase):
         self.assertEqual((crm.last, call.done), (["Stop calling me"], True))
 
 
+class Refusal(Exception):
+    """What requests raises for an HTTP error: it carries the response."""
+
+    def __init__(self, status):
+        super().__init__(f"{status} error")
+        self.response = type("R", (), {"status_code": status})()
+
+
+class FakeLine:
+    """A CRM behind ``post`` that is down (raises), answers an HTTP error, or takes the request."""
+
+    def __init__(self, answer=None):
+        self.state, self.got, self.answer = "down", [], answer or {}
+        self.refuse = {}            # call id -> the HTTP error the CRM answers for that call
+
+    def post(self, url, data, timeout, headers):
+        if self.state == "down":
+            raise ConnectionError("CRM not reachable")
+        if isinstance(self.state, int):
+            raise Refusal(self.state)
+        body = data.decode()
+        if json.loads(body)["call_id"] in self.refuse:
+            raise Refusal(self.refuse[json.loads(body)["call_id"]])
+        self.got.append((url.rsplit("/", 1)[1], json.loads(body), headers["X-Voice-Timestamp"],
+                         headers["X-Voice-Signature"], body))
+        answer = self.answer
+
+        class Res:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return answer
+        return Res()
+
+
+class OutboxTest(unittest.TestCase):
+    SECRET = "s" * 40
+
+    def setUp(self):
+        import tempfile
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.now = [1_000_000.0]
+        self.box = phone.Outbox(self.dir.name + "/outbox", clock=lambda: self.now[0])
+
+    def crm(self, line, outbox=True):
+        return phone.Crm("http://crm.local:8082", self.SECRET, post=line.post, outbox=self.box if outbox else None)
+
+    def test_a_stop_and_a_promised_call_back_wait_until_the_crm_is_back(self):
+        line = FakeLine({"opted_out": True, "callback_booked": True})
+        crm = self.crm(line)
+        self.assertIsNone(crm.trouble("c1", "opening failed: ConnectionError"))
+        self.assertIsNone(crm.last_words("c1", "Stop calling me"))
+        self.assertEqual(self.box.waiting(), 2)
+        self.assertEqual((self.box.deliver_all(crm), self.box.waiting()), (0, 2))     # still down: kept
+        # The engine restarts meanwhile: a new outbox on the same folder finds them.
+        self.box = phone.Outbox(self.box.folder, clock=lambda: self.now[0])
+        line.state = "up"
+        self.assertEqual((self.box.deliver_all(self.crm(line)), self.box.waiting()), (2, 0))
+        # In the order they were made, each freshly signed (the CRM refuses signatures older than 5 minutes).
+        self.assertEqual([(step, body) for step, body, *_ in line.got],
+                         [("trouble", {"call_id": "c1", "what": "opening failed: ConnectionError"}),
+                          ("last", {"call_id": "c1", "said": "Stop calling me"})])
+        for _, _, ts, signature, raw in line.got:
+            self.assertEqual(signature, phone.sign(self.SECRET, ts, raw))
+        self.assertEqual(list(self.box.folder.iterdir()), [])                         # nothing of the caller's left
+
+    def test_when_the_crm_takes_it_at_once_nothing_is_kept(self):
+        line = FakeLine({"opted_out": True})
+        line.state = "up"
+        self.assertTrue(self.crm(line).last_words("c1", "Stop calling me"))
+        self.assertEqual(self.box.waiting(), 0)
+
+    def test_a_request_the_crm_refuses_for_good_is_not_kept(self):
+        line = FakeLine()
+        for status in (400, 404):
+            line.state = status
+            with self.assertRaises(Refusal):
+                self.crm(line).last_words("c1", "Stop calling me")
+        self.assertEqual(self.box.waiting(), 0)
+
+    def test_a_crm_with_another_secret_or_failing_keeps_it(self):
+        line = FakeLine()
+        for status in (401, 500, 503):
+            line.state = status
+            self.assertIsNone(self.crm(line).trouble("c1", "turn failed"))
+        self.assertEqual(self.box.waiting(), 3)
+
+    def test_one_the_crm_refuses_later_is_dropped_and_the_rest_still_go(self):
+        line = FakeLine()
+        crm = self.crm(line)
+        crm.last_words("gone", "Stop calling me")
+        crm.last_words("c2", "Do not call again")
+        line.state, line.refuse["gone"] = "up", 404     # the first call no longer exists (for example, erased)
+        with self.assertLogs("phone", "WARNING"):
+            self.assertEqual((self.box.deliver_all(crm), self.box.waiting()), (1, 0))
+        self.assertEqual([body["call_id"] for _, body, *_ in line.got], ["c2"])
+
+    def test_nothing_is_kept_longer_than_a_week(self):
+        line = FakeLine()
+        crm = self.crm(line)
+        crm.last_words("c1", "Stop calling me")
+        self.now[0] += 7 * 24 * 3600 - 60
+        self.assertEqual(self.box.waiting(), 1)
+        self.box.deliver_all(crm)
+        self.assertEqual(self.box.waiting(), 1)
+        self.now[0] += 120
+        line.state = "up"
+        with self.assertLogs("phone", "ERROR") as logs:
+            self.assertEqual(self.box.deliver_all(crm), 0)
+        self.assertIn("NEVER REACHED THE CRM", logs.output[0])
+        self.assertEqual((self.box.waiting(), line.got), (0, []))
+
+    def test_a_damaged_or_foreign_file_is_deleted_not_sent(self):
+        self.box.folder.mkdir(parents=True)
+        (self.box.folder / "00000000000000000001-aa-last.json").write_text("{not json", encoding="utf-8")
+        (self.box.folder / "00000000000000000002-bb-end.json").write_text(
+            json.dumps({"step": "end", "payload": {"call_id": "c1"}, "since": self.now[0]}), encoding="utf-8")
+        line = FakeLine()
+        line.state = "up"
+        with self.assertLogs("phone", "ERROR"):
+            self.assertEqual(self.box.deliver_all(self.crm(line)), 0)
+        self.assertEqual((self.box.waiting(), line.got), (0, []))
+
+    def test_without_an_outbox_a_failure_is_raised_as_before(self):
+        with self.assertRaises(ConnectionError):
+            self.crm(FakeLine(), outbox=False).trouble("c1", "turn failed")
+
+    def test_a_whole_call_while_the_crm_is_down(self):
+        # The CRM is down when the call opens: the caller hears the trouble line, and the promised call-back waits in
+        # the outbox; so do the words they said as they hung up. Both reach the CRM once it is back.
+        line = FakeLine({"callback_booked": True, "opted_out": True})
+        crm = self.crm(line)
+        CallTest.run_call(self, crm, [CallTest.START, "wait", media(np.concatenate([quiet(0.3), tone(1.0)]))],
+                          stt=lambda audio: "Stop calling me")
+        self.assertEqual(self.box.waiting(), 2)
+        line.state = "up"
+        self.assertEqual(self.box.deliver_all(crm), 2)
+        self.assertEqual([(step, body) for step, body, *_ in line.got],
+                         [("trouble", {"call_id": "c1", "what": "opening failed: ConnectionError"}),
+                          ("last", {"call_id": "c1", "said": "Stop calling me"})])
+
+
 class UnfinishedTest(unittest.TestCase):
 
     def test_cut_off_sentences(self):
@@ -668,21 +812,27 @@ class EndpointTest(unittest.TestCase):
     SECRET = "s" * 40
 
     def setUp(self):
+        import tempfile
         import engine
         self.engine = engine
         self.crm = FakeCrm([phone.Reply("Thank you. Goodbye.", True)])
         saved = (engine.VOICE_HMAC_SECRET, engine.stt_pcm, engine.tts_pcm, phone.Crm, engine.STT_MODEL, engine.NAME_HINTS,
-                 engine.WARM_UP)
+                 engine.WARM_UP, engine.OUTBOX)
+        self.real_crm = phone.Crm
         engine.WARM_UP = "off"      # no real models in these tests (WarmUpTest covers the warm-up)
         engine.VOICE_HMAC_SECRET = self.SECRET
         engine.STT_MODEL, engine.NAME_HINTS = "small.en", "auto"
         engine.stt_pcm = lambda audio: "I will pay on Friday"
         engine.tts_pcm = lambda text: (tone(0.5, 440, 4000, rate=22050), 22050)
-        phone.Crm = lambda url, secret: self.crm
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        engine.OUTBOX = phone.Outbox(folder.name)     # never the real outbox folder
+        self.outboxes = []                            # the outbox each call's CRM client was given
+        phone.Crm = lambda url, secret, outbox=None: self.outboxes.append(outbox) or self.crm
 
         def restore():
             (engine.VOICE_HMAC_SECRET, engine.stt_pcm, engine.tts_pcm, phone.Crm, engine.STT_MODEL,
-             engine.NAME_HINTS, engine.WARM_UP) = saved
+             engine.NAME_HINTS, engine.WARM_UP, engine.OUTBOX) = saved
         self.addCleanup(restore)
 
     def refused(self, url):
@@ -727,6 +877,31 @@ class EndpointTest(unittest.TestCase):
             self.assertEqual(ws.receive()["type"], "websocket.close")
         self.assertEqual(self.crm.heard, ["I will pay on Friday"])
         self.assertEqual(self.crm.ended, 1)
+        self.assertIs(self.outboxes[-1], self.engine.OUTBOX)    # what the CRM cannot take now is kept
+
+    def test_the_outbox_is_sent_again_and_shown_on_health(self):
+        from starlette.testclient import TestClient
+        line = FakeLine({"opted_out": True})
+        engine = self.engine
+        engine.CRM_URL = "http://crm.local:8082"
+        self.addCleanup(setattr, engine, "CRM_URL", engine.CRM_URL)
+        phone.Crm = self.real_crm
+        self.real_crm("http://crm.local:8082", self.SECRET, post=line.post, outbox=engine.OUTBOX).last_words(
+            "c1", "Stop calling me")                  # the CRM was down: kept
+        self.assertEqual(TestClient(engine.app).get("/health").json()["undelivered"], 1)
+        # The retry loop sends it through the engine's own CRM client once the CRM is back.
+        engine.phone.Crm = lambda url, secret, outbox=None: self.real_crm(url, secret, post=line.post, outbox=outbox)
+        line.state = "up"
+
+        async def one_round():
+            try:
+                await asyncio.wait_for(engine.resend_outbox(every=60), 1.0)
+            except TimeoutError:
+                pass
+        asyncio.run(one_round())
+        self.assertEqual([(step, body) for step, body, *_ in line.got],
+                         [("last", {"call_id": "c1", "said": "Stop calling me"})])
+        self.assertEqual(TestClient(engine.app).get("/health").json()["undelivered"], 0)
 
     def test_the_socket_closing_mid_sentence_sends_the_last_words(self):
         import time

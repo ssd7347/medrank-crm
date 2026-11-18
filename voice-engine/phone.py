@@ -9,6 +9,8 @@ brains, tools and rules as the test console), and Piper speaks it back into the 
   * When the stream closes, what the caller said that the CRM has not had yet is sent as their last words (live/last).
   * A call the CRM says to record (its opening told the person it may be recorded) is recorded, both voices as the
     caller heard them, and sent to the CRM as Ogg Opus once the call is over (live/recording; Recorder).
+  * The call-back a caller was promised (live/trouble) and their last words (live/last, maybe "stop calling me") are
+    kept in an outbox folder when the CRM cannot be reached, and sent again until it takes them (Outbox).
 
 Pure numpy (no audioop: it is gone from Python 3.13), so it is tested without a phone line: test_phone.py.
 """
@@ -19,11 +21,15 @@ import asyncio
 import base64
 import hashlib
 import hmac
+import itertools
 import json
 import logging
+import os
 import re
 import time
+import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Awaitable, Callable
 
 import numpy as np
@@ -263,14 +269,85 @@ def sign(secret: str, timestamp: str, body: str) -> str:
     return "sha256=" + hmac.new(secret.encode(), f"{timestamp}.{body}".encode(), hashlib.sha256).hexdigest()
 
 
+def refused(e: Exception) -> bool:
+    """The CRM answered that it will never take this request (400: malformed, 404: no such call, for example a test
+    call or one deleted since). Anything else (not reachable, timed out, 401 while the secrets differ, 5xx) may work
+    later."""
+    return getattr(getattr(e, "response", None), "status_code", None) in (400, 404)
+
+
+class Outbox:
+    """Requests the CRM must get even when it is down at the moment they are made: the call-back a caller was promised
+    ("trouble") and the caller's last words ("last", which may be "stop calling me"). Each waits as one JSON file in
+    ``folder`` until the CRM takes it; ``deliver_all`` sends them again, oldest first (the engine runs it every RETRY_S
+    seconds and at start-up, so they also survive a restart). The files hold what callers said: each is deleted as
+    soon as the CRM has it, and none is kept longer than MAX_AGE_S. Recordings are not kept here (a call that was not
+    recorded breaks no promise), so the outbox stays small."""
+
+    STEPS = ("trouble", "last")
+    RETRY_S = 30.0
+    MAX_AGE_S = 7 * 24 * 3600.0
+    _seq = itertools.count()
+
+    def __init__(self, folder: str | Path, clock: Callable[[], float] = time.time) -> None:
+        self.folder, self.clock = Path(folder), clock
+
+    def put(self, step: str, payload: dict) -> None:
+        self.folder.mkdir(parents=True, exist_ok=True)
+        # Oldest first by name: the clock (coarse on Windows), then a counter for the same tick, then a random part.
+        name = f"{time.time_ns():020d}-{next(self._seq):08d}-{uuid.uuid4().hex[:8]}-{step}.json"
+        tmp = self.folder / (name + ".tmp")         # written whole, then renamed: never read half-written
+        tmp.write_text(json.dumps({"step": step, "payload": payload, "since": self.clock()}), encoding="utf-8")
+        os.replace(tmp, self.folder / name)
+
+    def waiting(self) -> int:
+        return len(list(self.folder.glob("*.json"))) if self.folder.is_dir() else 0
+
+    def deliver_all(self, crm: "Crm") -> int:
+        """Sends what is waiting, oldest first; stops at the first one the CRM does not take yet (it is still down),
+        to try again later. Returns how many the CRM took."""
+        taken = 0
+        for path in sorted(self.folder.glob("*.json")) if self.folder.is_dir() else []:
+            try:
+                item = json.loads(path.read_text(encoding="utf-8"))
+                step, payload, since = item["step"], item["payload"], float(item["since"])
+            except (OSError, ValueError, KeyError, TypeError) as e:
+                log.error("outbox: %s cannot be read (%s): deleted", path.name, e)
+                path.unlink(missing_ok=True)
+                continue
+            call_id = payload.get("call_id") if isinstance(payload, dict) else None
+            if step not in self.STEPS or not isinstance(payload, dict):
+                log.error("outbox: %s is not a request this engine sends: deleted", path.name)
+                path.unlink(missing_ok=True)
+                continue
+            if self.clock() - since > self.MAX_AGE_S:
+                log.error("outbox: call %s: %s NEVER REACHED THE CRM in %d days and is deleted. Read the call's "
+                          "transcript and act on it by hand.", call_id, step, self.MAX_AGE_S // 86400)
+                path.unlink(missing_ok=True)
+                continue
+            try:
+                crm._call(step, payload)
+            except Exception as e:
+                if not refused(e):
+                    return taken            # still not reachable: the rest wait their turn
+                log.warning("outbox: call %s: the CRM refused %s (%s): deleted", call_id, step, e)
+                path.unlink(missing_ok=True)
+                continue
+            path.unlink(missing_ok=True)
+            taken += 1
+            log.info("outbox: call %s: %s delivered", call_id, step)
+        return taken
+
+
 class Crm:
     """Signed calls to the CRM's live-call hooks."""
 
-    def __init__(self, base_url: str, secret: str, post=None) -> None:
+    def __init__(self, base_url: str, secret: str, post=None, outbox: Outbox | None = None) -> None:
         import requests
 
         self.base, self.secret = base_url.rstrip("/"), secret
         self.post = post or requests.post
+        self.outbox = outbox
 
     def _call(self, step: str, payload: dict, timeout: float = 20) -> dict:
         body = json.dumps(payload, separators=(",", ":"))
@@ -295,15 +372,31 @@ class Crm:
         told they are being connected)."""
         return bool(self._call("end", {"call_id": call_id}).get("transferred"))
 
-    def last_words(self, call_id: str, said: str) -> bool:
-        """What the caller said that had not been passed on when the stream closed. Nothing is said back; the CRM keeps
-        it, and opts the caller out if they asked to stop. True if it did."""
-        return bool(self._call("last", {"call_id": call_id, "said": said[:500]}).get("opted_out"))
+    def _must_arrive(self, step: str, payload: dict) -> dict | None:
+        """``_call`` for a request that must not be lost: if the CRM cannot take it now, it goes in the outbox (when
+        there is one) and None is returned. A request the CRM refuses for good is not kept."""
+        try:
+            return self._call(step, payload)
+        except Exception as e:
+            if self.outbox is None or refused(e):
+                raise
+            self.outbox.put(step, payload)
+            log.warning("call %s: the CRM did not take %s (%s): kept in the outbox, sent again until it does",
+                        payload.get("call_id"), step, type(e).__name__)
+            return None
 
-    def trouble(self, call_id: str, what: str) -> bool:
+    def last_words(self, call_id: str, said: str) -> bool | None:
+        """What the caller said that had not been passed on when the stream closed. Nothing is said back; the CRM keeps
+        it, and opts the caller out if they asked to stop. True if it did; None if it is in the outbox for later."""
+        d = self._must_arrive("last", {"call_id": call_id, "said": said[:500]})
+        return None if d is None else bool(d.get("opted_out"))
+
+    def trouble(self, call_id: str, what: str) -> bool | None:
         """The call broke on our side and the caller was told someone will call back: the CRM books that call-back.
-        True if it booked one (none is needed when one is already arranged or the caller asked not to be called)."""
-        return bool(self._call("trouble", {"call_id": call_id, "what": what[:200]}).get("callback_booked"))
+        True if it booked one (none is needed when one is already arranged or the caller asked not to be called);
+        None if the request is in the outbox for later."""
+        d = self._must_arrive("trouble", {"call_id": call_id, "what": what[:200]})
+        return None if d is None else bool(d.get("callback_booked"))
 
     def recording(self, call_id: str, ogg: bytes) -> bool:
         """The call's recording, once it is over. True if the CRM kept it (it keeps only calls it said to record)."""
@@ -448,7 +541,8 @@ class Call:
         async def send() -> None:
             try:
                 booked = await asyncio.to_thread(self.crm.trouble, self.call_id, what)
-                log.info("call %s: fault reported (%s), call-back booked: %s", self.call_id, what, booked)
+                if booked is not None:
+                    log.info("call %s: fault reported (%s), call-back booked: %s", self.call_id, what, booked)
             except Exception as e:
                 log.warning("call %s: could not report the fault (%s): %s", self.call_id, what, e)
         task = asyncio.create_task(send())
@@ -565,6 +659,7 @@ class Call:
             text = await self.hear(audio)
             if text:
                 opted_out = await asyncio.to_thread(self.crm.last_words, self.call_id, text)
-                log.info("call %s: the caller's last words sent, opted out: %s", self.call_id, opted_out)
+                if opted_out is not None:
+                    log.info("call %s: the caller's last words sent, opted out: %s", self.call_id, opted_out)
         except Exception as e:
             log.warning("call %s: could not send the caller's last words: %s", self.call_id, e)
