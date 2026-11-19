@@ -96,7 +96,10 @@ Tick these off with the developer:
 - **AI voice agent**:
   - *Overview*: whether calling is Live, Simulated or Paused, the calling hours, call-backs waiting and overdue,
     and how the calls are going. **Pause all** (admin) stops every campaign at once and sends incoming callers to
-    the normal greeting. Use it whenever something looks wrong; "Resume calling" undoes it.
+    the normal greeting. Use it whenever something looks wrong; "Resume calling" undoes it. Calling shows **On
+    hold** when a part a real call needs is down (the speech engine, the AI brain, or the public address Plivo
+    uses). Campaigns then call nobody, and the admin gets an urgent alert saying which part. When it answers again,
+    the calls start by themselves and the admin is told.
   - *Call-backs*: people the agent promised a call from a person. Call them and mark each one done. Complaints and
     distress come in marked urgent. One that starts "CHECK BEFORE CALLING" means the caller said something later
     (for example "no need to call me back"): read the call's transcript first, and mark it done if they really don't want the call.
@@ -218,7 +221,7 @@ Every listen is in the audit log. Test-console calls are never recorded.
 |---|---|
 | The agent is saying something wrong, or calls should stop now | **Pause all** on the AI voice agent Overview (admin). Then flag the bad calls and tell the developer |
 | Callers hear "Sorry, I am having trouble on this line. A member of our team will call you back." | A part failed (the speech engine, or the CRM server). The engine asks the CRM to book that call-back, so it appears under Call-backs, and the call's transcript says "call_cut_off". If the CRM server itself was down, the engine keeps the request (and anything the caller said as they hung up, such as "stop calling me") and sends it again every 30 seconds until the CRM is back; the call-back then appears. The speech engine's `/health` shows how many are still waiting (`"undelivered"`). Check every part is running; the developer can see the reason in the speech engine's log. **Never switch off the speech engine's computer for good while `"undelivered"` is above 0**: those call-backs and stops would be lost |
-| A campaign is running but nobody is called | Check: calling is not Paused; it is within calling hours; the contacts have consent recorded; the script is approved; the campaign preview's reasons |
+| A campaign is running but nobody is called | Check: calling is not Paused or **On hold** (the red banner says which part is down: start it, and the calls resume by themselves); it is within calling hours; the contacts have consent recorded; the script is approved; the campaign preview's reasons |
 | Long silences on calls | The brain or speech engine is slow: is the GPU computer running, and the brain warmed up? |
 | Call-backs pile up as overdue | Someone must call those people; the Overview shows the count in red |
 | Cannot sign in | Codes expire; ask for a new one. Being signed out after 3 idle minutes is normal |

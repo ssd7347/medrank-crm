@@ -77,6 +77,17 @@ export function SimulatedBanner() {
       </div>
     );
   }
+  if (data.held) {
+    return (
+      <div className="mb-4">
+        <Alert tone="red">
+          <strong>AI campaign calls are on hold</strong>
+          {data.heldSince && ` since ${new Date(data.heldSince).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}`}. {data.held} Nobody is
+          being called; calls start again by themselves once it answers.
+        </Alert>
+      </div>
+    );
+  }
   if (data.live) return null;
   return (
     <div className="mb-4">

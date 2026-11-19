@@ -40,7 +40,7 @@ export default function VoiceOverviewPage() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Calling" value={!data.enabled ? "Switched off" : data.paused ? "Paused" : data.live ? "Live" : "Simulated"} tone={data.paused || !data.enabled ? "red" : data.live ? "green" : "amber"} />
+        <Stat label="Calling" value={!data.enabled ? "Switched off" : data.paused ? "Paused" : data.held ? "On hold" : data.live ? "Live" : "Simulated"} tone={data.paused || !data.enabled || data.held ? "red" : data.live ? "green" : "amber"} />
         <Stat label="Calling hours (IST)" value={`${data.windowStart.slice(0, 5)} – ${data.windowEnd.slice(0, 5)}`} />
         <Stat label="Call-backs waiting" value={String(data.openCallbacks)} href="/voice/callbacks" />
         <Stat label="Overdue call-backs" value={String(data.overdueCallbacks)} tone={data.overdueCallbacks > 0 ? "red" : undefined} href="/voice/callbacks" />

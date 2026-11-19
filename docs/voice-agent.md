@@ -60,6 +60,26 @@ to be recorded, erased ones, ones past retention and anything that is not Ogg, a
 and runs both its models as it starts (`WARM_UP`, on by default), so the first caller does not wait for them; the
 brain is warmed by the CRM while each call's opening line plays.
 
+Campaign calls on hold (19 Nov 2026): before a campaign places a call on Plivo, `LineCheck` asks the three things the
+call needs:
+- the speech engine's `/health`, with its models loaded;
+- the brain set in `AI_BRAIN`: the open-model server has the model, or Claude has its key;
+- the public address: an unsigned test callback through `PLIVO_PUBLIC_URL` must get this CRM's 401.
+
+If one fails, nobody is called, because a call placed then would reach a real person and fail in front of them.
+- **The people.** They stay due, with no attempt counted.
+- **The admins.** They get one urgent alert naming the part. The Overview shows **On hold**, with the reason for
+  admins only, since it can name internal addresses.
+- **Resuming.** Every sweep (30 s) asks again, and the calls resume by themselves once all three answer, with a
+  second alert.
+
+When the check runs:
+- It runs once a sweep, and only when a call is about to be placed. Outside a campaign's calling hours nothing is
+  asked, so a GPU computer switched off at night raises no alert.
+- Simulated calls and incoming calls are not held.
+- The check is made inside the sweep's database transaction, so it holds one database connection while it waits.
+  Each of the three requests has a timeout: 3 s for the engine, 2 s for the model server, 6 s for the address.
+
 A transfer to the desk on Plivo waits until the caller has heard "I am connecting you": the hand-over marks the call
 (`transfer_pending`), and when the engine has played the line and asks to end the call, the CRM transfers it instead
 of hanging up (`end` replies `"transferred": true`). The engine then leaves the stream for Plivo to close, and closes it

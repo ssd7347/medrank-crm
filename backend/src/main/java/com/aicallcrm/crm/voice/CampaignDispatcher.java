@@ -26,8 +26,9 @@ import com.aicallcrm.crm.voice.Voice.TargetStatus;
 /**
  * Works through running campaigns every 30 seconds: up to {@code maxConcurrent} calls at a
  * time per campaign, each number re-checked for eligibility the moment before it is dialled. Does nothing
- * while the feature is switched off or "Pause all" is on. Also tidies up calls the platform never reported
- * on, deletes conversations past the retention period, and warns the admins about an opt-out spike or the
+ * while the feature is switched off or "Pause all" is on, and holds the calls while a part a real call needs is
+ * down ({@link LineCheck}), telling the admins when the hold starts and ends. Also tidies up calls the platform never
+ * reported on, deletes conversations past the retention period, and warns the admins about an opt-out spike or the
  * monthly cost limit.
  */
 @Component
@@ -48,13 +49,15 @@ public class CampaignDispatcher {
     private final VoiceProperties props;
     private final TransactionTemplate tx;
     private final RecordingService recordings;
+    private final LineCheck line;
     private final ReentrantLock lock = new ReentrantLock();
 
     public CampaignDispatcher(VoiceCampaignRepository campaigns, VoiceCampaignTargetRepository targets,
                               VoiceCallRepository calls, ContactConsentRepository consents,
                               CallEligibility eligibility, VoiceCallService callService,
                               VoiceQueryService queries, AppUserRepository users, AlertService alerts,
-                              VoiceProperties props, TransactionTemplate tx, RecordingService recordings) {
+                              VoiceProperties props, TransactionTemplate tx, RecordingService recordings,
+                              LineCheck line) {
         this.campaigns = campaigns;
         this.targets = targets;
         this.calls = calls;
@@ -67,6 +70,21 @@ public class CampaignDispatcher {
         this.props = props;
         this.tx = tx;
         this.recordings = recordings;
+        this.line = line;
+    }
+
+    /** One sweep's look at the line: asked the first time a call is about to be placed, then remembered. */
+    final class Sweep {
+        private boolean checked;
+        private String problem;
+
+        boolean lineDown() {
+            if (!checked) {
+                problem = line.problem();
+                checked = true;
+            }
+            return problem != null;
+        }
     }
 
     @Scheduled(initialDelayString = "PT45S", fixedDelayString = "${app.voice.dispatch-interval:PT30S}")
@@ -105,9 +123,13 @@ public class CampaignDispatcher {
             int placed = 0;
             List<Long> running = tx.execute(s -> campaigns.findByStatus(CampaignStatus.RUNNING).stream()
                     .map(VoiceCampaign::getId).toList());
+            Sweep sweep = new Sweep();
             for (Long id : running) {
-                Integer n = tx.execute(s -> dispatchCampaign(id, now));
+                Integer n = tx.execute(s -> dispatchCampaign(id, now, sweep));
                 placed += n == null ? 0 : n;
+            }
+            if (sweep.checked) {
+                lineChecked(sweep.problem, now);
             }
             return placed;
         } finally {
@@ -115,7 +137,7 @@ public class CampaignDispatcher {
         }
     }
 
-    private int dispatchCampaign(Long campaignId, Instant now) {
+    private int dispatchCampaign(Long campaignId, Instant now, Sweep sweep) {
         VoiceCampaign c = campaigns.findById(campaignId).orElse(null);
         if (c == null || c.getStatus() != CampaignStatus.RUNNING) {
             return 0;
@@ -130,7 +152,8 @@ public class CampaignDispatcher {
             for (VoiceCampaignTarget t : targets.findDue(campaignId, now, PageRequest.of(0, 100))) {
                 Verdict v = eligibility.check(c, t, now);
                 if (v.ok()) {
-                    if (placed >= slots) {
+                    // No free slot, or the line is down: they stay due and are called on a later sweep.
+                    if (placed >= slots || sweep.lineDown()) {
                         continue;
                     }
                     callService.placeOutbound(c, t);
@@ -151,6 +174,30 @@ public class CampaignDispatcher {
             c.setFinishedAt(now);
         }
         return placed;
+    }
+
+    /** Starts or ends the hold, and tells the admins once each way. */
+    private void lineChecked(String problem, Instant now) {
+        int change = line.record(problem, now);
+        LineCheck.Hold hold = line.hold();
+        if (change > 0) {
+            log.warn("AI campaign calls are on hold: {}", problem);
+            tx.executeWithoutResult(s -> alertAdmins(Priority.URGENT, "AI calls are on hold: part of the phone line is down",
+                    problem + " Nobody is being called. Calls start again by themselves once it answers.",
+                    "VLINE:" + hold.since().toEpochMilli()));
+        } else if (change < 0) {
+            log.info("AI campaign calls resumed: the phone line answers again");
+            tx.executeWithoutResult(s -> alertAdmins(Priority.NORMAL, "AI calls have resumed",
+                    "Every part of the phone line answers again, so campaign calls are being placed.",
+                    "VLINE-OK:" + now.toEpochMilli()));
+        }
+    }
+
+    private void alertAdmins(Priority priority, String title, String body, String dedupKey) {
+        for (Long admin : users.findByActiveTrueAndRoleInOrderByFullName(List.of(Role.SUPER_ADMIN)).stream()
+                .map(u -> u.getId()).toList()) {
+            alerts.notifyUser(admin, null, "VOICE_LINE", priority, title, body, "/voice", dedupKey);
+        }
     }
 
     /** Transcripts and recordings are kept for {@code app.voice.retention-days}, then removed. */

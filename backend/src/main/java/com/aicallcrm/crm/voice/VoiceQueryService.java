@@ -82,8 +82,12 @@ public class VoiceQueryService {
 
     public record Overview(boolean enabled, boolean paused, String platform, boolean live, boolean signingConfigured,
                            boolean dndConnected, boolean transferConfigured, LocalTime windowStart,
-                           LocalTime windowEnd, int openCallbacks, int overdueCallbacks, int runningCampaigns) {
+                           LocalTime windowEnd, int openCallbacks, int overdueCallbacks, int runningCampaigns,
+                           String held, Instant heldSince) {
     }
+
+    /** Said instead of the reason to staff who are not admins: the reason can name internal addresses. */
+    static final String HELD_FOR_STAFF = "A part of the phone line is down. The admins have been told.";
 
     public record Metrics(int days, int calls, int connected, int noAnswer, int failed, int simulated,
                           int connectRatePercent, Integer avgDurationSec, Map<String, Integer> outcomes,
@@ -108,6 +112,7 @@ public class VoiceQueryService {
     private final AppUserRepository users;
     private final AuditService audit;
     private final RecordingService recordings;
+    private final LineCheck line;
 
     public VoiceQueryService(VoiceCallRepository calls, VoiceToolAuditRepository toolAudits,
                              CallbackRequestRepository callbacks, VoiceCampaignRepository campaigns,
@@ -115,7 +120,7 @@ public class VoiceQueryService {
                              VoiceCallService callService, VoicePlatforms platforms, DndService dnd,
                              VoiceProperties props, ContactRepository contacts, ContactService contactService,
                              AppUserRepository users,
-                             AuditService audit, RecordingService recordings) {
+                             AuditService audit, RecordingService recordings, LineCheck line) {
         this.calls = calls;
         this.toolAudits = toolAudits;
         this.callbacks = callbacks;
@@ -131,6 +136,7 @@ public class VoiceQueryService {
         this.users = users;
         this.audit = audit;
         this.recordings = recordings;
+        this.line = line;
     }
 
     // ------------------------------------------------------------------ overview and the kill switch
@@ -140,11 +146,14 @@ public class VoiceQueryService {
         CurrentUser me = CurrentUser.get();
         Instant now = Instant.now();
         List<CallbackRequest> open = visibleCallbacks(me, true);
+        LineCheck.Hold hold = line.hold();
         return new Overview(props.enabled(), callService.paused(), platforms.current().name(), platforms.live(),
                 props.signingConfigured(), dnd.connected(), !props.deskTransferNumber().isBlank(),
                 props.windowStart(), props.windowEnd(), open.size(),
                 (int) open.stream().filter(c -> c.getDueAt().isBefore(now)).count(),
-                me.isAdmin() ? campaigns.findByStatus(CampaignStatus.RUNNING).size() : 0);
+                me.isAdmin() ? campaigns.findByStatus(CampaignStatus.RUNNING).size() : 0,
+                hold == null ? null : me.isAdmin() ? hold.reason() : HELD_FOR_STAFF,
+                hold == null ? null : hold.since());
     }
 
     /** "Pause all": stops dialling at once, for every campaign. */

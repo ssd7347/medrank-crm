@@ -3,11 +3,14 @@ package com.aicallcrm.crm.voice;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +44,9 @@ import com.sun.net.httpserver.HttpServer;
  * "Ready for a real call?" end to end, with one stand-in server on this machine playing Plivo's API, the public
  * gateway, the speech engine and the model server. The check only reads: Plivo gets one GET, the public address gets
  * an unsigned GET and POST, nothing else is called and no call is placed.
+ *
+ * <p>The same stand-in shows the line check before a campaign dials ({@link LineCheck}): with a part down, nobody's
+ * phone rings, the people stay due, the admins are told once, and the calls go ahead once it answers again.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -54,6 +61,10 @@ class ReadinessIntegrationTest {
     static final AtomicInteger ME_STATUS = new AtomicInteger(404);
     static final AtomicInteger HOOK_STATUS = new AtomicInteger(401);
     static final AtomicBoolean WARMED = new AtomicBoolean(true);
+    static final AtomicBoolean ENGINE_UP = new AtomicBoolean(true);
+    static final AtomicBoolean MODEL_UP = new AtomicBoolean(true);
+    private static final AtomicInteger SEQ = new AtomicInteger(73000);
+    private static final AtomicInteger UUIDS = new AtomicInteger();
     /** "METHOD path" of everything the stand-in received, and the Authorization header Plivo got. */
     static final List<String> SEEN = new CopyOnWriteArrayList<>();
     static final List<String> PLIVO_AUTH = new CopyOnWriteArrayList<>();
@@ -68,7 +79,9 @@ class ReadinessIntegrationTest {
         FAKE.createContext("/", ex -> {
             String path = ex.getRequestURI().getPath();
             SEEN.add(ex.getRequestMethod() + " " + path);
-            if (path.startsWith("/v1/Account/")) {
+            if (path.startsWith("/v1/Account/") && path.endsWith("/Call/") && "POST".equals(ex.getRequestMethod())) {
+                reply(ex, 201, "{\"api_id\":\"r2\",\"message\":\"call fired\",\"request_uuid\":\"hold-" + UUIDS.incrementAndGet() + "\"}");
+            } else if (path.startsWith("/v1/Account/")) {
                 PLIVO_AUTH.add(ex.getRequestHeaders().getFirst("Authorization"));
                 reply(ex, PLIVO_STATUS.get(), "{\"api_id\":\"r1\",\"account_type\":\"standard\"}");
             } else if (path.equals("/api/auth/me")) {
@@ -76,10 +89,10 @@ class ReadinessIntegrationTest {
             } else if (path.equals("/api/voice/hooks/plivo/hangup")) {
                 reply(ex, HOOK_STATUS.get(), "{}");
             } else if (path.equals("/health")) {
-                reply(ex, 200, "{\"ok\":true,\"stt_model\":\"small.en\",\"voice\":\"en_IN-test\",\"warmed\":"
-                        + WARMED.get() + ",\"warm_up_error\":null}");
+                reply(ex, ENGINE_UP.get() ? 200 : 503, "{\"ok\":true,\"stt_model\":\"small.en\",\"voice\":\"en_IN-test\","
+                        + "\"warmed\":" + WARMED.get() + ",\"warm_up_error\":null}");
             } else if (path.equals("/v1/models")) {
-                reply(ex, 200, "{\"object\":\"list\",\"data\":[{\"id\":\"ready-model\"}]}");
+                reply(ex, MODEL_UP.get() ? 200 : 500, "{\"object\":\"list\",\"data\":[{\"id\":\"ready-model\"}]}");
             } else {
                 reply(ex, 404, "{}");
             }
@@ -142,10 +155,17 @@ class ReadinessIntegrationTest {
         ME_STATUS.set(404);
         HOOK_STATUS.set(401);
         WARMED.set(true);
+        ENGINE_UP.set(true);
+        MODEL_UP.set(true);
+        line.record(null, Instant.now());
     }
 
     @Autowired
     MockMvc mvc;
+    @Autowired
+    CampaignDispatcher dispatcher;
+    @Autowired
+    LineCheck line;
 
     @Test
     void readsEverythingAndChangesNothing() throws Exception {
@@ -205,6 +225,142 @@ class ReadinessIntegrationTest {
         SEEN.clear();
         mvc.perform(auth(get("/api/voice/readiness"), manager)).andExpect(status().isForbidden());
         assertThat(SEEN).isEmpty();
+    }
+
+    @Test
+    void aCampaignWaitsWhileTheSpeechEngineIsDownAndDialsOnceItIsBack() throws Exception {
+        String admin = admin();
+        long heldBefore = notes(admin, "AI calls are on hold: part of the phone line is down");
+        long resumedBefore = notes(admin, "AI calls have resumed");
+        ENGINE_UP.set(false);
+        long campaign = campaign(admin, null, 2);
+        SEEN.clear();
+
+        assertThat(dispatcher.dispatch()).isZero();
+        assertThat(dispatcher.dispatch()).isZero();
+        assertThat(dials()).isZero();
+        // Asked once a sweep, not once a person.
+        assertThat(SEEN.stream().filter("GET /health"::equals).count()).isEqualTo(2);
+        // They are still due, with no attempt counted against them.
+        mvc.perform(auth(get("/api/voice/campaigns/" + campaign), admin))
+                .andExpect(jsonPath("$.targets.length()").value(2))
+                .andExpect(jsonPath("$.targets[*].status").value(Matchers.everyItem(Matchers.is("PENDING"))))
+                .andExpect(jsonPath("$.targets[*].attempts").value(Matchers.everyItem(Matchers.is(0))));
+        // The admin sees why, is told once however many sweeps find it down, and other staff get no addresses.
+        String overview = overview(admin);
+        assertThat((String) JsonPath.read(overview, "$.held")).contains("The speech engine answered 503");
+        assertThat((String) JsonPath.read(overview, "$.heldSince")).isNotBlank();
+        assertThat(notes(admin, "AI calls are on hold: part of the phone line is down")).isEqualTo(heldBefore + 1);
+        assertThat((String) JsonPath.read(overview(manager(admin)), "$.held")).isEqualTo(VoiceQueryService.HELD_FOR_STAFF);
+
+        ENGINE_UP.set(true);
+        assertThat(dispatcher.dispatch()).isEqualTo(2);
+        assertThat(dials()).isEqualTo(2);
+        assertThat((Object) JsonPath.read(overview(admin), "$.held")).isNull();
+        assertThat(notes(admin, "AI calls have resumed")).isEqualTo(resumedBefore + 1);
+        assertThat(notes(admin, "AI calls are on hold: part of the phone line is down")).isEqualTo(heldBefore + 1);
+        finish(admin, campaign);
+    }
+
+    @Test
+    void eachPartACallNeedsIsChecked() throws Exception {
+        String admin = admin();
+        long campaign = campaign(admin, null, 1);
+        Map<String, Runnable> downs = new java.util.LinkedHashMap<>();
+        downs.put("still loading its speech models", () -> WARMED.set(false));
+        downs.put("The AI brain is not available: The model server answered 500", () -> MODEL_UP.set(false));
+        downs.put("got 502 instead of the CRM's 401", () -> HOOK_STATUS.set(502));
+        downs.put("got 404 instead of the CRM's 401", () -> HOOK_STATUS.set(404));
+        for (Map.Entry<String, Runnable> down : downs.entrySet()) {
+            reset();
+            down.getValue().run();
+            SEEN.clear();
+            assertThat(dispatcher.dispatch()).as(down.getKey()).isZero();
+            assertThat(dials()).as(down.getKey()).isZero();
+            assertThat(line.hold()).as(down.getKey()).isNotNull();
+            assertThat(line.hold().reason()).contains(down.getKey());
+        }
+        reset();
+        assertThat(dispatcher.dispatch()).isEqualTo(1);
+        assertThat(dials()).isEqualTo(1);
+        assertThat(line.hold()).isNull();
+        finish(admin, campaign);
+    }
+
+    @Test
+    void outsideTheCampaignsHoursNothingIsAskedAndNothingIsHeld() throws Exception {
+        // The GPU computer may be off at night: no check, no alert, while nobody would be called anyway.
+        String admin = admin();
+        ENGINE_UP.set(false);
+        int hour = ZonedDateTime.now(java.time.ZoneId.of("Asia/Kolkata")).getHour();
+        long campaign = campaign(admin, hour < 12 ? new String[] {"20:00", "21:00"} : new String[] {"08:00", "09:00"}, 1);
+        SEEN.clear();
+        assertThat(dispatcher.dispatch()).isZero();
+        assertThat(SEEN).doesNotContain("GET /health").isEmpty();
+        assertThat(line.hold()).isNull();
+        finish(admin, campaign);
+    }
+
+    /** A running campaign of {@code people} consenting contacts on the approved enquiry script. */
+    private long campaign(String admin, String[] window, int people) throws Exception {
+        mvc.perform(auth(post("/api/fields"), admin).contentType(MediaType.APPLICATION_JSON).content(
+                "{\"label\":\"Hold Tag\",\"fieldType\":\"TEXT\",\"agentAccess\":\"NONE\",\"verifyWith\":false,"
+                        + "\"sortOrder\":10,\"active\":true}"));      // 201 the first time, refused after: either is fine
+        List<Integer> scripts = JsonPath.read(mvc.perform(auth(get("/api/voice/scripts"), admin)).andReturn()
+                .getResponse().getContentAsString(), "$[?(@.name == 'Enquiry follow-up')].id");
+        mvc.perform(auth(post("/api/voice/scripts/" + scripts.get(0) + "/approve"), admin)).andExpect(status().isOk());
+        String tag = "H" + SEQ.incrementAndGet();
+        List<String> names = List.of("Hema Rao", "Ira Shah", "Jaya Menon");
+        for (int i = 0; i < people; i++) {
+            String phone = "9" + String.format("%05d", SEQ.incrementAndGet()) + "4321";
+            long id = ((Number) JsonPath.read(mvc.perform(auth(post("/api/contacts"), admin)
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"fullName\":\"" + names.get(i)
+                                    + "\",\"phone\":\"" + phone + "\",\"fields\":{\"hold_tag\":\"" + tag + "\"}}"))
+                    .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id")).longValue();
+            mvc.perform(auth(post("/api/contacts/" + id + "/voice-consent"), admin).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"alternate\":false,\"aiCallConsent\":true,\"recordingConsent\":true,\"source\":\"SIGNUP_FORM\"}"))
+                    .andExpect(status().isOk());
+        }
+        String hours = window == null ? "" : ",\"windowStart\":\"" + window[0] + "\",\"windowEnd\":\"" + window[1] + "\"";
+        long campaign = ((Number) JsonPath.read(mvc.perform(auth(post("/api/voice/campaigns"), admin)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Hold " + tag + "\",\"scriptName\":\"Enquiry follow-up\",\"fieldKey\":\"hold_tag\","
+                                + "\"fieldOp\":\"EQUALS\",\"fieldValue\":\"" + tag + "\",\"maxAttempts\":2,"
+                                + "\"maxConcurrent\":20,\"retryGapMin\":60" + hours + "}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.campaign.id"))
+                .longValue();
+        mvc.perform(auth(post("/api/voice/campaigns/" + campaign + "/start"), admin)).andExpect(status().isOk());
+        return campaign;
+    }
+
+    private void finish(String admin, long campaign) throws Exception {
+        mvc.perform(auth(post("/api/voice/campaigns/" + campaign + "/finish"), admin)).andExpect(status().isOk());
+    }
+
+    /** How many calls Plivo was asked to place since SEEN was cleared. */
+    private long dials() {
+        return SEEN.stream().filter(("POST /v1/Account/" + AUTH_ID + "/Call/")::equals).count();
+    }
+
+    private String overview(String token) throws Exception {
+        return mvc.perform(auth(get("/api/voice/overview"), token)).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString();
+    }
+
+    private long notes(String token, String title) throws Exception {
+        List<String> titles = JsonPath.read(mvc.perform(auth(get("/api/notifications").param("limit", "200"), token))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$[*].title");
+        return titles.stream().filter(title::equals).count();
+    }
+
+    private String manager(String admin) throws Exception {
+        String email = "hold.manager." + SEQ.incrementAndGet() + "@ready.test";
+        mvc.perform(auth(post("/api/users"), admin).contentType(MediaType.APPLICATION_JSON).content("{\"fullName\":"
+                        + "\"Hold Manager\",\"email\":\"" + email + "\",\"role\":\"MANAGER\",\"password\":\"StaffPass123!\"}"))
+                .andExpect(status().isCreated());
+        return JsonPath.read(mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"StaffPass123!\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.accessToken");
     }
 
     private Map<String, Map<String, Object>> checks(String admin) throws Exception {

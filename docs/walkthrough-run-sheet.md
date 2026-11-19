@@ -150,6 +150,9 @@ agent's voice (a US English voice for now; the ear on this laptop is the smaller
 outcomes, why calls were handed over, "Asked to stop", the cost estimate against the monthly limit (₹60,000 by
 default; the alert does not stop calls). **Pause all** stops every campaign at once: press it, confirm, and *Calling*
 shows **Paused** ("Incoming callers hear the normal greeting instead of the AI agent"); then **Resume calling**.
+If a part a real call needs stops answering (the speech engine, the AI brain, the public address), *Calling* shows
+**On hold** by itself. Nobody is called until it is back, the admin gets an alert saying which part, and the calls
+resume on their own.
 
 ### 3.8 What we need from you, and the dates (8 min)
 

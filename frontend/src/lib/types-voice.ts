@@ -95,6 +95,9 @@ export type VoiceOverview = {
   openCallbacks: number;
   overdueCallbacks: number;
   runningCampaigns: number;
+  /** Campaign calls are held because a part of the phone line is down: why (admins get the details). */
+  held: string | null;
+  heldSince: string | null;
 };
 
 export type VoiceMetrics = {

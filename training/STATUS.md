@@ -14,6 +14,54 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 19 November 2026: A CAMPAIGN NO LONGER DIALS WHILE THE SPEECH ENGINE, THE BRAIN OR THE TUNNEL IS DOWN (user: "continue the next task")
+
+The dialer checked only "calling enabled and not paused". A call placed while a needed part was down reached a real
+person and failed in front of them:
+- with the speech engine down, or the tunnel or gateway down, they answered to silence;
+- with the brain down, each heard "a member of our team will call you back".
+
+A 50-person pilot list would be used up that way.
+
+**Built.** New `voice/LineCheck`, used by `CampaignDispatcher`. Before a call is placed on Plivo it asks:
+- the speech engine's `/health`, with its models loaded;
+- the brain in `AI_BRAIN`: the open-model server has the model (new `Brains.option(kind)`, so only that one is
+  asked), or Claude has its key;
+- the public address: an unsigned test callback must get this CRM's 401.
+
+**While one fails:**
+- Nobody is called. The people stay due, with no attempt counted, like people waiting for a free slot.
+- The admins get one urgent alert naming the part.
+- The Overview says **On hold**, and every voice page shows a red banner with the time and the reason. Other staff
+  get a generic sentence, because the reason can name internal addresses.
+- Calls resume by themselves on the first sweep that finds every part answering, and the admins are told.
+
+**When it asks:**
+- At most once a sweep, and only when a call is about to be placed. So nothing is asked outside a campaign's hours,
+  when the GPU computer may be off.
+- Simulated calls and incoming calls are not held.
+
+**Tests.** In `ReadinessIntegrationTest`, whose stand-in already played Plivo, the gateway, the engine and the model
+server. 3 new tests:
+- the engine down, then back: nothing dialled, still due, asked once a sweep, one alert, generic text for a manager,
+  then 2 calls and a "resumed" alert;
+- each part down in turn: models loading, model server 500, callback 502, callback 404;
+- outside the campaign's hours: nothing asked, nothing held.
+
+11 separate breaks were each caught. The first try of "an alert every sweep" was not caught: the alert's dedup key
+(the hold's start time) already stops a repeat. With the key broken too, the test fails.
+
+**Seen live** on the in-memory test CRM, in Plivo mode with the speech engine and Plivo's API at dead local
+addresses (the rehearsal token):
+- the real scheduled sweep held the campaign: "The speech engine is not running at http://127.0.0.1:9.";
+- one alert, no request to Plivo;
+- the Overview and banner as above (checked in the browser).
+
+**Suites.** Backend 164/164 on H2 and on PostgreSQL. Website tsc and eslint clean.
+
+**Docs.** `voice-agent.md` (Plivo section), the hand-over guide's Overview and its "nobody is called" row, and the
+walkthrough run-sheet 3.7.
+
 # 19 November 2026: A CUSTOMER'S NUMBER AND NAME NO LONGER REACH THE SERVER LOG (user: "continue the next task")
 
 Server logs are a copy of personal data that an erasure never reaches (compliance checklist 2.1). Every log line of

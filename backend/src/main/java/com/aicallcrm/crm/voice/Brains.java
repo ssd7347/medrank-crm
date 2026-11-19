@@ -70,12 +70,19 @@ public class Brains {
     }
 
     public List<BrainOption> options() {
-        return List.of(
-                new BrainOption(Kind.SIMULATED, "Simulated (rules, no AI)", true, "Free and instant; follows keywords only."),
-                local(),
-                new BrainOption(Kind.CLAUDE, "Claude (" + props.anthropicModel() + ")", props.claudeConfigured(),
-                        props.claudeConfigured() ? "Paid per use; fast and the most capable."
-                                : "Add an Anthropic API key (ANTHROPIC_API_KEY) to use it."));
+        return List.of(option(Kind.SIMULATED), option(Kind.LOCAL), option(Kind.CLAUDE));
+    }
+
+    /** One brain's option; only the open-model server is asked over the network. */
+    public BrainOption option(Kind kind) {
+        return switch (kind) {
+            case SIMULATED -> new BrainOption(Kind.SIMULATED, "Simulated (rules, no AI)", true,
+                    "Free and instant; follows keywords only.");
+            case LOCAL -> local();
+            case CLAUDE -> new BrainOption(Kind.CLAUDE, "Claude (" + props.anthropicModel() + ")",
+                    props.claudeConfigured(), props.claudeConfigured() ? "Paid per use; fast and the most capable."
+                            : "Add an Anthropic API key (ANTHROPIC_API_KEY) to use it.");
+        };
     }
 
     /** Is the open-model server up, and does it have the model? Asked live, so the screen shows the truth. */
