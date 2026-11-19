@@ -334,6 +334,53 @@ class CallTest(unittest.TestCase):
         self.assertEqual(crm.troubles, ["turn failed: RuntimeError"])
         self.assertEqual((crm.ended, closed), (1, [True]))
 
+    def test_nobody_the_team_cannot_call_back_is_promised_a_call_back(self):
+        last = lambda sent: {"event": "playedStream", "name": [m for m in sent if m["event"] == "checkpoint"][-1]["name"]}
+        speech = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+
+        def run(crm, script, ear):
+            said = []
+
+            def voice(text):
+                said.append(text)
+                return tone(0.5, 440, 4000, rate=22050), 22050
+            self.run_call(crm, script, stt=ear, tts=voice)
+            return said
+
+        def broken_after(n):
+            heard = []
+
+            def ear(audio):
+                heard.append(1)
+                if len(heard) > n:
+                    raise RuntimeError("the model crashed")
+                return "Fine."
+            return ear
+
+        class Withheld(FakeCrm):         # the CRM says at the opening: number withheld
+            def open(self, call_id):
+                return phone.Reply("Hello.", False, call_back=False)
+        crm = Withheld([])
+        said = run(crm, [self.START, "wait", last, speech, "wait", last, "wait"], broken_after(0))
+        self.assertEqual(said, ["Hello.", phone.TROUBLE_NO_CALL_BACK])
+        self.assertEqual(crm.troubles, ["turn failed: RuntimeError"])     # still reported, for the transcript
+
+        # Opted out during the call: the turn's reply says so, and the next fault promises nothing.
+        crm = FakeCrm([phone.Reply("You will not be called again.", False, call_back=False)])
+        said = run(crm, [self.START, "wait", last, speech, "wait", last, speech, "wait", last, "wait"], broken_after(1))
+        self.assertEqual(said[-1], phone.TROUBLE_NO_CALL_BACK)
+
+        # The other way round: a CRM that says they can be called back again (a reply without it means yes).
+        crm = Withheld([phone.Reply("Noted.", False)])
+        said = run(crm, [self.START, "wait", last, speech, "wait", last, speech, "wait", last, "wait"], broken_after(1))
+        self.assertEqual(said[-1], phone.TROUBLE)
+
+        # The CRM is down as the call opens, so it never said: the call-back is promised (the outbox delivers it).
+        class Down(FakeCrm):
+            def open(self, call_id):
+                raise ConnectionError("CRM down")
+        self.assertEqual(run(Down([]), [self.START, "wait", last, "wait"], broken_after(0)), [phone.TROUBLE])
+
     def test_when_the_voice_fails_the_fault_is_reported_and_the_call_ends_instead_of_going_silent(self):
         crm = FakeCrm([])
 
@@ -588,6 +635,25 @@ class CrmTest(unittest.TestCase):
         self.assertEqual(json.loads(body), {"call_id": "c1", "said": "hello"})
         ts = seen["headers"]["X-Voice-Timestamp"]
         self.assertEqual(seen["headers"]["X-Voice-Signature"], phone.sign("s" * 40, ts, body))
+
+    def test_the_crm_says_whether_the_person_can_be_called_back(self):
+        replies = []
+
+        class Res:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return replies.pop(0)
+
+        crm = phone.Crm("http://crm.local:8082", "s" * 40, post=lambda url, data, timeout, headers: Res())
+        replies[:] = [{"say": "Hello", "over": False, "call_back": False}, {"say": "Hello", "over": False},
+                      {"say": "Noted.", "over": False, "call_back": False}, {"say": "Noted.", "over": False,
+                                                                            "call_back": True}]
+        self.assertFalse(crm.open("c1").call_back)
+        self.assertTrue(crm.open("c1").call_back)       # a CRM that does not say: as before, a call-back is promised
+        self.assertFalse(crm.turn("c1", "hi").call_back)
+        self.assertTrue(crm.turn("c1", "hi").call_back)
 
     def test_a_fault_is_reported_signed_and_says_whether_a_call_back_was_booked(self):
         seen = []

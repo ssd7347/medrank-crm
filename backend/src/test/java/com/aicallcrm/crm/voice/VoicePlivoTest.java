@@ -174,6 +174,8 @@ class VoicePlivoTest {
     JdbcTemplate jdbc;
     @Autowired
     VoiceCallRepository callRepo;
+    @Autowired
+    com.aicallcrm.crm.contact.ContactRepository contactRepo;
 
     @Test
     void placingACallSendsOurCallbackUrlsWithBasicAuth() {
@@ -510,6 +512,83 @@ class VoicePlivoTest {
         assertThat(callbacks(up)).isEmpty();
     }
 
+    // ------------------------------------------------------------------ a withheld number
+
+    @Test
+    void aCallerWhoWithholdsTheirNumberIsNeverPromisedACallBack() throws Exception {
+        String admin = login();
+        approve(admin, "Incoming calls");
+        // A contact saved with the placeholder by mistake: a withheld caller is still nobody's.
+        com.aicallcrm.crm.contact.Contact stray = new com.aicallcrm.crm.contact.Contact();
+        stray.setFullName("Stray Placeholder");
+        stray.setPhone("unknown");
+        long strayId = contactRepo.save(stray).getId();
+        try {
+            String callUuid = "cu-" + SEQ.incrementAndGet();
+            assertThat(answerInbound("anonymous", callUuid)).contains("<Stream ");
+            UUID call = callOf(callUuid);
+            assertThat(jdbc.queryForObject("select contact_id from voice_call where id = ?", Long.class, call)).isNull();
+            // The engine is told nobody can call them back, so its "having trouble" goodbye promises nothing.
+            live("open", call, null).andExpect(jsonPath("$.call_back").value(false));
+
+            // They ask for a call-back: no contact, no task; they are asked to call again, and the staff are told.
+            Integer contacts = jdbc.queryForObject("select count(*) from contact", Integer.class);
+            tool(call, "schedule_callback", "{\"preferred_time_text\":\"4 pm\",\"caller_name\":\"Ravi\"}")
+                    .andExpect(jsonPath("$.speak_hint").value(HandoffService.NO_NUMBER_MESSAGE));
+            assertThat(jdbc.queryForObject("select count(*) from contact", Integer.class)).isEqualTo(contacts);
+            assertThat(jdbc.queryForList("select title || ' | ' || body from notification where dedup_key = ?",
+                    String.class, "VNONUM:" + call + ":NORMAL")).isNotEmpty()
+                    .allMatch(t -> t.startsWith("Could not be called back (number withheld): caller ")
+                            && t.contains("They asked to be called back (4 pm)."));
+
+            // A person, with the desk shut: the same, and the staff are told at once.
+            NOW.set(SUNDAY);
+            try {
+                tool(call, "request_human_handoff", "{\"reason_code\":\"COMPLAINT_OR_DISPUTE\",\"summary\":\"Disputes a charge.\"}")
+                        .andExpect(jsonPath("$.speak_hint").value(HandoffService.NO_NUMBER_MESSAGE));
+                tool(call, "request_human_handoff", "{\"reason_code\":\"CALLER_REQUEST\",\"summary\":\"Asked again.\"}")
+                        .andExpect(jsonPath("$.speak_hint").value(HandoffService.NO_NUMBER_MESSAGE));
+            } finally {
+                NOW.set(MONDAY);
+            }
+            assertThat(jdbc.queryForList("select body from notification where dedup_key = ?", String.class,
+                    "VNONUM:" + call + ":URGENT")).isNotEmpty()
+                    .allMatch(b -> b.startsWith("They asked for a person (COMPLAINT_OR_DISPUTE). Disputes a charge."));
+
+            // The call breaks on our side: nothing is booked either.
+            live("trouble", call, null).andExpect(jsonPath("$.callback_booked").value(false));
+            assertThat(callbacks(call)).isEmpty();
+        } finally {
+            jdbc.update("delete from contact where id = ?", strayId);
+        }
+    }
+
+    @Test
+    void aWithheldCallerWhoseTransferFailsIsNotBookedACallBackNobodyCanMake() throws Exception {
+        String admin = login();
+        approve(admin, "Incoming calls");
+        String callUuid = "cu-refuse-" + SEQ.incrementAndGet();
+        assertThat(answerInbound("anonymous", callUuid)).contains("<Stream ");
+        UUID call = callOf(callUuid);
+        live("open", call, null);
+        live("turn", call, "Can I speak to a real person").andExpect(jsonPath("$.over").value(true));
+        live("end", call, null).andExpect(jsonPath("$.transferred").value(false));
+        assertThat(callbacks(call)).isEmpty();
+        assertThat(jdbc.queryForList("select body from notification where dedup_key = ?", String.class,
+                "VNONUM:" + call + ":URGENT")).isNotEmpty().allMatch(b -> b.startsWith(
+                "The transfer to the desk did not go through. They asked for a person (CALLER_REQUEST) and were told "
+                        + "they were being connected."));
+    }
+
+    @Test
+    void theEngineIsToldOnEveryReplyWhetherTheCallerCanBeCalledBack() throws Exception {
+        String admin = login();
+        UUID call = incomingCall(admin, "cu-" + SEQ.incrementAndGet());       // its opening said yes (ringsIn)
+        live("turn", call, "What is this about?").andExpect(jsonPath("$.call_back").value(true));
+        tool(call, "opt_out", "{\"scope\":\"ALL_CALLS\"}").andExpect(jsonPath("$.ok").value(true));
+        live("turn", call, "Okay.").andExpect(jsonPath("$.call_back").value(false));
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private static final String XML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>";
@@ -588,7 +667,7 @@ class VoicePlivoTest {
         UUID call = UUID.fromString(m.group(1));
         assertThat(m.group(2)).isEqualTo(PlivoHooksController.streamToken(SECRET, call));
 
-        live("open", call, null).andExpect(jsonPath("$.over").value(false));
+        live("open", call, null).andExpect(jsonPath("$.over").value(false)).andExpect(jsonPath("$.call_back").value(true));
         return call;
     }
 

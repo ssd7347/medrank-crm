@@ -257,6 +257,7 @@ class Reply:
     over: bool
     hint: str = ""              # on opening: the called contact's name, given to Whisper on every turn (never said)
     record: bool = False        # on opening: record this call (its opening told the person it may be recorded)
+    call_back: bool = True      # the team can call this person back (False: number withheld, or asked not to be called)
 
 
 def stream_token(secret: str, call_id: str) -> str:
@@ -361,11 +362,11 @@ class Crm:
     def open(self, call_id: str) -> Reply:
         d = self._call("open", {"call_id": call_id})
         return Reply(d.get("say") or "", bool(d.get("over")), str(d.get("hint") or "").strip()[:100],
-                     d.get("record") is True)
+                     d.get("record") is True, d.get("call_back") is not False)
 
     def turn(self, call_id: str, said: str) -> Reply:
         d = self._call("turn", {"call_id": call_id, "said": said})
-        return Reply(d.get("say") or "", bool(d.get("over")))
+        return Reply(d.get("say") or "", bool(d.get("over")), call_back=d.get("call_back") is not False)
 
     def end(self, call_id: str) -> bool:
         """The goodbye was heard: the CRM hangs up. True if instead it transferred the call to the desk (the caller was
@@ -392,7 +393,8 @@ class Crm:
         return None if d is None else bool(d.get("opted_out"))
 
     def trouble(self, call_id: str, what: str) -> bool | None:
-        """The call broke on our side and the caller was told someone will call back: the CRM books that call-back.
+        """The call broke on our side and the caller was told someone will call back (unless the CRM had said nobody can,
+        TROUBLE_NO_CALL_BACK): the CRM books that call-back.
         True if it booked one (none is needed when one is already arranged or the caller asked not to be called);
         None if the request is in the outbox for later."""
         d = self._must_arrive("trouble", {"call_id": call_id, "what": what[:200]})
@@ -407,6 +409,8 @@ class Crm:
 # ---------------------------------------------------------------------------------------------- one call
 
 TROUBLE = "Sorry, I am having trouble on this line. A member of our team will call you back. Goodbye."
+# For someone the team cannot call back (the CRM's last reply said so): no promise that would not be kept.
+TROUBLE_NO_CALL_BACK = "Sorry, I am having trouble on this line. Please call us again later. Goodbye."
 _LAST_WORDS: set[asyncio.Task] = set()     # callers' last words still being heard or sent (see Call.stop)
 TRANSFER_WAIT_S = 10.0      # how long Plivo gets to move a transferred call before we close its stream ourselves
 
@@ -451,6 +455,9 @@ class Call:
         self.marks = 0
         self.ending = ""            # the goodbye's checkpoint once the agent has finished
         self.hint = ""              # the called contact's name, from the CRM's opening reply
+        # Whether the team can call this person back, from the CRM's latest reply. Until the CRM has said (it is down
+        # as the call opens), a call-back is promised: the outbox delivers it later, and the CRM books it if it can.
+        self.call_back = True
         self.reported = False       # a fault has been reported to the CRM (once per call)
         self.reports: set[asyncio.Task] = set()
         self.unsent: np.ndarray | None = None   # the turn being heard, until it is on its way to the CRM
@@ -498,6 +505,7 @@ class Call:
             try:
                 if kind == "open":
                     reply = await asyncio.to_thread(self.crm.open, self.call_id)
+                    self.call_back = reply.call_back
                     self.hint = reply.hint
                     self.record = reply.record
                     if not reply.record:
@@ -518,10 +526,11 @@ class Call:
                     if not text:
                         continue
                     reply = await asyncio.to_thread(self.crm.turn, self.call_id, text)
+                    self.call_back = reply.call_back
             except Exception as e:     # the CRM or a model failed: say so and end, rather than go silent
                 log.warning("call %s: %s failed: %s", self.call_id, kind, e)
                 self.report(f"{'opening' if kind == 'open' else 'turn'} failed: {type(e).__name__}")
-                reply = Reply(TROUBLE, True)
+                reply = Reply(TROUBLE if self.call_back else TROUBLE_NO_CALL_BACK, True)
                 if kind == "open":
                     self.recorder = None        # the CRM never said to record it
             try:

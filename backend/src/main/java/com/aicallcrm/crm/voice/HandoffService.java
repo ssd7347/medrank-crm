@@ -41,6 +41,10 @@ public class HandoffService {
     public static final String CALLBACK_TASK = "CALLBACK_TASK";
     /** A person was already asked for earlier in this call; no second task is made. */
     public static final String ALREADY_ARRANGED = "ALREADY_ARRANGED";
+    /** The caller withheld their number, so no call-back can be booked; they are asked to call again. */
+    public static final String NO_NUMBER = "NO_NUMBER";
+    static final String NO_NUMBER_MESSAGE = "I cannot see the number you are calling from, so our team cannot call you "
+            + "back. Please call us again from a phone that shows its number.";
 
     /**
      * {@code callbackId} is null for a live transfer and for test calls, which save nothing. {@code slot} is the
@@ -82,6 +86,9 @@ public class HandoffService {
         HandoffReason earlier = call.getHandoffReason();
         if (earlier != null && urgency(reason) <= urgency(earlier)) {
             // A second hand-over in the same call (the model asking twice): the team already has the first one.
+            if (withheld(call) && !call.isTransferPending()) {
+                return new Handoff(NO_NUMBER, NO_NUMBER_MESSAGE, null, null);   // and nobody will be "in touch"
+            }
             return new Handoff(ALREADY_ARRANGED, "Our team already has your request from this call, so they will be in "
                     + "touch as arranged.", null, null);
         }
@@ -108,9 +115,43 @@ public class HandoffService {
             return new Handoff(TRANSFER_NOW, "I am connecting you to a member of our team now. Please stay on the line.",
                     null, null);
         }
+        if (withheld(call)) {
+            return noNumber(call, contact, reason.high() ? Priority.URGENT : Priority.NORMAL,
+                    "They asked for a person (" + reason.name() + "). " + summary);
+        }
         CallbackRequest cb = task(call, contact, reason.name(), null, summary,
                 reason.high() ? Priority.URGENT : Priority.NORMAL, dueAt(reason, now));
         return new Handoff(CALLBACK_TASK, callbackMessage(cb.getDueAt()), cb.getId(), cb.getDueAt());
+    }
+
+    /** Did the caller withhold their number? Then nobody can call them back ({@link VoiceCallService#WITHHELD}). */
+    static boolean withheld(VoiceCall call) {
+        return VoiceCallService.WITHHELD.equals(call.getPhone());
+    }
+
+    /**
+     * Can the team call this person back if the call breaks? Not when the number was withheld, nor when they opted out
+     * or are marked "Do not call". The engine asks on every reply, so it never promises a call-back nobody will make.
+     */
+    @Transactional(readOnly = true)
+    public boolean canCallBack(VoiceCall call) {
+        Contact contact = contact(call);
+        return !withheld(call) && call.getPhone() != null && !call.getPhone().isBlank()    // blank: erased
+                && call.getOutcome() != Outcome.OPTED_OUT
+                && !(contact != null && ContactStatus.DO_NOT_CALL.equals(contact.getStatus()));
+    }
+
+    /**
+     * A caller who withheld their number asked for a call-back or a person, and the desk could not take the call now:
+     * no task (there is no number to ring), but the staff are told, and the caller is asked to call again.
+     */
+    private Handoff noNumber(VoiceCall call, Contact contact, Priority priority, String what) {
+        alerts.notifyOwnerOrManagers(owner(contact), call.getContactId(), "VOICE_CALLBACK", priority,
+                "Could not be called back (number withheld): " + label(call, contact),
+                cut(what, 1500) + " Their number was withheld, so nobody can call them back; they were asked to call "
+                        + "again. The call's transcript has the details.", "/voice/calls/" + call.getId(),
+                "VNONUM:" + call.getId() + ":" + priority.name());
+        return new Handoff(NO_NUMBER, NO_NUMBER_MESSAGE, null, null);
     }
 
     /**
@@ -142,6 +183,11 @@ public class HandoffService {
 
     private void book(VoiceCall call, String what) {
         HandoffReason reason = call.getHandoffReason() == null ? HandoffReason.CALLER_REQUEST : call.getHandoffReason();
+        if (withheld(call)) {
+            noNumber(call, contact(call), Priority.URGENT, what + ". They asked for a person (" + reason.name()
+                    + ") and were told they were being connected.");
+            return;
+        }
         task(call, contact(call), reason.name(), null, what + ". They asked for a person and were told they were being "
                 + "connected: call them back now. The call's transcript has the details.", Priority.URGENT,
                 Instant.now(clock).plus(Duration.ofMinutes(15)));
@@ -160,6 +206,11 @@ public class HandoffService {
         }
         if (call.isTestCall()) {
             return handoff(promise, null);
+        }
+        if (withheld(call)) {
+            return noNumber(call, contact(call), Priority.NORMAL, "They asked to be called back"
+                    + (preferredTimeText == null || preferredTimeText.isBlank() ? "" : " (" + preferredTimeText + ")")
+                    + ". " + (reason == null ? "" : reason));
         }
         // Asked twice in one call (the model booking again, or the CRM booking for a logged outcome): one task.
         CallbackRequest open = callbacks.findByVoiceCallId(call.getId()).stream()
@@ -209,15 +260,15 @@ public class HandoffService {
     /**
      * The call broke on our side (the speech engine or the CRM failed) and the caller was told a member of the team
      * will call back: a call-back task, never a transfer, because the engine is hanging up. Nothing (null) for a test
-     * call, a caller who opted out or is marked "Do not call", or a call that already has an open call-back.
+     * call, anyone the team cannot call back ({@link #canCallBack}: the engine then promised nothing), or a call that
+     * already has an open call-back.
      */
     @Transactional
     public CallbackRequest cutOff(VoiceCall call, String summary) {
         // The caller now hears "a member of our team will call you back": no transfer after that.
         call.setTransferPending(false);
         Contact contact = contact(call);
-        if (call.isTestCall() || call.getOutcome() == Outcome.OPTED_OUT
-                || contact != null && ContactStatus.DO_NOT_CALL.equals(contact.getStatus())
+        if (call.isTestCall() || !canCallBack(call)
                 || callbacks.findByVoiceCallId(call.getId()).stream()
                         .anyMatch(c -> c.getStatus() != Voice.CallbackStatus.DONE)) {
             return null;

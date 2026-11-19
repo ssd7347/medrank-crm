@@ -48,6 +48,8 @@ import tools.jackson.databind.ObjectMapper;
 public class VoiceCallService {
 
     static final Set<CallStatus> LIVE = EnumSet.of(CallStatus.QUEUED, CallStatus.DIALING, CallStatus.CONNECTED);
+    /** The phone of an incoming call whose number was withheld: nobody can call it back, and it is no contact's. */
+    static final String WITHHELD = "unknown";
     private static final int TRANSCRIPT_LIMIT = 95_000;
     private static final Duration STALE_AFTER = Duration.ofMinutes(30);
 
@@ -232,9 +234,10 @@ public class VoiceCallService {
         }
         String phone = Phones.normalize(callerNumber);
         if (phone == null || phone.isBlank()) {
-            phone = "unknown";
+            phone = WITHHELD;
         }
-        List<Contact> matches = contacts.findByAnyPhone(phone);
+        // A withheld number is nobody's: never linked to a contact (one saved with "unknown" by mistake included).
+        List<Contact> matches = WITHHELD.equals(phone) ? List.of() : contacts.findByAnyPhone(phone);
         Contact contact = matches.size() == 1 ? matches.get(0) : null;
         VoiceCall call = new VoiceCall(Direction.INBOUND, script.getName(), contact == null ? null : contact.getId(),
                 phone, platforms.current().name().toUpperCase(Locale.ROOT));

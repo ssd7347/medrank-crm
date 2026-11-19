@@ -353,8 +353,9 @@ public class VoiceTools {
     // ------------------------------------------------------------------ the four tools that change something
 
     private ToolResult scheduleCallback(VoiceCall call, Map<String, Object> args) {
-        if (!call.isTestCall() && call.getContactId() == null) {
-            // An unknown caller who wants a call-back becomes a contact, so the team has someone to call.
+        if (!call.isTestCall() && call.getContactId() == null && !HandoffService.withheld(call)) {
+            // An unknown caller who wants a call-back becomes a contact, so the team has someone to call. Not one who
+            // withheld their number: there is nobody to call (HandoffService.callback asks them to call again).
             Contact c = new Contact();
             String name = text(args, "caller_name");
             c.setFullName(name == null ? "Caller " + HandoffService.mask(call.getPhone()) : cut(name, 120));

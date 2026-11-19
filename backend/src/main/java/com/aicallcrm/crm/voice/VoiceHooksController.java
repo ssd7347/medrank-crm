@@ -110,7 +110,8 @@ public class VoiceHooksController {
      * up; replies {@code {"callback_booked": true|false}}. {@code last}: {@code {"call_id", "said"}}, what the caller said
      * that the engine had not passed on when the stream closed (they hung up mid-sentence); nothing is said back;
      * replies {@code {"opted_out": true|false}}. {@code open} also replies {@code "record"}: whether the engine records
-     * this call. {@code recording}: {@code {"call_id", "audio"}}, the call's recording as base64 Ogg Opus, sent once
+     * this call. {@code open} and {@code turn} also reply {@code "call_back"}: whether the team can call this person
+     * back ({@link HandoffService#canCallBack}); if not, a fault ends the call without promising one. {@code recording}: {@code {"call_id", "audio"}}, the call's recording as base64 Ogg Opus, sent once
      * the call has ended; replies {@code {"kept": true|false}} (RecordingService.receive).
      */
     @PostMapping("/live/{step}")
@@ -134,6 +135,7 @@ public class VoiceHooksController {
                 if ("open".equals(step)) {
                     out.put("record", r.record());
                 }
+                out.put("call_back", live.canCallBack(callId));
             }
             case "end" -> {
                 LiveCallService.Ended e = live.end(callId);

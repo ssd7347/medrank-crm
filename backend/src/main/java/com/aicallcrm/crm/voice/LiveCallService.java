@@ -126,6 +126,14 @@ public class LiveCallService {
         return new Reply(said(added), brain.over(callId));
     }
 
+    /**
+     * Can the team call this person back if the call breaks ({@link HandoffService#canCallBack})? Sent to the engine
+     * with every reply, so its "having trouble" goodbye promises a call-back only when one will be made.
+     */
+    public boolean canCallBack(UUID callId) {
+        return Boolean.TRUE.equals(tx.execute(s -> calls.findById(callId).map(handoffs::canCallBack).orElse(false)));
+    }
+
     /** {@code transferred}: the call went to the desk instead of being hung up. */
     public record Ended(boolean hungUp, boolean transferred) {
     }

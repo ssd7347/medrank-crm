@@ -14,6 +14,56 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 19 November 2026: NOBODY IS PROMISED A CALL-BACK THAT CANNOT BE MADE (user: "continue the next task")
+
+The gap noted in the last entry was bigger than one line. With a withheld number (Plivo sends none, so the call's phone
+is `unknown`):
+- asking for a call-back saved a contact with the phone "unknown" and booked a task nobody could ring;
+- every later withheld caller was then linked to that contact, and given its name as the ear's hint;
+- the engine's "having trouble" goodbye promised a call-back, as it did for someone who had just opted out.
+
+**Built (CRM).**
+- `VoiceCallService.inbound`: a withheld number (`WITHHELD`) is never looked up, so it is never linked to a contact.
+- `VoiceTools.scheduleCallback`: no contact is made for a withheld number.
+- `HandoffService`:
+  - `callback`, and `handoff` when the desk cannot take the call: for a withheld number, no task. The agent's line
+    is the new `NO_NUMBER` message, asking them to call again from a phone that shows its number.
+  - The managers or owner get "Could not be called back (number withheld)", linking to the call. It is urgent for
+    complaints, disputes, distress and a failed transfer.
+  - A second hand-over in the call no longer says "they will be in touch as arranged".
+  - A transfer that fails, or is missed, books nothing for a withheld number and alerts urgently.
+  - New `canCallBack`: not withheld, not erased, not opted out, not "Do not call". `cutOff` uses it.
+- `/live/open` and `/live/turn` replies carry `call_back` (`LiveCallService.canCallBack`), so it follows an opt-out
+  made during the call.
+- `PlivoHooksController.cutOff` drops its own withheld check. It now relies on `canCallBack`, and the transcript still
+  gets `call_cut_off`.
+
+**Built (engine).** `phone.py`: `Reply.call_back`, read from each `open` and `turn` reply; a missing value means yes,
+for an older CRM. A fault then says `TROUBLE_NO_CALL_BACK` ("Please call us again later") instead of the promise, and
+is still reported. If the CRM was down before it said, the promise stands, because the outbox delivers the report later
+and the CRM books it if it can.
+
+**Left as is.** A withheld caller while the CRM is down is still promised a call-back. The engine cannot know the
+number, because Plivo's stream does not carry it.
+
+**Tests.**
+- `VoicePlivoTest` has 3 new tests, and `ringsIn` checks `call_back: true`:
+  - a withheld caller is not linked even to a stray "unknown" contact; asking for a call-back or a person (desk
+    shut), twice, books nothing, makes no contact and alerts; a fault books nothing;
+  - a withheld caller's failed transfer gives an urgent alert and no task;
+  - `call_back` turns false after an opt-out during the call.
+- `test_phone.py` has 2 new tests: the reply fields are read, and the goodbye follows the latest reply (withheld,
+  opted out during the call, back to yes, CRM down at the opening).
+- 16 mutants, all caught (scratchpad `mutate_withheld.py`): 10 in the CRM (`VoicePlivoTest`) and 6 in the engine
+  (`test_phone`). They cover each check above: linking, the contact made, the call-back, the hand-over, the second
+  hand-over, the failed transfer, `canCallBack` ignoring a withheld number or an opt-out, the alert, `call_back` not
+  sent, and in the engine each reply not read or not kept, always promising, and promising nothing until told.
+- The backend has 170 tests (167 before). All pass on H2 and on a throwaway PostgreSQL database, which was dropped
+  afterwards. The engine has 109 tests (107 before), all passing.
+
+**Docs.** voice-agent.md ("A withheld number", two table rows), the hand-over guide (the "having trouble" row, and a
+new row for the alert), and the voice-engine README.
+
 # 19 November 2026: NOBODY IS PUT THROUGH TO SILENCE WHEN THE SPEECH ENGINE IS DOWN AS A CALL CONNECTS (user: "continue")
 
 The campaign hold (below) stops new campaign calls. But incoming calls, and a campaign call already ringing when the

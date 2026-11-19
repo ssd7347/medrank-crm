@@ -97,14 +97,11 @@ public class PlivoHooksController {
     /**
      * The speech engine did not answer as the call connected, so nobody would speak. A call-back is booked, as for a
      * call cut off mid-way ({@link LiveCallService#trouble}), and the person is told so (again, if Plivo asks twice).
-     * A caller whose number was withheld cannot be called back, so they are only asked to call again; so is anyone
-     * no call-back is booked for (they asked not to be called).
+     * Anyone no call-back is booked for ({@link HandoffService#canCallBack}: their number was withheld, or they asked
+     * not to be called) is only asked to call again.
      */
     private String cutOff(UUID callId) {
         log.warn("Call {} connected while the speech engine was not answering", callId);
-        if (callRepo.findById(callId).filter(c -> !"unknown".equals(c.getPhone())).isEmpty()) {
-            return NOBODY;
-        }
         try {
             live.trouble(callId, "the speech engine was not answering when the call connected");
         } catch (ApiException e) {
