@@ -425,6 +425,16 @@ public class HandoffService {
         return t.plus(left);
     }
 
+    /** Is there a desk number, and is the desk open now? */
+    boolean deskOpenNow() {
+        return !props.deskTransferNumber().isBlank() && deskOpen(Instant.now(clock));
+    }
+
+    /** Is a call-back booked from this call still to be made? */
+    boolean callBackOpen(UUID callId) {
+        return callbacks.findByVoiceCallId(callId).stream().anyMatch(c -> c.getStatus() != Voice.CallbackStatus.DONE);
+    }
+
     boolean deskOpen(Instant now) {
         return deskTime(now, props.deskOpen(), props.deskClose()).equals(now);
     }

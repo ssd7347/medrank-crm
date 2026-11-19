@@ -11,6 +11,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -18,7 +19,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,7 +52,8 @@ import com.sun.net.httpserver.HttpServer;
  * URLs, callbacks must carry Plivo's V3 signature, an answered call streams to our speech engine with a per-call
  * token, a hand-over transfers the answered call to the desk once the caller has heard "I am connecting you" (the
  * engine's "end"), and otherwise "end" hangs up only that call. A transfer that fails, or a caller who hangs up before
- * it, gets an urgent call-back.
+ * it, gets an urgent call-back. If the speech engine is down as a call connects, nobody is left in silence: a caller
+ * goes to the desk while it is open, and otherwise (and anyone we rang) is told a call-back is booked.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -65,6 +69,7 @@ class VoicePlivoTest {
     /** "METHOD path body" for every request the fake Plivo API received. */
     static final List<String> PLIVO = new CopyOnWriteArrayList<>();
     static final List<String> AUTHS = new CopyOnWriteArrayList<>();
+    static final AtomicBoolean ENGINE_UP = new AtomicBoolean(true);
     static final HttpServer FAKE;
 
     static {
@@ -102,6 +107,11 @@ class VoicePlivoTest {
             }
             ex.close();
         });
+        // Our speech engine's /health, which the answer hook asks before streaming a call to it.
+        FAKE.createContext("/health", ex -> {
+            ex.sendResponseHeaders(ENGINE_UP.get() ? 200 : 503, -1);
+            ex.close();
+        });
         FAKE.start();
     }
 
@@ -117,6 +127,7 @@ class VoicePlivoTest {
         r.add("app.voice.desk-transfer-number", () -> "+914400000000");
         r.add("app.voice.desk-open", () -> "00:00");
         r.add("app.voice.desk-close", () -> "23:59");
+        r.add("app.voice.ai.speech-url", () -> "http://127.0.0.1:" + FAKE.getAddress().getPort());
     }
 
     @AfterAll
@@ -125,12 +136,33 @@ class VoicePlivoTest {
     }
 
     /** Monday 16 Nov 2026, 11:00 in India: the desk is open whatever day the tests run (it is shut on Sundays). */
+    static final Instant MONDAY = Instant.parse("2026-11-16T05:30:00Z");
+    /** The day before, when the desk is shut. */
+    static final Instant SUNDAY = Instant.parse("2026-11-15T05:30:00Z");
+    static final AtomicReference<Instant> NOW = new AtomicReference<>(MONDAY);
+
+    /** The CRM's clock: {@link #NOW}, which a test may move and must put back. */
     @TestConfiguration
     static class Weekday {
         @Bean
         @Primary
         Clock weekdayClock() {
-            return Clock.fixed(Instant.parse("2026-11-16T05:30:00Z"), ZoneOffset.UTC);
+            return new Clock() {
+                @Override
+                public ZoneId getZone() {
+                    return ZoneOffset.UTC;
+                }
+
+                @Override
+                public Clock withZone(ZoneId zone) {
+                    return Clock.fixed(NOW.get(), zone);
+                }
+
+                @Override
+                public Instant instant() {
+                    return NOW.get();
+                }
+            };
         }
     }
 
@@ -140,6 +172,8 @@ class VoicePlivoTest {
     PlivoClient plivo;
     @Autowired
     JdbcTemplate jdbc;
+    @Autowired
+    VoiceCallRepository callRepo;
 
     @Test
     void placingACallSendsOurCallbackUrlsWithBasicAuth() {
@@ -401,7 +435,119 @@ class VoicePlivoTest {
         assertThat(unknown).contains("<Response><Hangup/></Response>").doesNotContain("Stream");
     }
 
+    // ------------------------------------------------------------------ the speech engine is down
+
+    @Test
+    void whenTheSpeechEngineIsDownACallerIsPutThroughToTheDeskWhileItIsOpen() throws Exception {
+        String admin = login();
+        approve(admin, "Incoming calls");
+        String phone = newContact(admin).phone();
+        String callUuid = "cu-" + SEQ.incrementAndGet();
+        ENGINE_UP.set(false);
+        try {
+            assertThat(answerInbound("+91" + phone, callUuid))
+                    .isEqualTo(XML + "<Dial callerId=\"+918000000001\"><Number>+914400000000</Number></Dial></Response>");
+        } finally {
+            ENGINE_UP.set(true);
+        }
+        assertThat(callbacks(callOf(callUuid))).isEmpty();
+    }
+
+    @Test
+    void whenTheSpeechEngineIsDownAndTheDeskIsShutACallerIsPromisedACallBack() throws Exception {
+        String admin = login();
+        approve(admin, "Incoming calls");
+        String phone = newContact(admin).phone();
+        String callUuid = "cu-" + SEQ.incrementAndGet();
+        String withheld = "cu-" + SEQ.incrementAndGet();
+        ENGINE_UP.set(false);
+        NOW.set(SUNDAY);
+        try {
+            assertThat(answerInbound("+91" + phone, callUuid)).isEqualTo(XML + PlivoHooksController.CALL_BACK + "</Response>");
+            UUID call = callOf(callUuid);
+            assertThat(callbacks(call)).containsExactly("TOOL_FAILURE NORMAL");
+            assertThat(jdbc.queryForObject("select transcript from voice_call where id = ?", String.class, call))
+                    .contains("call_cut_off", "CALLBACK_BOOKED", "the speech engine was not answering when the call connected");
+
+            // Plivo asks again: the same answer, and still one call-back.
+            assertThat(answerInbound("+91" + phone, callUuid)).isEqualTo(XML + PlivoHooksController.CALL_BACK + "</Response>");
+            assertThat(callbacks(call)).containsExactly("TOOL_FAILURE NORMAL");
+
+            // A withheld number cannot be called back: they are asked to call again, and nothing is booked.
+            assertThat(answerInbound("anonymous", withheld)).isEqualTo(XML + PlivoHooksController.NOBODY + "</Response>");
+            assertThat(callbacks(callOf(withheld))).isEmpty();
+
+            // Nor is anyone promised a call-back who asked not to be called.
+            Contact refused = newContact(admin);
+            jdbc.update("update contact set status = 'DO_NOT_CALL' where id = ?", refused.id());
+            String refusedUuid = "cu-" + SEQ.incrementAndGet();
+            assertThat(answerInbound("+91" + refused.phone(), refusedUuid))
+                    .isEqualTo(XML + PlivoHooksController.NOBODY + "</Response>");
+            assertThat(callbacks(callOf(refusedUuid))).isEmpty();
+        } finally {
+            ENGINE_UP.set(true);
+            NOW.set(MONDAY);
+        }
+    }
+
+    @Test
+    void whenTheSpeechEngineIsDownAPersonWhoAnswersOurCallIsPromisedACallBack() throws Exception {
+        String admin = login();
+        Contact person = newContact(admin);
+        UUID up = dialling(person);
+        UUID down = dialling(person);
+
+        // The engine answers: the call streams to it.
+        assertThat(answerOutbound(up)).contains("<Stream ").doesNotContain("<Speak>");
+        // It does not: even with the desk open, the person we rang is not put through to it, but called back.
+        ENGINE_UP.set(false);
+        try {
+            assertThat(answerOutbound(down)).isEqualTo(XML + PlivoHooksController.CALL_BACK + "</Response>");
+        } finally {
+            ENGINE_UP.set(true);
+        }
+        assertThat(callbacks(down)).containsExactly("TOOL_FAILURE NORMAL");
+        assertThat(callbacks(up)).isEmpty();
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    private static final String XML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>";
+
+    private record Contact(long id, String phone) {
+    }
+
+    /** A new contact, Nisha Rao, with a number nobody else has. */
+    private Contact newContact(String admin) throws Exception {
+        String phone = "9" + String.format("%09d", SEQ.incrementAndGet());
+        String body = mvc.perform(auth(post("/api/contacts"), admin).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Nisha Rao\",\"phone\":\"" + phone + "\",\"fields\":{}}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        return new Contact(((Number) JsonPath.read(body, "$.id")).longValue(), phone);
+    }
+
+    /** An AI call to this contact that Plivo is ringing, as the dispatcher leaves it. */
+    private UUID dialling(Contact person) {
+        VoiceCall call = new VoiceCall(Voice.Direction.OUTBOUND, "Payment reminder", person.id(), person.phone(), "PLIVO");
+        call.setStatus(Voice.CallStatus.DIALING);
+        return callRepo.save(call).getId();
+    }
+
+    private String answerOutbound(UUID call) throws Exception {
+        return plivoHook("/answer", "call_id=" + call, "CallUUID", "cu-" + SEQ.incrementAndGet(), "Direction", "outbound")
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    }
+
+    private String answerInbound(String from, String callUuid) throws Exception {
+        return plivoHook("/answer", null, "From", from, "To", "+918000000001", "CallUUID", callUuid,
+                "Direction", "inbound", "CallStatus", "ringing").andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString();
+    }
+
+    /** Our id for the call Plivo calls this. */
+    private UUID callOf(String callUuid) {
+        return jdbc.queryForObject("select id from voice_call where provider_call_id = ?", UUID.class, callUuid);
+    }
 
     /**
      * A known contact rings in, the call streams to our engine (checking the stream URL and its token), and they ask

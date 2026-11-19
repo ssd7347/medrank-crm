@@ -14,6 +14,50 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 19 November 2026: NOBODY IS PUT THROUGH TO SILENCE WHEN THE SPEECH ENGINE IS DOWN AS A CALL CONNECTS (user: "continue")
+
+The campaign hold (below) stops new campaign calls. But incoming calls, and a campaign call already ringing when the
+engine stopped, were still streamed to an engine that was not there. The person heard nothing, and nobody knew to call
+them back.
+
+**Built.** In `PlivoHooksController.answer`, before streaming, the hook asks the engine's `/health` (new
+`SpeechService.answers()`: 2 s, any 200; an engine still loading its models can take the call). If the engine does not
+answer:
+- **Someone rings in.** While the desk is open (new `HandoffService.deskOpenNow()`: a desk number, Monday to Saturday,
+  desk hours), the call goes straight to the desk. Otherwise they hear "Sorry, we cannot take this call right now. A
+  member of our team will call you back." and a call-back is booked through the existing cut-off path
+  (`LiveCallService.trouble`, `call_cut_off` in the transcript).
+- **Someone answers our call.** The same line and booking, even with the desk open.
+- **No call-back is possible.** A withheld number, or someone who asked not to be called, hears only "please call again
+  later". If Plivo asks twice for the same call, it gets the same answer and nothing more is booked (new
+  `HandoffService.callBackOpen`).
+- A warning is logged with the call id only.
+
+**Tests.** `VoicePlivoTest`, in the same context:
+- Its stand-in now also plays the engine's `/health`, with an `ENGINE_UP` switch.
+- Its clock is now movable (`NOW`), to reach a Sunday when the desk is shut.
+- 3 new tests: desk open, then desk shut (call-back, repeat, withheld, "do not call"), then outbound (engine up gives
+  the stream; engine down gives the call-back, not the desk).
+- `VoicePlivoTest` has 18 tests, all passing; `PlivoSignatureTest` has 4, all passing.
+- The full backend suite has 167 tests (164 before). All pass on H2 and on a throwaway PostgreSQL database, which was
+  dropped afterwards.
+- 11 mutants, all caught (scratchpad `mutate_engine_down.py`):
+  - the engine ignored, outbound or inbound;
+  - outbound always cut off;
+  - never or always to the desk;
+  - desk hours ignored;
+  - the withheld number not checked;
+  - nothing booked;
+  - a repeat not recognised;
+  - a call-back promised to everyone;
+  - any engine reply counted.
+
+**Docs.** voice-agent.md ("Engine down as a call connects"), and a new row in the hand-over guide's troubleshooting
+table.
+
+**Not changed.** The engine's own mid-call "having trouble" line still promises a call-back to a withheld caller, which
+cannot be kept. This was noted earlier and is left as is.
+
 # 19 November 2026: A CAMPAIGN NO LONGER DIALS WHILE THE SPEECH ENGINE, THE BRAIN OR THE TUNNEL IS DOWN (user: "continue the next task")
 
 The dialer checked only "calling enabled and not paused". A call placed while a needed part was down reached a real

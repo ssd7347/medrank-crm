@@ -11,6 +11,9 @@ import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,7 +31,9 @@ import jakarta.servlet.http.HttpServletRequest;
  * account's auth token over the exact URL Plivo called, which is rebuilt from {@code app.voice.plivo.public-url}.
  * <ul>
  * <li>{@code answer}: a call connected. Outbound calls carry our {@code call_id}; an incoming call is looked up by
- * the caller's number. The reply streams the call's audio, both ways, to our speech engine.</li>
+ * the caller's number. The reply streams the call's audio, both ways, to our speech engine. If the engine does not
+ * answer at that moment, nobody would speak: a caller is put through to the desk while it is open, and otherwise
+ * (and for an outbound call) told a member of the team will call back, with the call-back booked.</li>
  * <li>{@code hangup}: the call is over (whoever hung up).</li>
  * <li>{@code desk}: a transfer to the staff desk ({@link PlivoClient#transfer}).</li>
  * </ul>
@@ -37,22 +42,30 @@ import jakarta.servlet.http.HttpServletRequest;
 @RequestMapping(value = "/api/voice/hooks/plivo", produces = MediaType.APPLICATION_XML_VALUE)
 public class PlivoHooksController {
 
-    private static final String NOBODY = "<Speak>Sorry, no one can take your call right now. Please call again later."
+    static final String NOBODY ="<Speak>Sorry, no one can take your call right now. Please call again later."
             + "</Speak><Hangup/>";
+    static final String CALL_BACK = "<Speak>Sorry, we cannot take this call right now. A member of our team will call "
+            + "you back.</Speak><Hangup/>";
+
+    private static final Logger log = LoggerFactory.getLogger(PlivoHooksController.class);
 
     private final PlivoProperties plivo;
     private final VoiceProperties voice;
     private final VoiceCallService calls;
     private final LiveCallService live;
     private final VoiceCallRepository callRepo;
+    private final SpeechService speech;
+    private final HandoffService handoffs;
 
     public PlivoHooksController(PlivoProperties plivo, VoiceProperties voice, VoiceCallService calls, LiveCallService live,
-                                VoiceCallRepository callRepo) {
+                                VoiceCallRepository callRepo, SpeechService speech, HandoffService handoffs) {
         this.plivo = plivo;
         this.voice = voice;
         this.calls = calls;
         this.live = live;
         this.callRepo = callRepo;
+        this.speech = speech;
+        this.handoffs = handoffs;
     }
 
     @PostMapping("/answer")
@@ -65,13 +78,39 @@ public class PlivoHooksController {
             // this CRM did not place, or one already over, is hung up.
             calls.started(callId, callUuid);
             boolean ours = callRepo.findById(callId).filter(c -> !c.isTestCall() && c.getStatus().live()).isPresent();
-            return xml(ours ? stream(callId) : "<Hangup/>");
+            if (!ours) {
+                return xml("<Hangup/>");
+            }
+            return xml(speech.answers() ? stream(callId) : cutOff(callId));
         }
         Inbound in = calls.inbound(p.get("From"), callUuid);
         if (in.fallback() || in.callId() == null) {
             return xml(voice.deskTransferNumber().isBlank() ? NOBODY : dial());
         }
-        return xml(stream(in.callId()));
+        if (speech.answers()) {
+            return xml(stream(in.callId()));
+        }
+        // The engine is down: a caller is put through to the desk while it is open, rather than to silence.
+        return xml(handoffs.deskOpenNow() ? dial() : cutOff(in.callId()));
+    }
+
+    /**
+     * The speech engine did not answer as the call connected, so nobody would speak. A call-back is booked, as for a
+     * call cut off mid-way ({@link LiveCallService#trouble}), and the person is told so (again, if Plivo asks twice).
+     * A caller whose number was withheld cannot be called back, so they are only asked to call again; so is anyone
+     * no call-back is booked for (they asked not to be called).
+     */
+    private String cutOff(UUID callId) {
+        log.warn("Call {} connected while the speech engine was not answering", callId);
+        if (callRepo.findById(callId).filter(c -> !"unknown".equals(c.getPhone())).isEmpty()) {
+            return NOBODY;
+        }
+        try {
+            live.trouble(callId, "the speech engine was not answering when the call connected");
+        } catch (ApiException e) {
+            return NOBODY;
+        }
+        return handoffs.callBackOpen(callId) ? CALL_BACK : NOBODY;
     }
 
     @PostMapping("/hangup")

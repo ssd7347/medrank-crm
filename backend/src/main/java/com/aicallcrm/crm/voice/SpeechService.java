@@ -80,6 +80,23 @@ public class SpeechService {
         }
     }
 
+    /**
+     * Does the speech engine answer at all, within 2 seconds? Asked while a phone call is connecting
+     * ({@link PlivoHooksController}), so it only looks for a 200 from {@code /health}: an engine still loading its models
+     * can take the call, with a slower first reply.
+     */
+    public boolean answers() {
+        try {
+            return HTTP.send(request("/health").timeout(Duration.ofSeconds(2)).GET().build(),
+                    HttpResponse.BodyHandlers.discarding()).statusCode() == 200;
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            return false;
+        }
+    }
+
     /** Speech to text. The audio is whatever the browser recorded (WebM/Opus, WAV...); the engine decodes it. */
     @SuppressWarnings("unchecked")
     public Heard listen(MultipartFile audio) throws IOException {

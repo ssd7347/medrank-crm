@@ -73,6 +73,17 @@ If one fails, nobody is called, because a call placed then would reach a real pe
 - **Resuming.** Every sweep (30 s) asks again, and the calls resume by themselves once all three answer, with a
   second alert.
 
+Engine down as a call connects (19 Nov 2026): before the answer hook streams a call to the speech engine, it asks the
+engine's `/health` (2 s, any 200 will do: an engine still loading its models can take the call). If it does not answer,
+nobody would speak, so nobody is put through to silence:
+- **Someone rings in.** While the desk is open (a desk number is set, Monday to Saturday, desk hours) the call goes
+  straight to the desk. Otherwise they hear "Sorry, we cannot take this call right now. A member of our team will call
+  you back." and a call-back is booked, as for a call cut off mid-way (`call_cut_off` in the transcript).
+- **Someone answers our call.** The same call-back line and booking, even with the desk open: the desk did not ask to
+  speak to them.
+- **No call-back is possible.** A withheld number, or someone who asked not to be called, hears only "Please call again
+  later". Plivo asking twice for the same call gets the same answer and books nothing more.
+
 When the check runs:
 - It runs once a sweep, and only when a call is about to be placed. Outside a campaign's calling hours nothing is
   asked, so a GPU computer switched off at night raises no alert.
