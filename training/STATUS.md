@@ -14,6 +14,42 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 19 November 2026: TODAY'S TWO CALL FIXES REHEARSED WITH THE REAL ENGINE (user: "continue the next task")
+
+The setup was the in-memory test CRM in Plivo mode (`jdbc:h2:mem` checked first), the real speech engine (base.en,
+warmed) and the gateway, driven by `rehearse.py` with the made-up token. Desk hours were 9:30 to 18:30 and it was
+21:15 IST, so the desk was shut. The engine's outbox was in the scratchpad.
+
+| Call | What happened |
+|---|---|
+| Withheld number, "Please call me back at 4 pm." | `schedule_callback` OK; the agent gave the `NO_NUMBER` line and Goodbye; no call-back, no contact; alert "Could not be called back (number withheld)" |
+| Withheld number, "Can I speak to a real person please?" | `request_human_handoff` OK, the same line, no call-back, alert |
+| Priya Shankar (contact), "Please call me back at 4 pm." | "...call you back on Friday 20 November at 4:00 PM"; task booked |
+| Engine stopped, Priya rings in | Plivo would say "Sorry, we cannot take this call right now. A member of our team will call you back."; `call_cut_off` CALLBACK_BOOKED; task "by Friday 20 November, 11:30 AM" (the desk's first two hours) |
+| Engine stopped, withheld number | "Sorry, no one can take your call right now. Please call again later."; `call_cut_off` NO_CALLBACK_NEEDED; nothing booked |
+
+The CRM log had a warning for each engine-down call with only the call id, and no errors. All ports were freed
+afterwards.
+
+**Fixed from what it showed:**
+- Staff saw the withheld number as "******nown", the masked placeholder, in the calls list and the alert title
+  ("caller ******nown"). `HandoffService.mask` now gives "withheld", and alerts say "caller with a withheld number".
+  There is a test in `VoicePlivoTest`.
+- `rehearse.py` called a spoken or desk answer "The CRM did not take the call (no approved incoming script...)". It
+  now says what Plivo would say or ring (`ending` "spoken" or "desk"), and sends the hang-up callback as Plivo does.
+  `test_rehearse` has 1 new test (17 in all).
+
+**Not rehearsed live.** The engine's mid-call goodbye for someone who cannot be called back. Making a fault in the
+middle of a call needs the CRM stopped, which also ends the rehearsal. `test_phone` covers it.
+
+**Tests.** 5 mutants, all caught (scratchpad `mutate_rehearse_mask.py`): the mask, the alert's name, and in
+`rehearse.py` a spoken answer called refused, the desk read as spoken, and no hang-up callback. The backend has 170
+tests, all passing on H2 and on a throwaway PostgreSQL database, which was dropped afterwards. The engine has 110 tests,
+all passing.
+
+**Docs.** The voice-engine README (rehearsing an engine-down call and a withheld number), and voice-agent.md ("withheld"
+as staff see it).
+
 # 19 November 2026: NOBODY IS PROMISED A CALL-BACK THAT CANNOT BE MADE (user: "continue the next task")
 
 The gap noted in the last entry was bigger than one line. With a withheld number (Plivo sends none, so the call's phone

@@ -237,6 +237,21 @@ async def rehearse(hooks: Hooks, api: PretendPlivoApi, lines: list[np.ndarray], 
     t0 = time.monotonic()
     xml = await asyncio.to_thread(hooks, "answer", form, answer_url)
     m = re.search(r"<Stream[^>]*>([^<]+)</Stream>", xml)
+    spoken = re.search(r"<Speak[^>]*>([^<]*)</Speak>", xml)
+    desk = re.search(r"<Dial[^>]*>\s*<Number>([^<]+)</Number>", xml)
+    if not m and (spoken or desk):
+        # The CRM answered without our engine (it is down, or nobody can take the call): Plivo says the line and
+        # hangs up, or rings the desk.
+        result["ending"] = "desk" if desk else "spoken"
+        result["spoken"] = html.unescape(spoken.group(1)) if spoken else None
+        result["desk"] = html.unescape(desk.group(1)) if desk else None
+        say(f"answered without the agent: Plivo would ring the desk, {result['desk']}" if desk
+            else f'answered without the agent: Plivo says "{result["spoken"]}" and hangs up')
+        duration = max(1, int(time.monotonic() - t0))
+        await asyncio.to_thread(hooks, "hangup", {"CallUUID": call_uuid, "CallStatus": "completed",
+                                                  "Duration": str(duration), "HangupCause": "NORMAL_CLEARING"}, hangup_url)
+        say("hung up; the call is on the CRM's /voice/calls page")
+        return result
     if not m:
         result["ending"] = "refused"
         say("The CRM did not take the call (" + ("the call is not one it is placing, or it is over"

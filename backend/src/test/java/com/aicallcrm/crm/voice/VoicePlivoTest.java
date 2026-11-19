@@ -538,8 +538,10 @@ class VoicePlivoTest {
             assertThat(jdbc.queryForObject("select count(*) from contact", Integer.class)).isEqualTo(contacts);
             assertThat(jdbc.queryForList("select title || ' | ' || body from notification where dedup_key = ?",
                     String.class, "VNONUM:" + call + ":NORMAL")).isNotEmpty()
-                    .allMatch(t -> t.startsWith("Could not be called back (number withheld): caller ")
-                            && t.contains("They asked to be called back (4 pm)."));
+                    .allMatch(t -> t.startsWith("Could not be called back (number withheld): caller with a withheld "
+                            + "number | They asked to be called back (4 pm)."));
+            // Staff see it as withheld, not as the placeholder's last letters ("******nown").
+            mvc.perform(auth(get("/api/voice/calls/" + call), admin)).andExpect(jsonPath("$.call.phone").value("withheld"));
 
             // A person, with the desk shut: the same, and the staff are told at once.
             NOW.set(SUNDAY);

@@ -174,6 +174,17 @@ An outbound call, as the first real call will be: start `rehearse.py --outbound`
 then a one-contact campaign in the CRM (the contact with AI-call consent, the script approved). The dispatcher picks
 it up within about 30 seconds. `--no-answer` rehearses a call nobody picks up.
 
+When the CRM answers without the agent, the script says what the caller would hear and reports the hang-up, as Plivo
+would. That happens when the speech engine is down as the call connects: a spoken line, or a transfer to the desk
+while it is open. To rehearse it, stop the engine and give a WAV file as the caller's line, since text needs the
+engine's voice:
+
+```
+python rehearse.py --auth-token <the made-up token> --from +919876500001 caller.wav
+```
+
+`--from anonymous` rehearses a caller who withheld their number.
+
 ```
 python rehearse.py --auth-token <the made-up token> --outbound "Yes, speaking." "Priya Shankar, and my customer ref is 4471." "Please call me back at 4 pm."
 ```

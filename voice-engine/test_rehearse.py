@@ -114,6 +114,13 @@ async def hook(hook: str, request: Request):
     SEEN["forms"].append(form)
     if hook == "answer" and MODE["answer"] == "refuse":
         return Response("<Response><Hangup/></Response>", media_type="application/xml")
+    if hook == "answer" and MODE["answer"] == "speak":
+        return Response("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Speak>Sorry, we cannot take this call "
+                        "right now. A member of our team will call you back.</Speak><Hangup/></Response>",
+                        media_type="application/xml")
+    if hook == "answer" and MODE["answer"] == "desk":
+        return Response("<Response><Dial callerId=\"+918000000001\"><Number>+914400000000</Number></Dial></Response>",
+                        media_type="application/xml")
     if hook == "answer":
         ws = FakeCall.base.replace("http", "ws") + "/call?call_id=c1&amp;token=t1"
         return Response(f"<Response><Stream bidirectional=\"true\">{ws}</Stream><Hangup/></Response>",
@@ -265,6 +272,18 @@ class FakeCall(unittest.TestCase):
         r = self.run_call()
         self.assertEqual((r["ending"], r["turns"]), ("refused", []))
         self.assertEqual(SEEN["hooks"], ["answer"])
+
+    def test_a_call_answered_without_the_agent_says_what_the_caller_hears(self):
+        MODE["answer"] = "speak"        # the CRM's reply while the speech engine is down
+        r = self.run_call()
+        self.assertEqual((r["ending"], r["spoken"], r["desk"], r["turns"]),
+                         ("spoken", "Sorry, we cannot take this call right now. A member of our team will call you "
+                                    "back.", None, []))
+        self.assertTrue(any('Plivo says "Sorry, we cannot take this call' in s for s in self.said), self.said)
+        MODE["answer"] = "desk"
+        r = self.run_call()
+        self.assertEqual((r["ending"], r["spoken"], r["desk"]), ("desk", None, "+914400000000"))
+        self.assertEqual(SEEN["hooks"], ["answer", "hangup", "answer", "hangup"])    # Plivo reports each call's end
 
     def test_a_wrong_token_is_refused_by_the_crm(self):
         hooks = rehearse.Hooks(self.base, self.base, "some-other-token")

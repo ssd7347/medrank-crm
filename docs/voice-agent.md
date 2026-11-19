@@ -86,7 +86,8 @@ nobody would speak, so nobody is put through to silence:
 
 A withheld number (19 Nov 2026): Plivo sends no number, so the call's phone is `unknown` and nobody can ring it back.
 - **Never a contact's.** Such a caller is not linked to any contact, not even one saved by mistake with that number,
-  and asking for a call-back does not make them a contact.
+  and asking for a call-back does not make them a contact. Staff see the number as "withheld", and alerts name them
+  as "caller with a withheld number".
 - **No call-back booked.** Asking for a call-back, or for a person when the desk cannot take the call now, books no
   task. The agent says "I cannot see the number you are calling from, so our team cannot call you back. Please call us
   again from a phone that shows its number." The managers (or the contact's owner) get an alert, "Could not be called

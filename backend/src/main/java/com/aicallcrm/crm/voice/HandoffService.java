@@ -432,7 +432,8 @@ public class HandoffService {
     }
 
     private static String label(VoiceCall call, Contact contact) {
-        return contact != null ? contact.getFullName() : "caller " + mask(call.getPhone());
+        return contact != null ? contact.getFullName()
+                : withheld(call) ? "caller with a withheld number" : "caller " + mask(call.getPhone());
     }
 
     /** Distress, then complaints and disputes, then everything else: a later hand-over only counts if it is higher. */
@@ -507,7 +508,11 @@ public class HandoffService {
         return CallbackTime.by(due).message();
     }
 
+    /** The last four digits only; a withheld number says so, rather than showing the placeholder's last letters. */
     static String mask(String phone) {
+        if (VoiceCallService.WITHHELD.equals(phone)) {
+            return "withheld";
+        }
         return phone == null || phone.length() <= 4 ? "****" : "******" + phone.substring(phone.length() - 4);
     }
 
