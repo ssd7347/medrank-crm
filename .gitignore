@@ -16,3 +16,4 @@ frontend/public/palettes.html
 training/data/
 training/out/
 training/__pycache__/
+ops/__pycache__/

@@ -71,6 +71,14 @@ npm run start -- --port 3000
 - **The website tells browsers to use HTTPS only** (`Strict-Transport-Security`, one year), and to never show it
   inside another site.
 
+**Backups**: before the first real customer data goes in, schedule `ops/backup.py`.
+- **Nightly `backup`**: the database and the recordings folder, to another disk.
+- **Weekly `check`**: proves the newest backup restores.
+- **Then run both once by hand** and read their output.
+
+`docs/backups.md` has the scheduling lines for Linux and Windows. It needs Python 3.10+ and the PostgreSQL client
+tools.
+
 ### Sign-in codes by SMS (MSG91)
 
 Staff sign in with their mobile number and a 6-digit code, sent by SMS through the customer's own MSG91 account.

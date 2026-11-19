@@ -97,7 +97,8 @@ dropdb -U postgres ai_call_crm_test
 See [docs/new-customer-setup.md](docs/new-customer-setup.md). For the company taking it over (what it is, what is
 ready, their decisions, daily use, going live, running it, troubleshooting):
 [docs/handover-guide.md](docs/handover-guide.md). Before going live, with their compliance adviser:
-[docs/compliance-checklist.md](docs/compliance-checklist.md).
+[docs/compliance-checklist.md](docs/compliance-checklist.md). Nightly backups, the weekly restore check and
+restoring after a loss (`ops/backup.py`): [docs/backups.md](docs/backups.md).
 
 To show the CRM to a client, a throwaway demo copy (in-memory database, simulated calls, made-up loan customers) starts
 with `demo\start-demo-crm.cmd` and `demo\start-demo-website.cmd` and is filled by `python demo\setup_demo.py`; the plan

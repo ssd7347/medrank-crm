@@ -194,9 +194,14 @@ The settings that matter most for live calls:
 `docs/first-real-call.md`. In that plan the CRM server reaches the brain through a private SSH tunnel; the brain
 is never put on the open internet.
 
-**Backups**: back up the database every day (your hosting's automatic backups are enough), and the recordings folder
-(`VOICE_RECORDINGS_DIR`) with it. Transcripts and recordings are deleted automatically after 365 days
-(`VOICE_RETENTION_DAYS`, never fewer than 120).
+**Backups**: `ops/backup.py` does them; `docs/backups.md` has the details and the lines to schedule it.
+- **Every night**, it backs up the database and the recordings folder (`VOICE_RECORDINGS_DIR`) to another disk.
+- **Every week**, `check` proves the newest backup restores.
+- **Backups are deleted after `BACKUP_KEEP_DAYS`** (default 14), so an erased person's data leaves the backups too.
+- **Read its log weekly**: a failed night says `BACKUP FAILED`.
+
+Transcripts and recordings in the CRM itself are deleted automatically after 365 days (`VOICE_RETENTION_DAYS`,
+never fewer than 120).
 
 **Call recordings**: every real AI call whose opening line says "This call may be recorded" is recorded (both voices)
 and kept as one audio file on the CRM server. The admin can listen on the call's page (**Listen**); other staff only
@@ -215,7 +220,8 @@ Every listen is in the audit log. Test-console calls are never recorded.
 | Cannot sign in | Codes expire; ask for a new one. Being signed out after 3 idle minutes is normal |
 | A number keeps getting called that should not | Open the contact: record "Do not call" or withdraw consent; the agent never calls it again |
 | Someone asks what data you keep about them | Admin: open the contact, **Download their data**. Read the file, remove anything your adviser says not to send, and send it to them safely (compliance checklist, 2.1) |
-| Someone asks for their data to be deleted | Admin: open the contact, **Erase this person**, type their number and a reason (not their name). Then deal with backups, exports and Plivo as agreed with your adviser (compliance checklist, 2.1) |
+| Someone asks for their data to be deleted | Admin: open the contact, **Erase this person**, type their number and a reason (not their name). The backups lose them by themselves after `BACKUP_KEEP_DAYS` (`docs/backups.md`). Deal with exports and Plivo as agreed with your adviser (compliance checklist, 2.1) |
+| The database or the server is lost | Pause all calling. Restore the newest backup into a new database and point the CRM at it. Before calling again, re-enter anyone who said stop, was marked Do not call, or was erased since that backup (`docs/backups.md`, "Restoring after a loss") |
 
 ## 9. Where the details are
 
@@ -224,6 +230,7 @@ Every listen is in the audit log. Test-console calls are never recorded.
 - `docs/voice-agent.md`: the AI agent in depth: rules, tools, settings, privacy.
 - `docs/first-real-call.md`: the plan and checks for the first real phone call.
 - `docs/compliance-checklist.md`: what the CRM enforces, what it does not do yet, and what only you can decide.
+- `docs/backups.md`: nightly backups, the weekly restore check, and restoring after a loss.
 - `docs/walkthrough-run-sheet.md` and `demo/`: the demo copy and the plan for showing the CRM.
 - `voice-engine/README.md`: the speech engine, the gateway, the ear check.
 - `training/STATUS.md`: the full history of how the AI was built and tested.

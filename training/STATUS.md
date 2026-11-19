@@ -14,6 +14,63 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 19 November 2026: NIGHTLY BACKUPS, A WEEKLY RESTORE CHECK, AND OLD BACKUPS DELETED (user: "continue")
+
+The hand-over guide said "your hosting's automatic backups are enough". That is not true for every install: a
+laptop or a plain server has none. It also left the compliance checklist's "backups kept no longer than needed" to
+chance. An erased person stayed in backups for as long as anyone kept them.
+
+**Built: `ops/backup.py`.** Python's own library only, nothing to install. It reads the CRM's own settings
+(`backend/.env`; environment variables win).
+- **`backup`.**
+  - Dumps the database with `pg_dump`, in custom format.
+  - Writes the dump under a temporary name. It is renamed only once complete, readable by `pg_restore --list`, and
+    holding `flyway_schema_history`.
+  - Copies new and changed recordings.
+  - Moves recordings the CRM has deleted into `recordings-removed/<day>/`.
+  - Deletes dumps and removed recordings older than `BACKUP_KEEP_DAYS` (default 14). The newest dump always stays.
+  - Warns if it finds no recordings folder: a wrong path must not pass as a backup.
+- **`check`.** Restores the newest dump into `<db>_restorecheck`, counts what is in it, and drops it again, even
+  after a failure.
+- **`restore`.** Only into a NEW database. It refuses an existing name, the CRM's own database, and unsafe names.
+- **The password.** It goes to the PostgreSQL tools in `PGPASSWORD`, never on a command line or in the output.
+
+**Seen live** on PostgreSQL 17, on a throwaway copy (`ai_call_crm_pg_test`) of a CRM database:
+- **Backup.** The dump was 99 kB and took 0.5 s. 2 recordings were copied.
+- **Check.** The restored copy matched the source: 12 migrations, 8 staff, 35 contacts, 36 AI calls, 219 audit
+  entries. The check database was dropped afterwards.
+- **Restore.** Restoring into a new name worked. An existing name, the CRM's own database and a bad name were refused.
+- **Second run.**
+  - One recording was copied and one was left as unchanged.
+  - A deleted one moved to `recordings-removed/20261119`.
+  - A fake 18-day-old dump was deleted, and a 9-day-old one kept.
+- **Failures.** A wrong password or a wrong port gave exit 1 with the reason, and left no files.
+- **Clean-up.** The throwaway databases were dropped afterwards.
+
+**Tests: `ops/test_backup.py`**, 15 tests, with a fake PostgreSQL. 25 separate breaks of `backup.py` were each
+caught. Among them:
+- the password on a command line;
+- a failed dump left behind;
+- no read-back;
+- the newest dump pruned;
+- pruning too early or never;
+- removed recordings left in the copy;
+- restore over an existing database or the CRM's own;
+- the check's copy not dropped after a failure;
+- an empty copy passing;
+- a missing recordings folder not warned about.
+
+The warning for a missing recordings folder was added after the live run. Only the unit tests cover it.
+
+**Docs.**
+- New `docs/backups.md`: requirements, the three commands, cron and Task Scheduler lines, keep-days and erasures,
+  and restoring after a loss.
+- Restoring after a loss: re-enter anyone who said stop, was marked Do not call, or was erased since the dump, before
+  calling resumes.
+- Hand-over guide section 7 and two troubleshooting rows.
+- Compliance checklist 2.1 (with 14 days, every copy is gone within 16 days of an erasure) and 2.2.
+- New-customer setup and the README.
+
 # 18 November 2026: A PROMISED CALL-BACK OR A "STOP" IS NO LONGER LOST WHEN THE CRM IS DOWN (user: "continue the next task")
 
 The hand-over guide admitted a gap. When a call breaks, the caller hears "A member of our team will call you back".

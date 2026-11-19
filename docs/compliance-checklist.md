@@ -45,6 +45,15 @@ of the erasure. The speech engine's outbox (`voice-engine/README.md`, "The outbo
 while the CRM cannot be reached, at most 7 days, and deletes each as soon as the CRM has it; one that arrives after
 the person was erased is refused by the CRM and deleted, so nothing about them is written back.
 
+Backups made with `ops/backup.py` (since 19 November 2026, `docs/backups.md`) keep an erased person only until
+those backups are deleted:
+- Database dumps and removed recordings are deleted after `BACKUP_KEEP_DAYS` (default 14).
+- So with 14 days, every copy is gone within 16 days of the erasure.
+- Restoring a backup brings back anyone erased after it was made. The restore steps say to erase them again, and to
+  record again any "stop calling me", before calling resumes.
+- Backups made any other way (the hosting's own, copies of the backup folder) follow their own rules and are not
+  covered here.
+
 A person who asks what is kept about them (an access request): since 17 November 2026 the admin presses **Download
 their data** on the contact's page and gets one file with everything the CRM holds about them, from the same places
 an erasure deletes from (details, custom fields, tags, timeline, follow-ups, call log, consent records, AI calls with
@@ -52,8 +61,8 @@ transcripts, call-backs, campaign places, do-not-disturb results, staff alerts, 
 notes and alerts are in it, so the admin reads it before sending it; each download is in the audit log. Not in it:
 the copies outside the CRM listed above, upload reports, and what staff wrote about them on another contact.
 
-- [ ] Decided with the adviser: how long backups and server logs are kept, and how an erasure request also reaches
-  Plivo and anyone holding exported spreadsheets
+- [ ] Decided with the adviser: how long backups are kept (`BACKUP_KEEP_DAYS`), how long server logs are kept, and
+  how an erasure request also reaches Plivo and anyone holding exported spreadsheets
 - [ ] Decided with the adviser: what of the downloaded file is sent to a person who asks (staff notes, alerts), and
   how it is sent to them safely
 
@@ -78,7 +87,8 @@ asks again. Test-console calls are never recorded.
   calls without it are knowingly not recorded
 - [ ] The adviser has confirmed that announcing the recording at the start of the call is enough for this business
   (or what else is needed)
-- [ ] The recordings folder is included in the server's backups, and the backups are kept no longer than needed
+- [ ] The nightly backup (`docs/backups.md`) runs with the CRM's real recordings folder. Its log shows
+  `"recordings_folder_found": true` and no `WARNING`. Its `BACKUP_KEEP_DAYS` is the number agreed in 2.1.
 - [ ] Who may listen is decided, and only those staff have the tick
 
 **2.3 Do-not-disturb scrubbing.** No DND service is connected, so the CRM cannot skip numbers on the national
