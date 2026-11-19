@@ -14,6 +14,42 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 19 November 2026: A CUSTOMER'S NUMBER AND NAME NO LONGER REACH THE SERVER LOG (user: "continue the next task")
+
+Server logs are a copy of personal data that an erasure never reaches (compliance checklist 2.1). Every log line of
+the CRM and the speech engine was read through.
+- **Clean already.** The engine logs call ids only. The sign-in SMS log shows the last four digits of the staff
+  member's number. The brain's guard lines log fixed keywords, or numbers the model made up.
+- **Not clean: database errors.** PostgreSQL's error text holds the values. Shown first, with a test (it failed on H2
+  and on PostgreSQL 17):
+  - A duplicate number wrote `Key (phone)=(+91...) already exists`.
+  - A row that could not be saved wrote `Failing row contains (3, <name>, <number>, ...)`.
+  - Each was logged twice: by Hibernate (`org.hibernate.orm.jdbc.error`), and by the CRM's own error handler.
+
+**Fixed.**
+- New `common/SafeLog.describe`. For a database error it gives only the kind, the SQL state and the constraint name
+  (for example `DataIntegrityViolationException (SQL state 23505, constraint uq_contact_phone)`). Anything else is
+  described as before.
+- It is used by the error handler, the voice tool runner (twice), the campaign sweep and housekeeping, and the
+  follow-up reminders.
+- Hibernate's own log of failed statements is off (`application.properties`).
+
+**Tests.**
+- `LogPrivacyIntegrationTest` (3 tests). Real errors from the database go to the error handler, and the captured log
+  must not hold the number or the name.
+  - 5 separate breaks were each caught: Hibernate's log back on, the handler's raw message, SafeLog not used for SQL,
+    and no SQL state or constraint.
+  - The voice tool, sweep and reminder call sites are covered only by SafeLog's own test.
+- A first version of the test registered its own controller, which gave it a Spring context of its own. On PostgreSQL
+  that ran the server out of connections ("too many clients already", 15 tests in another class failed). Rewritten
+  to share the other tests' context.
+- **Suites.** Backend 161/161 on H2 and on PostgreSQL. The whole PostgreSQL run's log has no `Detail: Key (...)`
+  or `Failing row` lines. Before the fix, this test class alone logged 12.
+
+**Not in the CRM: the reverse proxy's access log.** A contact search puts what was typed in the address (`?q=...`),
+and nginx logs every address by default. The compliance checklist (2.1), the hand-over guide and the setup guide now
+say to log addresses without their query, or keep that log short.
+
 # 19 November 2026: NIGHTLY BACKUPS, A WEEKLY RESTORE CHECK, AND OLD BACKUPS DELETED (user: "continue")
 
 The hand-over guide said "your hosting's automatic backups are enough". That is not true for every install: a

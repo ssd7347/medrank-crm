@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.aicallcrm.crm.alert.AlertService;
 import com.aicallcrm.crm.alert.Priority;
 import com.aicallcrm.crm.common.Role;
+import com.aicallcrm.crm.common.SafeLog;
 import com.aicallcrm.crm.user.AppUserRepository;
 import com.aicallcrm.crm.voice.CallEligibility.Verdict;
 import com.aicallcrm.crm.voice.Voice.CampaignStatus;
@@ -73,7 +74,7 @@ public class CampaignDispatcher {
         try {
             dispatch();
         } catch (RuntimeException e) {
-            log.warn("Voice campaign sweep failed: {}", e.toString());
+            log.warn("Voice campaign sweep failed: {}", SafeLog.describe(e));
         }
     }
 
@@ -86,7 +87,7 @@ public class CampaignDispatcher {
             }
             tx.executeWithoutResult(s -> raiseAlerts());
         } catch (RuntimeException e) {
-            log.warn("Voice housekeeping failed: {}", e.toString());
+            log.warn("Voice housekeeping failed: {}", SafeLog.describe(e));
         }
     }
 

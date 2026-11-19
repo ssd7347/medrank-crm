@@ -50,7 +50,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail handleIntegrity(DataIntegrityViolationException ex) {
-        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        log.warn("Data integrity violation: {}", SafeLog.describe(ex));
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
                 "This conflicts with an existing record (duplicate or still referenced)");
     }

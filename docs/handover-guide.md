@@ -203,6 +203,10 @@ is never put on the open internet.
 Transcripts and recordings in the CRM itself are deleted automatically after 365 days (`VOICE_RETENTION_DAYS`,
 never fewer than 120).
 
+**Logs**: the CRM's and the speech engine's logs hold no customer's number, name or words. A database error is
+logged without its values. A reverse proxy in front of the website can still record contact searches in its access
+log. Set it up as the compliance checklist (2.1) says.
+
 **Call recordings**: every real AI call whose opening line says "This call may be recorded" is recorded (both voices)
 and kept as one audio file on the CRM server. The admin can listen on the call's page (**Listen**); other staff only
 if the admin ticks "Can listen to call recordings" for them on **Staff users**, and then only for calls they can see.

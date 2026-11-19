@@ -54,6 +54,22 @@ those backups are deleted:
 - Backups made any other way (the hosting's own, copies of the backup folder) follow their own rules and are not
   covered here.
 
+Server logs (checked 19 November 2026):
+- **The CRM's own log.** Every line it writes was read through, and customers' numbers, names and words are kept
+  out.
+  - A database error is logged by its kind, SQL state and constraint only. Before, PostgreSQL's own text was logged:
+    a duplicate wrote the number ("Key (phone)=(...)"), and a row that could not be saved wrote the whole row, name
+    and number included.
+  - Sign-in code messages show the last four digits of the staff member's number.
+  - The first start logs the first admin's email.
+- **The speech engine's log.** It names calls by their id only.
+- **What the hosting may add.** A reverse proxy in front of the website (nginx, for example) writes every address to
+  its access log by default, and a contact search puts what was typed, a name or a number, in the address
+  (`?q=...`).
+  - Either log addresses without their query (nginx: a `log_format` with `$uri` instead of `$request`), or keep
+    those logs only as long as agreed below.
+  - Caddy writes no access log unless told to.
+
 A person who asks what is kept about them (an access request): since 17 November 2026 the admin presses **Download
 their data** on the contact's page and gets one file with everything the CRM holds about them, from the same places
 an erasure deletes from (details, custom fields, tags, timeline, follow-ups, call log, consent records, AI calls with

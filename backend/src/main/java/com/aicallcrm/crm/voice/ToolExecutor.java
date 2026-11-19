@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.aicallcrm.crm.assistant.RateLimiter;
+import com.aicallcrm.crm.common.SafeLog;
 import com.aicallcrm.crm.voice.VoiceTools.Tool;
 
 /**
@@ -47,7 +48,7 @@ public class ToolExecutor {
         try {
             result = tx.execute(status -> run(callId, toolName, safeArgs));
         } catch (RuntimeException e) {
-            log.warn("Voice tool {} failed for call {}: {}", toolName, callId, e.toString());
+            log.warn("Voice tool {} failed for call {}: {}", toolName, callId, SafeLog.describe(e));
             result = ToolResult.error(ToolResult.INTERNAL, "Something went wrong. Apologise and offer a callback.");
         }
         int latencyMs = (int) ((System.nanoTime() - t0) / 1_000_000);
@@ -58,7 +59,7 @@ public class ToolExecutor {
                         toolName.length() > 40 ? toolName.substring(0, 40) : toolName,
                         DndService.sha256(new TreeMap<>(safeArgs).toString()), done.status(), latencyMs)));
             } catch (RuntimeException e) {
-                log.warn("Could not write the tool audit for call {}: {}", callId, e.toString());
+                log.warn("Could not write the tool audit for call {}: {}", callId, SafeLog.describe(e));
             }
         }
         return done;

@@ -13,6 +13,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.aicallcrm.crm.alert.AlertService;
 import com.aicallcrm.crm.alert.Priority;
+import com.aicallcrm.crm.common.SafeLog;
 
 /**
  * Tells the assignee (in the notification bell) when a follow-up is about to fall due, once per follow-up.
@@ -39,7 +40,7 @@ class FollowUpReminders {
         try {
             send();
         } catch (RuntimeException e) {
-            log.warn("Follow-up reminders failed: {}", e.toString());
+            log.warn("Follow-up reminders failed: {}", SafeLog.describe(e));
         }
     }
 

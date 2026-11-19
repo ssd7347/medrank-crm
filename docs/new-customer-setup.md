@@ -66,6 +66,11 @@ npm run start -- --port 3000
   the CRM server's address changes, build again.
 - **Only the website's port is put on the internet, behind HTTPS** (the hosting's, or a reverse proxy such as Caddy
   or nginx). It passes every `/api/...` request to the CRM server.
+- **The proxy's access log can hold customers' names and numbers.** A contact search puts what was typed in the
+  address (`?q=...`).
+  - Log addresses without their query (nginx: `$uri` instead of `$request` in the `log_format`), or keep the log
+    short (compliance checklist 2.1).
+  - The CRM's own log keeps them out.
 - **The sign-in cookie is `Secure`**, so on a real address the site works only over HTTPS. On `localhost` browsers
   allow it without HTTPS.
 - **The website tells browsers to use HTTPS only** (`Strict-Transport-Security`, one year), and to never show it
