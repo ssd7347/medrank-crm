@@ -96,9 +96,11 @@ A withheld number (19 Nov 2026): Plivo sends no number, so the call's phone is `
 - **No promise when the line breaks.** Every `open` and `turn` reply tells the engine `call_back`, whether the team can
   call this person back (`HandoffService.canCallBack`). It is false for a withheld number, and for someone who opted
   out or is marked "Do not call", including during the call. A fault then ends the call with "Sorry, I am having
-  trouble on this line. Please call us again later. Goodbye." and books nothing. If the CRM was down before it could
-  say, the engine still promises the call-back, because the CRM books it when the outbox delivers it later. The one
-  case left is a withheld caller while the CRM is down: they are promised a call-back nobody can make.
+  trouble on this line. Please call us again later. Goodbye." and books nothing. For a withheld number the CRM also
+  adds `call_back=no` to the stream URL as the call connects, so the engine knows before its first word, even if the
+  CRM goes down before its opening reply. If the CRM is down before it could say for anyone else, the engine promises
+  the call-back, because the CRM books it when the outbox delivers the report later (and books nothing for someone
+  who opted out).
 
 When the check runs:
 - It runs once a sweep, and only when a call is about to be placed. Outside a campaign's calling hours nothing is

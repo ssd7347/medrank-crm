@@ -135,11 +135,13 @@ public class PlivoHooksController {
 
     /**
      * The URL Plivo streams to: our engine with this call's id and a token only Plivo is given (in this XML), which
-     * the engine checks with the same shared secret ({@link #streamToken}).
+     * the engine checks with the same shared secret ({@link #streamToken}). {@code call_back=no} tells the engine
+     * before its first word that nobody can call this person back (a withheld number), so if the CRM is down as the
+     * call opens, its "having trouble" goodbye still promises nothing. Later replies carry it too (call_back).
      */
     private String stream(UUID callId) {
         String url = plivo.engineUrl() + (plivo.engineUrl().contains("?") ? "&" : "?") + "call_id=" + callId
-                + "&token=" + streamToken(voice.hmacSecret(), callId);
+                + "&token=" + streamToken(voice.hmacSecret(), callId) + (live.canCallBack(callId) ? "" : "&call_back=no");
         // keepCallAlive: the call stays up while the engine talks; if the engine drops, the call ends (Hangup).
         return "<Stream bidirectional=\"true\" keepCallAlive=\"true\" contentType=\"audio/x-mulaw;rate=8000\">"
                 + escape(url) + "</Stream><Hangup/>";

@@ -945,6 +945,30 @@ class EndpointTest(unittest.TestCase):
         self.assertEqual(self.crm.ended, 1)
         self.assertIs(self.outboxes[-1], self.engine.OUTBOX)    # what the CRM cannot take now is kept
 
+    def test_the_stream_url_says_when_nobody_can_call_them_back(self):
+        from starlette.testclient import TestClient
+        said = []
+        self.engine.tts_pcm = lambda text: said.append(text) or (tone(0.5, 440, 4000, rate=22050), 22050)
+
+        def down(call_id):
+            raise ConnectionError("CRM down")
+        self.crm.open = down        # the CRM went down after it answered: only the URL has said
+        token = phone.stream_token(self.SECRET, "c1")
+        for query, line in ((f"call_id=c1&token={token}&call_back=no", phone.TROUBLE_NO_CALL_BACK),
+                            (f"call_id=c1&call_back=no&token={token}", phone.TROUBLE_NO_CALL_BACK),
+                            (f"call_id=c1&token={token}", phone.TROUBLE),
+                            (f"call_id=c1&token={token}&call_back=yes", phone.TROUBLE)):
+            said.clear()
+            with TestClient(self.engine.app).websocket_connect(f"/call?{query}") as ws:
+                ws.send_text(json.dumps({"event": "start", "start": {"streamId": "s1", "callId": "p1"}}))
+                while (m := json.loads(ws.receive_text()))["event"] != "checkpoint":
+                    pass
+                self.assertTrue(m["name"].startswith("end-"), query)
+                ws.send_text(json.dumps({"event": "playedStream", "name": m["name"]}))
+                self.assertEqual(ws.receive()["type"], "websocket.close")
+            self.assertEqual(said, [line], query)
+        self.assertEqual(self.crm.troubles, ["opening failed: ConnectionError"] * 4)   # each still reported
+
     def test_the_outbox_is_sent_again_and_shown_on_health(self):
         from starlette.testclient import TestClient
         line = FakeLine({"opted_out": True})

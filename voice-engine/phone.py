@@ -445,7 +445,7 @@ class Call:
 
     def __init__(self, call_id: str, send: Callable[[dict], Awaitable[None]], crm: Crm,
                  stt: Callable[[np.ndarray], str], tts: Callable[[str], tuple[np.ndarray, int]],
-                 close: Callable[[], Awaitable[None]]) -> None:
+                 close: Callable[[], Awaitable[None]], call_back: bool = True) -> None:
         self.call_id, self.send, self.crm, self.stt, self.tts, self.close = call_id, send, crm, stt, tts, close
         self.stream_id = ""
         self.ears = Utterances()
@@ -455,9 +455,10 @@ class Call:
         self.marks = 0
         self.ending = ""            # the goodbye's checkpoint once the agent has finished
         self.hint = ""              # the called contact's name, from the CRM's opening reply
-        # Whether the team can call this person back, from the CRM's latest reply. Until the CRM has said (it is down
-        # as the call opens), a call-back is promised: the outbox delivers it later, and the CRM books it if it can.
-        self.call_back = True
+        # Whether the team can call this person back, from the CRM's latest reply. Before that, from the stream URL
+        # (the CRM adds call_back=no for a withheld number). If the CRM is down as the call opens, a call-back is
+        # promised unless the URL said no: the outbox delivers the report later, and the CRM books it if it can.
+        self.call_back = call_back
         self.reported = False       # a fault has been reported to the CRM (once per call)
         self.reports: set[asyncio.Task] = set()
         self.unsent: np.ndarray | None = None   # the turn being heard, until it is on its way to the CRM

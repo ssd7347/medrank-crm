@@ -10,7 +10,7 @@ The CRM backend calls it; browsers never do. Endpoints:
                    "undelivered": 0}     (requests waiting in the outbox for the CRM; see OUTBOX_DIR)
   POST /stt    body: audio bytes (WebM/Opus, WAV, MP3...)        -> {"text": "...", "ms": 412}
   POST /tts    body: {"text": "..."}                               -> audio/wav
-  WS   /call?call_id=...&token=...                                  a real phone call streamed by Plivo (phone.py)
+  WS   /call?call_id=...&token=...[&call_back=no]                   a real phone call streamed by Plivo (phone.py)
 
 Settings (environment variables):
   STT_MODEL      Whisper model name or folder (base.en, small.en, ...). Default base.en.
@@ -245,7 +245,7 @@ def tts_pcm(text: str) -> tuple[np.ndarray, int]:
 
 
 @app.websocket("/call")
-async def call(ws: WebSocket, call_id: str = "", token: str = ""):
+async def call(ws: WebSocket, call_id: str = "", token: str = "", call_back: str = ""):
     # The CRM gave Plivo this URL with a token made from the call id and the shared secret; nobody else has it.
     expected = phone.stream_token(VOICE_HMAC_SECRET, call_id).encode() if VOICE_HMAC_SECRET and call_id else b""
     if not expected or not hmac.compare_digest(token.encode(), expected):
@@ -262,7 +262,8 @@ async def call(ws: WebSocket, call_id: str = "", token: str = ""):
     def hear(audio: np.ndarray, hint: str = "") -> str:
         return stt_pcm(audio, hint=hint) if hint and hints_on(STT_MODEL, NAME_HINTS) else stt_pcm(audio)
 
-    session = phone.Call(call_id, send, crm(), hear, tts_pcm, close)
+    # call_back=no: the CRM said as the call connected that nobody can call this person back (a withheld number).
+    session = phone.Call(call_id, send, crm(), hear, tts_pcm, close, call_back=call_back != "no")
     try:
         while not session.done:
             await session.handle(json.loads(await ws.receive_text()))

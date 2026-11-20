@@ -14,6 +14,33 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 20 November 2026: A WITHHELD CALLER IS NOT PROMISED A CALL-BACK EVEN WHEN THE CRM GOES DOWN (user: "continue")
+
+This closes the gap left on 19 November. The engine learned `call_back` only from the CRM's `open` and `turn` replies.
+Suppose the CRM answered a withheld caller and then went down before its opening reply. The engine's "having trouble"
+goodbye then promised a call-back nobody could make.
+
+**Built.**
+- `PlivoHooksController.stream`: the stream URL gets `&call_back=no` when `LiveCallService.canCallBack` says no (a
+  withheld number). Other callers' URLs are unchanged.
+- `engine.py`'s `/call` reads `call_back` and passes it to `phone.Call` (new `call_back` argument, default yes). It is
+  the starting value; each `open` and `turn` reply still updates it.
+- The parameter is not part of the token. Only Plivo has the URL, and at most it changes which goodbye line is said.
+- `rehearse.py` and the gateway pass the whole URL on, so they need no change.
+
+**Tests.**
+- `VoicePlivoTest`: the withheld caller's stream XML ends with `&amp;call_back=no</Stream>`. `ringsIn` already checks
+  that everyone else's URL ends with the token.
+- `test_phone.EndpointTest` has 1 new test: the CRM is down at the opening. With `call_back=no` (in either place in
+  the query) the caller hears `TROUBLE_NO_CALL_BACK`; without it, or with `call_back=yes`, the promise is made. The
+  fault is reported each time.
+- 5 mutants, all caught (scratchpad `mutate_stream_cb.py`). In the CRM, the flag is never sent, or sent for everyone.
+  In the engine, the URL is ignored or read backwards, or `Call` ignores what it is given.
+- The backend has 170 tests, all passing on H2 and on a throwaway PostgreSQL database, which was dropped afterwards.
+  The engine has 111 tests (110 before), all passing.
+
+**Docs.** voice-agent.md ("No promise when the line breaks": the gap is gone), and the voice-engine README.
+
 # 19 November 2026: TODAY'S TWO CALL FIXES REHEARSED WITH THE REAL ENGINE (user: "continue the next task")
 
 The setup was the in-memory test CRM in Plivo mode (`jdbc:h2:mem` checked first), the real speech engine (base.en,

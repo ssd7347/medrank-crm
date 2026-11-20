@@ -525,7 +525,8 @@ class VoicePlivoTest {
         long strayId = contactRepo.save(stray).getId();
         try {
             String callUuid = "cu-" + SEQ.incrementAndGet();
-            assertThat(answerInbound("anonymous", callUuid)).contains("<Stream ");
+            // The engine is told as the call connects (ringsIn: other callers' URLs end with the token).
+            assertThat(answerInbound("anonymous", callUuid)).contains("<Stream ").contains("&amp;call_back=no</Stream>");
             UUID call = callOf(callUuid);
             assertThat(jdbc.queryForObject("select contact_id from voice_call where id = ?", Long.class, call)).isNull();
             // The engine is told nobody can call them back, so its "having trouble" goodbye promises nothing.

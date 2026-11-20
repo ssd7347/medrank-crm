@@ -81,8 +81,8 @@ If hearing, the voice or a request to the CRM fails, the engine says "Sorry, I a
 member of our team will call you back. Goodbye." and ends the call, and tells the CRM (`POST
 /api/voice/hooks/live/trouble`), which books that call-back (never for a caller who opted out or one who already has
 a call-back) and notes `call_cut_off` in the transcript. Someone the team cannot call back (a withheld number, or
-someone who opted out: the CRM's last `open` or `turn` reply said `"call_back": false`) hears "Please call us again
-later" instead of the promise; the fault is still reported, and nothing is booked. The report runs alongside the goodbye, so a CRM that is down
+someone who opted out: the CRM's last `open` or `turn` reply said `"call_back": false`, or, before the first reply,
+the stream URL carried `call_back=no`) hears "Please call us again later" instead of the promise; the fault is still reported, and nothing is booked. The report runs alongside the goodbye, so a CRM that is down
 does not keep the caller waiting. If the voice itself fails, nothing can be said, so the engine reports the fault and
 hangs up instead of leaving the caller in silence.
 
