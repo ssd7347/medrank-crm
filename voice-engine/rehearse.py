@@ -354,7 +354,10 @@ async def rehearse(hooks: Hooks, api: PretendPlivoApi, lines: list[np.ndarray], 
             result["ending"] = "transferred"
             # Plivo needs a moment to move the call; an engine that closes the stream at once would cut the caller off.
             await asyncio.sleep(1.0)
-            result["stream_open_at_transfer"] = not closed.is_set()
+            # Closed as soon as the engine's close frame arrives (the state leaves OPEN), not when the connection has
+            # ended: that can take up to 10 s more when the engine is behind on the caller's audio, as on a busy
+            # machine. Both websockets clients (websockets.connect and websockets.asyncio.client) have this state.
+            result["stream_open_at_transfer"] = ws.state.name == "OPEN"
             leg = request["body"].get("aleg_url", "")
             say(f"the CRM asked Plivo to transfer the call (to {leg}); the stream was "
                 + ("still open, as it must be" if result["stream_open_at_transfer"] else "ALREADY CLOSED by the engine"))

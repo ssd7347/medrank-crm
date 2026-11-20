@@ -261,6 +261,14 @@ class FakeCall(unittest.TestCase):
         self.assertEqual((r["ending"], r["stream_open_at_transfer"]), ("transferred", False))
         self.assertTrue(any("ALREADY CLOSED" in s for s in self.said), self.said)
 
+    def test_the_newer_websockets_client_is_judged_the_same(self):
+        # websockets.connect is the older client until websockets 14; the newer one has no ``open``, only ``state``.
+        import websockets.asyncio.client
+        for end, still_open in (("transfer", True), ("transfer, then close", False)):
+            MODE["end"] = end
+            r = self.run_call(connect=websockets.asyncio.client.connect)
+            self.assertEqual((r["ending"], r["stream_open_at_transfer"]), ("transferred", still_open), end)
+
     def test_a_call_the_crm_hangs_up(self):
         MODE["end"] = "hang up"
         r = self.run_call()

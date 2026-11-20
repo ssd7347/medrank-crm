@@ -14,6 +14,33 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 20 November 2026: THE FLAKY ENGINE TEST FOUND; THE REHEARSAL'S "STREAM STILL OPEN?" VERDICT FIXED (user: "Yes, find it")
+
+**Found.** The one unexplained failure (next entry down) reproduced with every CPU core kept busy (scratchpad
+`flaky_hunt.py`): 2 of 4 full runs failed, and 7 of 8 runs of `test_rehearse.FakeCall`. The failing test was
+`test_an_engine_that_closes_the_stream_at_the_transfer_is_caught`. The rehearsal said the stream was "still open" for a
+fake engine that closes it at the transfer.
+
+**Why** (timestamps, scratchpad `trace_close.py`). Under load the fake engine falls behind on the caller's audio, so
+its websockets receive queue (32 messages) is full when it closes. Its close frame reaches the rehearsal at once. But
+the engine side cannot read the rehearsal's reply until its 10 s close timeout. `rehearse.py` counted the stream as
+closed only once the whole connection had ended, so 1 s after the transfer it still said "open". The transfer request
+itself was not slow (0.03 s under load, `post_timing.py`). A real rehearsal on a busy machine could have given the same
+wrong verdict for an engine that cuts the caller off.
+
+**Fixed (`rehearse.py`).** The stream counts as closed as soon as the engine's close frame arrives: the connection's
+`state` leaves OPEN (CLOSING). It no longer waits for the connection to end. Both websockets clients have `state`.
+That is `websockets.connect`, the older client up to websockets 14 (pinned `13.*`), and `websockets.asyncio.client`,
+the newer one, which has no `open`. A first attempt using `ws.open` with a fallback for connections without it was
+dropped: the fallback had the same slow path, and its test failed once under load.
+
+**Tests.**
+- `test_rehearse` has 1 new test: the newer client, with an engine that keeps the stream open and one that closes it.
+- 4 mutants, all caught (scratchpad `mutate_stream_open.py`): always closed, always open, CLOSING counted as open (2
+  of 3 loaded rounds failed), and the old check (2 of 3 loaded rounds failed).
+- The engine has 112 tests (111 before). Under full load, 3 of 3 full runs passed, and idle too.
+- Correction: `test_rehearse` had 16 tests before this, not the 17 the 19 November entry says; it has 17 now.
+
 # 20 November 2026: PLIVO'S PROTOCOL CHECKED AGAINST ITS DOCS; A HIDDEN NUMBER'S PLACEHOLDER IS WITHHELD (user: "continue")
 
 The engine and the CRM had only met a fake Plivo, so before the first real call I checked them against Plivo's
@@ -43,7 +70,7 @@ them failing on the test's clean-up (the stray contact could not be deleted once
 which hid the real failure. The clean-up now unlinks first, and all 6 fail on their checks. The backend has 170 tests, all passing on H2 and on a throwaway PostgreSQL database, which was dropped
 afterwards. The engine has 111. One full run had 1 failure, unnamed in the saved output, with no engine change since
 the last clean run; that run was about 11 s slower than usual. The next 5 runs all passed. It is most likely one of
-the timing-based call tests under load. Not yet identified; if it recurs, record the test's name.
+the timing-based call tests under load. (Found and fixed the same day: the entry above.)
 
 **Docs.** voice-agent.md ("A withheld number"). first-real-call.md step 5 adds one call in with the number hidden,
 which must show as "withheld"; if digits show instead, note them.
