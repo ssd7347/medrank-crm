@@ -50,6 +50,19 @@ public class VoiceCallService {
     static final Set<CallStatus> LIVE = EnumSet.of(CallStatus.QUEUED, CallStatus.DIALING, CallStatus.CONNECTED);
     /** The phone of an incoming call whose number was withheld: nobody can call it back, and it is no contact's. */
     static final String WITHHELD = "unknown";
+
+    /**
+     * Could the team ring this caller's number back? Not for a withheld one, which arrives as a word ("anonymous",
+     * "Restricted"), as nothing, or as a placeholder of digits: fewer than 8 digits, or only zeros. A real number
+     * (10 digits in India, 8 to 15 with a country code) passes.
+     */
+    static boolean ringable(String phone) {
+        if (phone == null) {
+            return false;
+        }
+        String digits = phone.startsWith("+") ? phone.substring(1) : phone;
+        return digits.length() >= 8 && digits.chars().allMatch(Character::isDigit) && !digits.matches("0+");
+    }
     private static final int TRANSCRIPT_LIMIT = 95_000;
     private static final Duration STALE_AFTER = Duration.ofMinutes(30);
 
@@ -233,7 +246,7 @@ public class VoiceCallService {
             return Inbound.useFallback();
         }
         String phone = Phones.normalize(callerNumber);
-        if (phone == null || phone.isBlank()) {
+        if (!ringable(phone)) {
             phone = WITHHELD;
         }
         // A withheld number is nobody's: never linked to a contact (one saved with "unknown" by mistake included).

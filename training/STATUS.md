@@ -14,6 +14,40 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 20 November 2026: PLIVO'S PROTOCOL CHECKED AGAINST ITS DOCS; A HIDDEN NUMBER'S PLACEHOLDER IS WITHHELD (user: "continue")
+
+The engine and the CRM had only met a fake Plivo, so before the first real call I checked them against Plivo's
+current docs.
+- **The audio stream (`phone.py`) matches.** It reads `start.streamId`, and `media.track` and `media.payload`
+  (inbound only). It sends `playAudio` with `media.contentType` `audio/x-mulaw`, `sampleRate` 8000 and `payload`,
+  with no streamId, as documented. It sends `checkpoint` and `clearAudio` with `streamId`, and reads `playedStream`'s
+  `name`. Plivo's `clearedAudio`, `dtmf` and `sequenceNumber` are ignored, which is harmless.
+- **Placing a call (`PlivoClient`) matches.** POST `/Call/` with from, to, answer_url and method, hangup_url and
+  method, ring_timeout and time_limit; the reply's `request_uuid` is read. The answered call's `CallUUID` replaces it
+  (`VoiceCallService.started`), and hang-ups and transfers happen only after the answer, so they use the right id.
+
+**One gap found.** Plivo does not document what a hidden number arrives as in `From`. A word or nothing was already
+withheld. But a placeholder of digits ("0000000000", a short code) would have been taken as a real number: the call
+linked to any contact saved with it, and a call-back booked to ring it.
+
+**Built.** `VoiceCallService.ringable`: a caller's number is withheld unless it has at least 8 digits, only digits
+after an optional "+", and is not all zeros. India's 10 digits pass, with or without +91 or a leading 0, as do 8 to 15
+digits with a country code.
+
+**Tests.** The withheld-number test in `VoicePlivoTest` now rings in as "", "Restricted", "+", "0000000000",
+"+910000000000", "12345" and "1234567". Each streams with `call_back=no`, is stored as `unknown` and is linked to
+nobody, even with a contact saved as "0000000000". Five real numbers pass `ringable`. 6 mutants, all caught (scratchpad
+`mutate_ringable.py`): only an empty number withheld (as before), all zeros taken as a number, short numbers taken as
+numbers, too strict (10 digits needed), a leading "+" refused, and `ringable` not used. The first run showed two of
+them failing on the test's clean-up (the stray contact could not be deleted once a call was wrongly linked to it),
+which hid the real failure. The clean-up now unlinks first, and all 6 fail on their checks. The backend has 170 tests, all passing on H2 and on a throwaway PostgreSQL database, which was dropped
+afterwards. The engine has 111. One full run had 1 failure, unnamed in the saved output, with no engine change since
+the last clean run; that run was about 11 s slower than usual. The next 5 runs all passed. It is most likely one of
+the timing-based call tests under load. Not yet identified; if it recurs, record the test's name.
+
+**Docs.** voice-agent.md ("A withheld number"). first-real-call.md step 5 adds one call in with the number hidden,
+which must show as "withheld"; if digits show instead, note them.
+
 # 20 November 2026: A WITHHELD CALLER IS NOT PROMISED A CALL-BACK EVEN WHEN THE CRM GOES DOWN (user: "continue")
 
 This closes the gap left on 19 November. The engine learned `call_back` only from the CRM's `open` and `turn` replies.

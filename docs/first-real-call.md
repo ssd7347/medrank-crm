@@ -126,6 +126,10 @@ Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
    from the FAQ, "stop calling me". Note any long silences. During desk hours (not Sundays), also ask for a person
    once: you should hear the whole "I am connecting you to a member of our team now. Please stay on the line." and
    then the desk phone rings. If the transfer fails, an urgent call-back appears on `/voice/callbacks`.
+   Then ring the Plivo number once with your number hidden (`#31#` before the number, or the phone's "Show my caller ID"
+   setting turned off; not every network allows it; the incoming script must be approved). On `/voice/calls` its number must show as "withheld". If it shows digits
+   instead, note them: Plivo's placeholder for a hidden number is not documented, and the CRM treats only a word,
+   nothing, fewer than 8 digits or only zeros as withheld (`docs/voice-agent.md`, "A withheld number").
 6. Afterwards: read the transcript and tool trail on `/voice/calls`; write down what Whisper heard against what was
    said, and the reply times. Then take the tunnel down and stop the GPU machine, but only once the engine's
    `/health` says `"undelivered": 0` (a call-back or a "stop calling me" the CRM has not received yet waits in the

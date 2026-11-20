@@ -85,6 +85,9 @@ nobody would speak, so nobody is put through to silence:
   later". Plivo asking twice for the same call gets the same answer and books nothing more.
 
 A withheld number (19 Nov 2026): Plivo sends no number, so the call's phone is `unknown` and nobody can ring it back.
+Plivo does not document what a hidden number arrives as, so anything that is not a number the team could ring is
+taken as withheld (`VoiceCallService.ringable`, 20 Nov): a word ("anonymous", "Restricted"), nothing, fewer than 8
+digits, or only zeros. A real number passes (India's 10 digits, or 8 to 15 with a country code).
 - **Never a contact's.** Such a caller is not linked to any contact, not even one saved by mistake with that number,
   and asking for a call-back does not make them a contact. Staff see the number as "withheld", and alerts name them
   as "caller with a withheld number".

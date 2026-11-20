@@ -561,7 +561,24 @@ class VoicePlivoTest {
             // The call breaks on our side: nothing is booked either.
             live("trouble", call, null).andExpect(jsonPath("$.callback_booked").value(false));
             assertThat(callbacks(call)).isEmpty();
+
+            // Plivo does not document what a hidden number arrives as: a word, nothing, or a placeholder of digits
+            // are all withheld. A contact saved with the placeholder is still nobody's.
+            stray.setPhone("0000000000");
+            contactRepo.save(stray);
+            for (String from : new String[] {"", "Restricted", "+", "0000000000", "+910000000000", "12345", "1234567"}) {
+                String uuid = "cu-" + SEQ.incrementAndGet();
+                assertThat(answerInbound(from, uuid)).as(from).contains("&amp;call_back=no</Stream>");
+                assertThat(jdbc.queryForObject("select phone || '/' || coalesce(cast(contact_id as varchar), 'none') "
+                        + "from voice_call where provider_call_id = ?", String.class, uuid)).as(from).isEqualTo("unknown/none");
+            }
+            // Real numbers are not: India's 10 digits (with or without +91, or a leading 0), and others' 8 to 15.
+            for (String real : new String[] {"9876500001", "+919876500001", "09876500001", "+447700900123", "12345678"}) {
+                assertThat(VoiceCallService.ringable(com.aicallcrm.crm.common.Phones.normalize(real))).as(real).isTrue();
+            }
         } finally {
+            // Unlinked first, so a call wrongly linked to it fails on the check above, not on this clean-up.
+            jdbc.update("update voice_call set contact_id = null where contact_id = ?", strayId);
             jdbc.update("delete from contact where id = ?", strayId);
         }
     }
