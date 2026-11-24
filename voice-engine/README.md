@@ -126,6 +126,24 @@ once; if not, the turn goes on as it was. Finished sentences are not delayed. Th
 `small.en` writes "is..." where the caller paused, `base.en` often writes a full stop, so with base.en most such
 pauses still make two turns.
 
+**The ear starts early.** Once the caller has been quiet for 300 ms (`EAR_EARLY_MS`; 0 turns it off), the engine
+starts hearing what they said, while the rest of the 700 ms passes. If they say more, that hearing is simply not
+used (`Utterances.early`, `Call._hear_early`); it is also not used if the contact's name reached the engine after it
+started, and one that failed is heard again. This takes up to 0.4 s off each reply (the reply-time line then says
+"early ear"). Checked on 24 Nov against the recordings (Piper's voice and the developer's, line and mobile paths, 98
+turns), scored against the sentences read:
+
+| Early point | Model | Words wrong, whole → early (of 844) | Key words, whole → early (of 148) | Hearings wasted |
+|---|---|---|---|---|
+| 200 ms | base.en | 87 → 85 | 119 → 120 | 37 |
+| 200 ms | small.en | 29 → 24 | 145 → 144 | 37 |
+| **300 ms** | base.en | 87 → 83 | 119 → 120 | 17 |
+| **300 ms** | small.en | 29 → 28 | 145 → 145 | 17 |
+| 400 ms | base.en | 87 → 85 | 119 → 118 | 8 |
+
+Whisper's words move a little with the length of the silence after them, both ways. At 300 ms neither model lost a
+key word, with fewer wasted hearings than at 200 ms.
+
 **Reply times.** The engine's console shows, for every reply, how long the caller waited and where the time went, then
 a summary when the call ends (`Call.timed`; the call id only, nothing the caller said). From a rehearsal (24 Nov, the
 test CRM's stand-in brain, `base.en` on this laptop):

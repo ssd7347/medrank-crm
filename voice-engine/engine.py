@@ -31,6 +31,9 @@ Settings (environment variables):
                  "undelivered": 0.
   ONE_MOMENT_AFTER_S  Seconds the caller waits for the CRM's reply before the agent says "One moment, please." (once
                  per turn), rather than silence. Default 2.5; 0 never says it.
+  EAR_EARLY_MS   Once the caller has been quiet this long, the ear starts on what they said, while the rest of the
+                 700 ms that ends a turn passes; if they say more, that hearing is not used. Default 300; 0 waits
+                 for the end of the turn as before.
 
 Run:  uvicorn engine:app --host 127.0.0.1 --port 8090
 """
@@ -69,6 +72,7 @@ NAME_HINTS = os.environ.get("NAME_HINTS", "auto")
 WARM_UP = os.environ.get("WARM_UP", "on")
 OUTBOX = phone.Outbox(os.environ.get("OUTBOX_DIR", str(HERE / "outbox")))
 phone.Call.ONE_MOMENT_AFTER_S = float(os.environ.get("ONE_MOMENT_AFTER_S", phone.Call.ONE_MOMENT_AFTER_S))
+phone.Utterances.EARLY_FRAMES = max(0, int(os.environ.get("EAR_EARLY_MS", phone.Utterances.EARLY_FRAMES * 20)) // 20)
 MAX_AUDIO_BYTES = 5 * 1024 * 1024
 
 log = logging.getLogger("uvicorn.error")     # uvicorn's own log, so start-up notes show beside its "Started server"

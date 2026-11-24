@@ -95,6 +95,37 @@ class UtterancesTest(unittest.TestCase):
         self.assertEqual(ears.feed(quiet(3.0, level=60)), [])
         self.assertEqual(ears.feed(np.concatenate([tone(0.1), quiet(1.5)])), [])
 
+    def test_after_300_ms_of_quiet_the_utterance_so_far_is_kept_and_its_key_matches_the_end(self):
+        ears = phone.Utterances()
+        audio = np.concatenate([quiet(0.5), tone(1.0), quiet(1.0)])
+        early, ended = [], []
+        for i in range(0, len(audio), phone.FRAME):
+            ended += [(u, k) for u, k in zip(ears.feed(audio[i:i + phone.FRAME]), ears.ended)]
+            if ears.early is not None:
+                early.append((i / RATE, ears.early))
+                ears.early = None
+        self.assertEqual(len(early), 1)
+        at, (key, so_far) = early[0]
+        self.assertAlmostEqual(at, 0.5 + 1.0 + 0.3, delta=0.05)        # 300 ms after the last word
+        self.assertEqual(len(ended), 1)
+        self.assertEqual(ended[0][1], key)                              # nothing said since: the same key
+        self.assertTrue(np.array_equal(ended[0][0][:len(so_far)], so_far))
+        self.assertAlmostEqual((len(ended[0][0]) - len(so_far)) / RATE, 0.4, delta=0.03)
+
+    def test_speech_after_the_early_copy_changes_the_key(self):
+        ears = phone.Utterances()
+        audio = np.concatenate([quiet(0.5), tone(1.0), quiet(0.45), tone(0.6), quiet(1.0)])
+        keys, ended = [], []
+        for i in range(0, len(audio), phone.FRAME):
+            ended += list(zip(ears.feed(audio[i:i + phone.FRAME]), ears.ended))
+            if ears.early is not None:
+                keys.append(ears.early[0])
+                ears.early = None
+        self.assertEqual(len(ended), 1)                     # one utterance: the pause was shorter than 700 ms
+        self.assertEqual(len(keys), 2)                      # an early copy in the pause, and one at the end
+        self.assertNotEqual(keys[0], ended[0][1])
+        self.assertEqual(keys[1], ended[0][1])
+
     def test_talking_over_the_agent_needs_300_ms(self):
         ears = phone.Utterances()
         ears.feed(np.concatenate([quiet(0.5), tone(0.2)]))
@@ -600,6 +631,114 @@ class CallTest(unittest.TestCase):
         self.assertEqual(replies, [])
         self.assertFalse([line for line in rest if "silence" in line])
         self.assertTrue([line for line in rest if "turn failed" in line])
+
+    # ------------------------------------------------------------------ the turn heard while the quiet passes
+
+    @staticmethod
+    def chunked(pcm, start=0.0, stop=None):
+        """Plivo's 20 ms messages for ``pcm`` from ``start`` to ``stop`` seconds."""
+        a, b = int(start * RATE), len(pcm) if stop is None else int(stop * RATE)
+        return [media(pcm[i:i + phone.FRAME]) for i in range(a, b, phone.FRAME)]
+
+    SENTENCE = np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)])    # the last word ends at 1.3 s
+
+    def early_ear(self, crm, audio, pause_at, stt, **kw):
+        """Streams ``audio`` in 20 ms messages with a 0.3 s pause at ``pause_at`` seconds, as a real line would leave
+        the engine time; returns the reply lines and the other log lines (timed)."""
+        script = [self.START, "wait"] + self.chunked(audio, 0, pause_at) + ["wait"] + \
+            self.chunked(audio, pause_at) + ["wait", "wait", "wait"]
+        return self.timed(crm, script, stt=stt, **kw)
+
+    def test_the_turn_is_heard_while_the_quiet_that_ends_it_passes(self):
+        lengths = []
+
+        def ear(audio):
+            lengths.append(len(audio) / phone.STT_RATE)
+            time.sleep(0.2)
+            return "I will pay on Friday."
+        crm = FakeCrm([phone.Reply("Noted.", False)])
+        replies, _ = self.early_ear(crm, self.SENTENCE, 1.65, ear)
+        self.assertEqual(crm.heard, ["I will pay on Friday."])
+        self.assertEqual(len(lengths), 1)                       # heard once, early
+        # 0.14 s from before the speech (the 200 ms kept counts the 60 ms that started it), the speech, 0.3 s of quiet
+        self.assertAlmostEqual(lengths[0], 0.14 + 1.0 + 0.3, delta=0.03)
+        total, _, steps = replies[0]
+        self.assertIn("early ear", steps)
+        self.assertNotIn("ear", steps)
+        self.assertLess(steps["early ear"], 0.1)                # done during the quiet: the 0.2 s is not waited
+
+    def test_an_early_hearing_is_not_used_when_the_caller_carries_on(self):
+        heard = []
+
+        def ear(audio):
+            heard.append(len(audio) / phone.STT_RATE)
+            return "I will pay" if len(audio) < 2.0 * phone.STT_RATE else "I will pay on Friday."
+        audio = np.concatenate([quiet(0.3), tone(1.0), quiet(0.45), tone(0.6), quiet(0.9)])
+        crm = FakeCrm([phone.Reply("Noted.", False)])
+        self.early_ear(crm, audio, 1.65, ear)                   # the pause comes inside the 0.45 s gap
+        self.assertEqual(crm.heard, ["I will pay on Friday."])
+        self.assertEqual(len(heard), 2)                         # the gap's hearing, wasted; then the end's
+        self.assertLess(heard[0], 2.0)
+        self.assertGreater(heard[1], 2.0)
+
+    def test_a_turn_waiting_its_turn_is_not_given_the_next_sentences_early_hearing(self):
+        # The agent is busy with turn 1 (a slow CRM) while the caller says sentence 2 and then sentence 3 reaches its
+        # early point: turn 2 must be heard as itself, not given sentence 3's words.
+        def said(seconds):
+            return np.concatenate([quiet(0.3), tone(seconds), quiet(0.9)])
+
+        def ear(audio):
+            s = len(audio) / phone.STT_RATE
+            return "one" if s < 1.5 else "two" if s < 2.7 else "three"
+        one, two, three = said(0.4), said(1.4), said(2.6)
+        crm = self.SlowCrm([phone.Reply("Okay.", False)] * 3, 1.2)
+        script = [self.START, "wait"] + self.chunked(one) + self.chunked(two) + self.chunked(three, 0, 3.25) + \
+            ["wait"] + self.chunked(three, 3.25) + ["wait"] * 14
+        self.run_call(crm, script, stt=ear)
+        self.assertEqual(crm.heard, ["one", "two", "three"])
+
+    def test_with_the_setting_off_the_turn_is_heard_after_the_quiet_as_before(self):
+        saved = phone.Utterances.EARLY_FRAMES
+        phone.Utterances.EARLY_FRAMES = 0
+        self.addCleanup(setattr, phone.Utterances, "EARLY_FRAMES", saved)
+        lengths = []
+        crm = FakeCrm([phone.Reply("Noted.", False)])
+        replies, _ = self.early_ear(crm, self.SENTENCE, 1.65,
+                                    lambda audio: lengths.append(len(audio) / phone.STT_RATE) or "Yes.")
+        self.assertEqual(crm.heard, ["Yes."])
+        self.assertEqual(len(lengths), 1)
+        self.assertAlmostEqual(lengths[0], 0.14 + 1.0 + 0.7, delta=0.03)      # the whole 700 ms of quiet
+        self.assertIn("ear", replies[0][2])
+
+    def test_an_early_hearing_that_fails_is_heard_again(self):
+        calls = []
+
+        def ear(audio):
+            calls.append(len(audio))
+            if len(calls) == 1:
+                raise RuntimeError("model busy")
+            return "I will pay on Friday."
+        crm = FakeCrm([phone.Reply("Noted.", False)])
+        _, rest = self.early_ear(crm, self.SENTENCE, 1.65, ear)
+        self.assertEqual((crm.heard, crm.troubles, len(calls)), (["I will pay on Friday."], [], 2))
+        self.assertTrue([line for line in rest if "early hearing failed (model busy)" in line])
+
+    def test_a_turn_heard_early_without_the_name_is_heard_again_with_it(self):
+        class SlowNamed(FakeCrm):
+            def open(self, call_id):
+                time.sleep(0.8)         # the CRM's opening is slow: the caller has spoken before the name came
+                return phone.Reply("Hello, am I speaking with Lakshmi?", False, "Lakshmi Narayanan")
+        hints = []
+
+        def ear(audio, *hint):
+            hints.append(hint)
+            return "This is Lakshmi Narayanan" if hint else "This is Laxmina Rainan"
+        crm = SlowNamed([phone.Reply("Thank you.", False)])
+        script = [self.START] + self.chunked(self.SENTENCE, 0, 1.65) + ["wait"] + \
+            self.chunked(self.SENTENCE, 1.65) + ["wait", "wait", "wait", "wait"]
+        self.run_call(crm, script, stt=ear)
+        self.assertEqual(hints, [(), ("Lakshmi Narayanan",)])
+        self.assertEqual(crm.heard, ["This is Lakshmi Narayanan"])
 
     # ------------------------------------------------------------------ the caller's last words at the hang-up
 

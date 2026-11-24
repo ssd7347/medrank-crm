@@ -14,6 +14,60 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 24 November 2026: THE EAR STARTS DURING THE QUIET THAT ENDS A TURN (user: "continue the next task"); COMMON CRM MARKED (user: "commit this point as common crm")
+
+The reply-time log showed that the engine's share of each reply is the 0.7 s of quiet that ends a turn, then the
+ear (0.5 s with base.en on this laptop, more with small.en). The two can overlap.
+
+**Built (engine).**
+- `Utterances` keeps the utterance so far once the quiet after the last word reaches `EARLY_FRAMES` (15 = 300 ms,
+  engine setting `EAR_EARLY_MS`, 0 = off). Its key (utterance number, loud frames so far) only stays the same while
+  nothing more is said.
+- `Call` starts hearing it at once (`_hear_early`). The turn uses that hearing only when it is of exactly that turn
+  (the same key) and was heard with the same name hint; otherwise it hears the whole turn as before. An early
+  hearing that failed is heard again. The reply-time line says "early ear".
+- The setting was checked by hand: unset gives 15 frames; `0` and `-20` give 0; `400` gives 20; `35` gives 1.
+
+**Checked against real audio first** (scratchpad `early_ear_check.py`). The material was the ear-check recordings:
+Piper's voice and the developer's, line and mobile paths, 98 turns. Both hearings were scored against the sentences
+read. Words wrong and key words heard (whole → early, of 844 words and 148 key words):
+
+| Early point | base.en words | base.en keys | small.en words | small.en keys | wasted hearings |
+|---|---|---|---|---|---|
+| 200 ms | 87 → 85 | 119 → 120 | 29 → 24 | 145 → 144 | 37 |
+| 300 ms | 87 → 83 | 119 → 120 | 29 → 28 | 145 → 145 | 17 |
+| 400 ms | 87 → 85 | 119 → 118 | (stopped) | (stopped) | 8 |
+
+Whisper's words move a little with the silence after them, in both directions. 300 ms was chosen: neither model
+lost a key word, with fewer wasted hearings than at 200 ms. The recordings stay local; nothing was sent anywhere.
+
+**Tests.**
+- `test_phone` has 8 new tests:
+  - 2 on `Utterances`: the copy is made 300 ms after the last word, and its key matches the end; speech after it
+    changes the key.
+  - 6 on `Call`, in Plivo's 20 ms messages: the turn is heard once, early, and the 0.2 s ear is not waited; the
+    hearing is not used when the caller carries on; with the setting off, the turn is heard after the full quiet;
+    a failed early hearing is heard again; a turn heard before the contact's name came is heard again with it; a
+    turn waiting its turn is not given the next sentence's early hearing.
+- **Mutation check: stopped early at the user's request** (scratchpad `mutate_early_ear.py`). 7 of 9 mutants were
+  run before it was stopped:
+  - 6 were caught: never heard early, the name hint ignored, a failed early hearing ending the turn, starting for
+    an utterance already ended, the copy after 20 ms, and a key blind to speech.
+  - 1 was **missed**: the key check in `_early_for` removed. The new "turn waiting its turn" test was added for
+    it. It fails without the check (the CRM got `['three', 'two', 'three']`) and passes with it.
+  - The stop left that run's mutant (a fixed 15 frames) in `phone.py`. It was found and put back before anything
+    else.
+  - Not run: the setting off ignored, and the "early ear" log name.
+- **Not rehearsed live yet** (user asked to move on). The unit tests drive the real call code with fakes.
+- The engine has 134 tests (126 before), all passing in one idle run; the runs under load were skipped to move on.
+  The backend is unchanged.
+
+**Docs.** The voice-engine README ("The ear starts early", with the table) and the settings list in `engine.py`.
+
+**Common CRM.** This commit is tagged `common-crm-v1`, and the branch `common-crm` points at it: the white-label CRM
+as it stands. The MedRank edition is built from it separately, in the `ssd7347/medrank-crm` repository (user: "for
+this medrank crm use the medrank-crm github repo").
+
 # 24 November 2026: THE ENGINE LOGS EVERY REPLY'S TIME, AND ITS CALL LINES REACH THE CONSOLE AT LAST (user: "continue the next task")
 
 The delivery plan's pass mark includes "reply starts within ~2 s on a phone", and step 6 of the first-call plan says to

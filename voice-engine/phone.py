@@ -169,6 +169,7 @@ class Utterances:
     PRE_ROLL = 10               # 200 ms kept from before the start
     MIN_SPEECH = 12             # shorter than 240 ms of speech: a cough or a click
     MAX_FRAMES = 1000           # 20 s at most
+    EARLY_FRAMES = 15           # this much quiet inside an utterance: what was said so far is kept in `early` (0: never)
 
     def __init__(self) -> None:
         self.floor = 200.0
@@ -179,20 +180,30 @@ class Utterances:
         self.quiet = 0              # consecutive quiet frames inside an utterance
         self.speech = 0             # loud frames in the current utterance
         self.active = False
+        self.number = 0             # utterances started so far
+        # Once the quiet after the caller's last word reaches EARLY_FRAMES: (key(), the utterance so far). Call hears it
+        # while the rest of the 700 ms passes; if the utterance then ends with the same key, nothing was said since.
+        self.early: tuple[tuple[int, int], np.ndarray] | None = None
+        self.ended: list[tuple[int, int]] = []      # key() of each utterance the last feed() returned, in order
+
+    def key(self) -> tuple[int, int]:
+        """Which utterance, and how much speech it holds: unchanged while only quiet follows."""
+        return self.number, self.speech
 
     def talking(self) -> bool:
         """True once the caller has spoken long enough to count as talking over the agent."""
         return self.active and self.loud >= self.BARGE_FRAMES
 
     def feed(self, pcm: np.ndarray) -> list[np.ndarray]:
-        """Adds audio; returns the utterances it completed."""
+        """Adds audio; returns the utterances it completed (their keys in ``ended``)."""
         self.buf = np.concatenate([self.buf, pcm])
-        done = []
+        done, self.ended = [], []
         while len(self.buf) >= FRAME:
             frame, self.buf = self.buf[:FRAME], self.buf[FRAME:]
             u = self._frame(frame)
             if u is not None:
                 done.append(u)
+                self.ended.append(self.key())
         return done
 
     def flush(self) -> np.ndarray | None:
@@ -211,12 +222,15 @@ class Utterances:
             self.pre = (self.pre + [frame])[-self.PRE_ROLL:]
             if self.loud >= self.START_FRAMES:
                 self.active, self.frames, self.quiet, self.speech = True, list(self.pre), 0, self.loud
+                self.number += 1
             return None
         self.frames.append(frame)
         if loud:
             self.quiet, self.speech = 0, self.speech + 1
         else:
             self.quiet += 1
+            if self.quiet == self.EARLY_FRAMES and self.speech >= self.MIN_SPEECH:
+                self.early = (self.key(), np.concatenate(self.frames))
         if self.quiet >= self.END_FRAMES or len(self.frames) >= self.MAX_FRAMES:
             frames, speech = self.frames, self.speech
             self.active, self.frames, self.pre, self.loud, self.quiet = False, [], [], 0, 0
@@ -475,6 +489,8 @@ class Call:
         # Records from the start; kept and sent only if the CRM's opening reply says to record (send_recording).
         self.recorder: Recorder | None = Recorder()
         self.record = False
+        # The turn heard early (Utterances.early, _hear_early): its key, the name hint it was heard with, the hearing.
+        self.early: tuple[tuple[int, int], str, asyncio.Task] | None = None
         # Reply times (timed): when each line of the answer being worked on started to go out, how long its voice
         # took, and each answer's silence (seconds from the caller's last word to the agent's first sound).
         self.sounds: list[float] = []
@@ -486,7 +502,7 @@ class Call:
         if event == "start":
             self.stream_id = (msg.get("start") or {}).get("streamId", "")
             self.worker = asyncio.create_task(self._work())
-            await self.jobs.put(("open", None, time.perf_counter()))
+            await self.jobs.put(("open", None, time.perf_counter(), None))
         elif event == "media" and not self.done:
             media = msg.get("media") or {}
             if media.get("track", "inbound") != "inbound":
@@ -494,11 +510,14 @@ class Call:
             pcm = ulaw_decode(base64.b64decode(media.get("payload") or ""))
             if self.recorder:
                 self.recorder.hear(pcm)
-            for utterance in self.ears.feed(pcm):
+            for utterance, key in zip(self.ears.feed(pcm), self.ears.ended):
                 if not self.ending:
-                    await self.jobs.put(("turn", utterance, time.perf_counter()))
+                    await self.jobs.put(("turn", utterance, time.perf_counter(), key))
                 else:
                     self.late.append(utterance)     # said over the goodbye: no reply, but sent as last words
+            early, self.ears.early = self.ears.early, None
+            if early is not None and self.ears.active and early[0] == self.ears.key() and not self.ending:
+                self._hear_early(*early)
             if self.speaking and not self.ending and self.ears.talking():
                 # The caller talks over the agent: stop speaking and listen.
                 self.speaking = ""
@@ -515,7 +534,7 @@ class Call:
     async def _work(self) -> None:
         clock = time.perf_counter       # reply times; the loop's own clock ticks only every ~16 ms on Windows
         while not self.done:
-            kind, audio, at = await self.jobs.get()
+            kind, audio, at, key = await self.jobs.get()
             self.sounds, self.voice_s = [], 0.0
             took: dict[str, float] | None = {}     # seconds each step took after `at`, for the log (timed)
             try:
@@ -531,8 +550,9 @@ class Call:
                 else:
                     self.unsent = audio
                     t = clock()
-                    text = await self.hear(audio)
-                    took["ear"] = clock() - t
+                    early = self._early_for(key)
+                    text = await self._heard(early, audio)
+                    took["early ear" if early is not None else "ear"] = clock() - t
                     joins = 0
                     while text and unfinished(text) and joins < self.MOST_JOINS:
                         t = clock()
@@ -545,6 +565,7 @@ class Call:
                         self.unsent = audio
                         t = clock()
                         text = await self.hear(audio)
+                        took.pop("early ear", None)
                         took["ear"] = clock() - t
                     # From here the words are the CRM's: the request starts before anything can cancel this task.
                     self.unsent = None
@@ -615,6 +636,30 @@ class Call:
         hint = (self.hint,) if self.hint else ()
         return (await asyncio.to_thread(self.stt, pcm, *hint)).strip()
 
+    def _hear_early(self, key: tuple[int, int], audio: np.ndarray) -> None:
+        """The caller has gone quiet (Utterances.EARLY_FRAMES): hear what they said while the rest of the 700 ms that
+        ends a turn passes. If they say more, this hearing is simply not used."""
+        task = asyncio.get_running_loop().create_task(self.hear(audio))
+        task.add_done_callback(lambda t: t.cancelled() or t.exception())    # a failure is dealt with where it is used
+        self.early = (key, self.hint, task)
+
+    def _early_for(self, key: tuple[int, int] | None) -> asyncio.Task | None:
+        """The early hearing of exactly this turn (the same utterance, nothing said since, the same name hint), once."""
+        if self.early is None or self.early[0] != key or self.early[1] != self.hint:
+            return None
+        task, self.early = self.early[2], None
+        return task
+
+    async def _heard(self, early: asyncio.Task | None, audio: np.ndarray) -> str:
+        """The turn's words: from its early hearing if there is one, else heard now. An early hearing that failed is
+        heard again, so a fault is dealt with as on any turn."""
+        if early is not None:
+            try:
+                return await early
+            except Exception as e:
+                log.info("call %s: the early hearing failed (%s); hearing the turn again", self.call_id, e)
+        return await self.hear(audio)
+
     async def _more(self) -> tuple[np.ndarray, float] | None:
         """After an unfinished-looking turn: the caller's next utterance, and when it ended, if it starts within HOLD_S
         seconds (it is then waited for until it ends), else None."""
@@ -627,7 +672,7 @@ class Call:
                     return None
                 left = 0.1                          # the caller is speaking again: wait for the end of it
             try:
-                kind, audio, at = await asyncio.wait_for(self.jobs.get(), left)
+                kind, audio, at, _ = await asyncio.wait_for(self.jobs.get(), left)
             except asyncio.TimeoutError:
                 continue
             if kind == "turn":
@@ -708,7 +753,7 @@ class Call:
         parts = [] if self.unsent is None else [self.unsent]
         self.unsent = None
         while not self.jobs.empty():
-            kind, audio, _ = self.jobs.get_nowait()
+            kind, audio, _, _ = self.jobs.get_nowait()
             if kind == "turn":
                 parts.append(audio)
         parts += self.late
