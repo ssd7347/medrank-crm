@@ -2,7 +2,7 @@
 
 This is the AI Call CRM (tag `common-crm-v1` in `ssd7347/ai-call-crm`) set up for MedRank, a NEET UG
 admission-counselling company. It keeps everything the common CRM has, including the real AI phone calls (Plivo, our
-own speech engine and brain). Two things are added:
+own speech engine and brain). Three things are added:
 
 - **The "NEET UG counselling (MedRank)" starter pack** (`backend/src/main/resources/packs/neet_counselling.json`),
   listed first. It adds:
@@ -26,6 +26,9 @@ own speech engine and brain). Two things are added:
   choice filling, an allotted seat, a rank, a score or cut-off, a college, MBBS or BDS, or documents, unless the
   opening, an identity question or the caller used the word first (`FactGuard.REASON_WORDS`). The company's name
   "MedRank" does not count as "rank".
+- **The browser-tab icon is MedRank's shield** (`frontend/src/app/favicon.ico`, cropped from the MedRank Academy
+  logo). The logo in the menu and on the login page is a setting, not code: upload the shield in **Company
+  settings** (PNG, JPEG or WebP, up to 300 KB). The full logo with its words is too small to read there.
 
 ## Setting it up
 
