@@ -14,6 +14,38 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 24 November 2026: THE MEDRANK EDITION (user: "change this crm for medrank crm" / "use the current code and modify it for the medrank crm with the ai real calling" / "for this medrank crm use the medrank-crm github repo")
+
+The user chose: replace `main` of `ssd7347/medrank-crm` with this edition, after keeping the old MBBS-CRM app there
+as branch `mbbs-crm-old` and tag `mbbs-crm-final`; the change is a NEET counselling pack. Built on branch `medrank`
+from `common-crm-v1`. The common CRM (`ssd7347/ai-call-crm`, `main` and `common-crm`) does not have it.
+
+**Built.**
+- **Starter pack `neet_counselling`**, "NEET UG counselling (MedRank)", listed first:
+  - 5 stages;
+  - 13 fields: the roll number verifies but is never said; parent, category and state are never sent to the AI;
+    the rest only after the identity check;
+  - 5 draft scripts with the neutral recorded opening: enquiry follow-up, counselling round, documents, fee,
+    reporting after allotment. They never promise or predict a seat, never advise on choices, and send refunds
+    and seat exits to a person;
+  - 6 answers, switched off, with [placeholders].
+- **`FactGuard.REASON_WORDS`** now has NEET, counselling, choice filling, allotment/allotted, seat, rank, score,
+  cut-off, college, MBBS, BDS and documents. `training/spec/agent-spec.json` was rewritten (only `reason_words`).
+- **Training kit** (`callkit.py`): MedRank company names, and realistic values for the new fields (score 300 to
+  680, rank 5,000 to 250,000, NR- roll numbers). Without them, `test_every_template_scenario_produces_a_clean_call`
+  failed (KeyError: the kit builds practice calls from every pack).
+- **Docs.** `docs/medrank.md` (new): what is added, the setup order, and the reminder that the brain was not
+  trained on NEET calls, so test each script in the Test console first. The README heading says this is the
+  MedRank edition. `new-customer-setup.md` names the pack.
+
+**Tests.**
+- `CustomisationIntegrationTest` has 1 new test: the pack is listed first; loading it adds 5, 13, 5 and 6; it
+  checks the field access, the drafts, the switched-off answers and the industry setting.
+- `AiBrainIntegrationTest` has 1 new test: MedRank's reasons are held back; "MedRank", the roll-number question
+  and the caller's own words are allowed.
+- `StarterOpeningsIntegrationTest` now covers the pack (14 openings).
+- The training kit: 80 of 80 pass. The backend: all 172 tests pass on H2 (`mvn test`).
+
 # 24 November 2026: THE EAR STARTS DURING THE QUIET THAT ENDS A TURN (user: "continue the next task"); COMMON CRM MARKED (user: "commit this point as common crm")
 
 The reply-time log showed that the engine's share of each reply is the 0.7 s of quiet that ends a turn, then the

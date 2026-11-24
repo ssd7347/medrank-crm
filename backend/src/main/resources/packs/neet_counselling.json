@@ -1,0 +1,53 @@
+{
+  "id": "neet_counselling",
+  "name": "NEET UG counselling (MedRank)",
+  "description": "MBBS and BDS admission counselling: enquiry follow-ups, counselling-round and choice-filling reminders, documents, fees and reporting after a seat is allotted.",
+  "contactLabel": "Student",
+  "stages": [
+    {"label": "Counselling session booked", "color": "#7c3aed", "category": "OPEN"},
+    {"label": "Registered for counselling", "color": "#2563eb", "category": "OPEN"},
+    {"label": "Choices filled", "color": "#0891b2", "category": "OPEN"},
+    {"label": "Seat allotted", "color": "#0d9488", "category": "OPEN"},
+    {"label": "Admitted", "color": "#16a34a", "category": "WON"}
+  ],
+  "fields": [
+    {"label": "NEET roll number", "type": "TEXT", "agentAccess": "NONE", "verifyWith": true},
+    {"label": "Parent name", "type": "TEXT", "agentAccess": "NONE", "verifyWith": false},
+    {"label": "Course wanted", "type": "TEXT", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "NEET score", "type": "NUMBER", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "NEET All India Rank", "type": "NUMBER", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Category", "type": "TEXT", "agentAccess": "NONE", "verifyWith": false},
+    {"label": "Domicile state", "type": "TEXT", "agentAccess": "NONE", "verifyWith": false},
+    {"label": "Counselling round", "type": "TEXT", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Choice filling deadline", "type": "DATE", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Documents pending", "type": "TEXT", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Fee due", "type": "AMOUNT", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Fee due date", "type": "DATE", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
+    {"label": "Reporting deadline", "type": "DATE", "agentAccess": "AFTER_VERIFY", "verifyWith": false}
+  ],
+  "scripts": [
+    {"name": "NEET enquiry follow-up", "kind": "OUTBOUND",
+     "purpose": "Follow up an enquiry about NEET UG counselling. Ask whether they would like a session with one of our counsellors, and which course they are aiming for (MBBS or BDS). If yes, log INTERESTED and schedule a call-back at the time they choose. Answer questions about our services only from search_faq. Never promise or predict a seat, a college or a cut-off. If you are speaking with a student under 18, ask to speak with a parent.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"},
+    {"name": "Counselling round reminder", "kind": "OUTBOUND",
+     "purpose": "After verification, remind the student or parent that the counselling round in get_contact_details is open and say the choice filling deadline from get_contact_details. Offer a call-back from a counsellor to review their choices before the deadline. If they say they will finish choice filling, log WILL_ACT with the date. Never advise which college or course to choose; a counsellor does that. Never say anything about their rank or chances.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"},
+    {"name": "Documents reminder", "kind": "OUTBOUND",
+     "purpose": "After verification, tell the student or parent which documents are still needed, from Documents pending in get_contact_details, and how to send them, only from search_faq. If they say when they will send them, log WILL_ACT with the date. If a document is lost or they are unsure what is needed, offer a counsellor call-back.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"},
+    {"name": "Counselling fee reminder", "kind": "OUTBOUND",
+     "purpose": "Remind the student or parent that a counselling fee is due. After verification, share the amount and date from get_contact_details. If they say when they will pay, log WILL_ACT with the date. Never threaten, never pressure, and never say that their counselling or admission depends on paying. Any question about refunds goes to a person.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"},
+    {"name": "Reporting reminder after allotment", "kind": "OUTBOUND",
+     "purpose": "After verification, congratulate them on the seat allotted and remind them of the reporting deadline from get_contact_details. Offer a counsellor call-back to go through what to carry to the college. Any question about upgrading, resigning or exiting a seat, or about refunds, goes to a person. If they say they will report, log WILL_ACT with the date.",
+     "opening": "Hello, this is {{agent_name}}, an AI assistant calling from {{company_name}}. This call may be recorded. Am I speaking with {{first_name}}?"}
+  ],
+  "faqs": [
+    {"question": "What does MedRank do?", "answer": "[Company] helps NEET UG students and parents with [counselling guidance, choice filling, document checks and admission support]. One of our counsellors can explain how it works.", "keywords": "services, help, what do you do, medrank, about"},
+    {"question": "What is your counselling fee?", "answer": "Our [package name] costs [amount], payable [in instalments / at once]. A counsellor can explain what each package includes.", "keywords": "fee, fees, cost, price, package, charge"},
+    {"question": "Can you guarantee a seat?", "answer": "No one can guarantee a seat. Admission depends on your rank, category, the choices you fill and the official counselling rounds. Our counsellors help you make good choices.", "keywords": "guarantee, sure, confirm, seat, admission, chance"},
+    {"question": "When is the next counselling round?", "answer": "[Round] choice filling is open until [date], as announced by [MCC / the state counselling authority]. Please check the official website for any change.", "keywords": "round, counselling, when, date, deadline, choice filling, schedule"},
+    {"question": "Which documents are needed?", "answer": "Please keep these ready: [the documents list], and send them [how: WhatsApp, email, or at our office].", "keywords": "documents, certificate, papers, upload, send, marksheet"},
+    {"question": "How do I book a session with a counsellor?", "answer": "You can book a session [by phone on our number / on our website / at our office in (city)]. Sessions are [online / in person].", "keywords": "book, session, meet, counsellor, appointment, talk"}
+  ]
+}

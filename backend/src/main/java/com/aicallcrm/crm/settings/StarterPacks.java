@@ -48,7 +48,8 @@ import tools.jackson.databind.ObjectMapper;
 public class StarterPacks {
 
     /** Shown in this order. Each id is a file {@code packs/<id>.json}. */
-    static final List<String> IDS = List.of("clinic", "finance", "real_estate", "education", "insurance");
+    static final List<String> IDS = List.of("neet_counselling", "clinic", "finance", "real_estate", "education",
+            "insurance");
     static final String MODEL = "claude-sonnet-5-5";
 
     record PackStage(String label, String color, Category category) {

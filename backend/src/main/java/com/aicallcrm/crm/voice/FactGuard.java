@@ -71,6 +71,10 @@ final class FactGuard {
      * told whoever answered "Your appointment is for your dental check-up" and asked about "our courses"): a clinic
      * visit, a course or admission, an insurance policy, a property. Not "enquiry", which the model also uses for any
      * question ("happy to help with your inquiry"), nor "of course".
+     *
+     * <p>And what MedRank calls about (the NEET counselling pack): NEET, counselling, choice filling, an allotted seat,
+     * a rank, a score or cut-off, a college, MBBS or BDS, documents. The company's own name says none of them
+     * ("MedRank" is one word, not "rank").
      */
     static final String REASON_WORDS = "\\b(overdue|emis?|loans?|debts?|dues|arrears|outstanding|install?ments?|"
             + "pay|paying|payments?|premiums?|fees?|amounts?|bills?|owe|owed|owing|"
@@ -78,7 +82,9 @@ final class FactGuard {
             + "vaccinations?|scans?|test results?|diagnos[ie]s|symptoms?|"
             + "admissions?|enrol(?:l)?(?:ments?|ed|ing)?|(?<!of )courses?|class(?:es)?|tuition|exams?|counsell?ors?|"
             + "insurance|polic(?:y|ies)|renew(?:als?|ed|ing)?|claims?|"
-            + "propert(?:y|ies)|visits?|flats?|apartments?|plots?|villas?)\\b";
+            + "propert(?:y|ies)|visits?|flats?|apartments?|plots?|villas?|"
+            + "neet|counsell?ing|choice[- ]filling|allot(?:ments?|ted)|seats?|ranks?|scores?|cut[- ]?offs?|colleges?|"
+            + "mbbs|bds|documents?)\\b";
     private static final Pattern REASON = Pattern.compile(REASON_WORDS);
 
     /** Said instead when the model names the reason again after its private note; it names nothing. */

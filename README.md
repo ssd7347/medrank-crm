@@ -1,4 +1,8 @@
-# AI Call CRM
+# AI Call CRM: MedRank edition
+
+**This is the MedRank edition**: the common AI Call CRM (tag `common-crm-v1` in `ssd7347/ai-call-crm`) with a NEET UG
+counselling starter pack and NEET-aware call safeguards, with the real AI phone calls kept. What it adds and how to
+set it up: `docs/medrank.md`.
 
 A CRM with an English-speaking AI phone agent, built to be installed separately for each customer company and
 branded as theirs. Contacts come in from the customer's own Excel or CSV files, with whatever columns those files

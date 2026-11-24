@@ -159,6 +159,7 @@ COMPANIES = {
     "education": ["Bright Future Academy", "Vidya Coaching Centre", "Excel Institute"],
     "insurance": ["Shield Insurance", "SafeLife Assurance", "Guardian Insurance"],
     "real_estate": ["Greenfield Realty", "Skyline Homes", "Prestige Properties"],
+    "neet_counselling": ["MedRank", "MedRank Academy", "Pathway Medical Counselling"],
 }
 AGENTS = ["Asha", "Maya", "Priya", "Kavya", "Arjun", "Ravi", "Diya", "Neha"]
 TEXT_VALUES = {
@@ -173,6 +174,11 @@ TEXT_VALUES = {
     "parent_name": ["Mr. Raman", "Mrs. Latha"],
     "enquired_about": ["a home loan", "the premium plan", "a new connection", "the annual membership"],
     "plan": ["the Silver plan", "the Gold plan", "the Basic plan"],
+    "course_wanted": ["MBBS", "BDS"],
+    "category": ["General", "OBC", "SC", "ST", "EWS"],
+    "domicile_state": ["Tamil Nadu", "Karnataka", "Kerala", "Andhra Pradesh"],
+    "counselling_round": ["Round 1", "Round 2", "the mop-up round"],
+    "documents_pending": ["the Class 12 marksheet", "the domicile certificate", "the category certificate"],
 }
 
 
@@ -226,12 +232,13 @@ def make_person(script: Script, rng: random.Random) -> Person:
             n = rng.choice([1500, 2400, 3250, 4999, 7800, 12500, 18750, 23000, 45000]) if "budget" not in k else rng.choice([4500000, 6200000, 8500000])
             values[k], said[k] = str(n), spoken_amount(n)
         elif f.type == "NUMBER":
-            n = rng.randint(3, 45)
+            n = rng.randint(300, 680) if "score" in k else rng.randint(5000, 250000) if "rank" in k else rng.randint(3, 45)
             values[k], said[k] = str(n), str(n)
         elif k in TEXT_VALUES:
             values[k] = said[k] = rng.choice(TEXT_VALUES[k])
         else:  # reference numbers: customer, loan, policy, patient, student and enquiry IDs
-            prefix = {"loan": "LN", "policy": "POL", "patient": "PT", "student": "ST", "enquiry": "ENQ"}.get(k.split("_")[0], "CUST")
+            prefix = {"loan": "LN", "policy": "POL", "patient": "PT", "student": "ST", "enquiry": "ENQ",
+                      "neet": "NR"}.get(k.split("_")[0], "CUST")
             digits = str(rng.randint(100000, 999999))
             values[k] = f"{prefix}-{digits}"
             said[k] = rng.choice([digits, f"{prefix} {digits}", " ".join(digits)])

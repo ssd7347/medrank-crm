@@ -231,6 +231,25 @@ class AiBrainIntegrationTest {
     }
 
     @Test
+    void medranksReasonsStayUnsaidUntilTheCheck() {
+        String opening = "Hello, this is Asha, an AI assistant calling from MedRank. This call may be recorded."
+                + " Am I speaking with Priya?";
+        assertThat(FactGuard.reasonWords("Your NEET counselling round is open and choice filling ends on Friday.", opening))
+                .containsExactly("neet", "counselling", "choice filling");
+        assertThat(FactGuard.reasonWords("Congratulations on your seat allotment at the medical college.", opening))
+                .containsExactly("seat", "allotment", "college");
+        assertThat(FactGuard.reasonWords("With your rank and score, MBBS or BDS is possible; the cut-off was lower.",
+                opening)).containsExactly("rank", "score", "mbbs", "bds", "cut-off");
+        assertThat(FactGuard.reasonWords("We still need two documents from you.", opening)).containsExactly("documents");
+        assertThat(FactGuard.reasonWords("You were allotted a seat.", opening)).containsExactly("allotted", "seat");
+        // The company's name is not "rank"; the identity question and the caller's own words may be used.
+        assertThat(FactGuard.reasonWords("Thank you, this is MedRank. May I have your full name, please?", opening)).isEmpty();
+        assertThat(FactGuard.reasonWords("May I have your NEET roll number?", opening + " [{\"ask_for\":\"NEET roll number\"}]"))
+                .isEmpty();
+        assertThat(FactGuard.reasonWords("Yes, it is about counselling.", "Is this about counselling?")).isEmpty();
+    }
+
+    @Test
     void aStrangerNeverHearsAboutACheckUpOrARenewal() throws Exception {
         String admin = admin();
         // The note makes the model behave: the caller hears only the second, neutral answer.

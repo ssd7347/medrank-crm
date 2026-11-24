@@ -112,8 +112,8 @@ does not arrive shows up only in the logs.
 
 Sign in as the admin:
 
-1. **Industry starter packs**: load the pack closest to the customer's business (clinic, loans and EMI,
-   real estate, education, insurance). It adds stages, custom fields, call scripts and knowledge-base answers,
+1. **Industry starter packs**: load the pack closest to the customer's business (NEET UG counselling for MedRank,
+   `docs/medrank.md`; clinic, loans and EMI, real estate, education, insurance). It adds stages, custom fields, call scripts and knowledge-base answers,
    and sets what contacts are called. It never deletes or overwrites anything, so it is safe to load later too.
    Its answers arrive switched off and its scripts as drafts, because they contain [placeholders] to fill in.
 2. **Company settings**: company name, logo, the AI agent's name, brand colour, what contacts are called

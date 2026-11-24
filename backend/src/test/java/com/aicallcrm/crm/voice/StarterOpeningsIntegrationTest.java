@@ -62,7 +62,7 @@ class StarterOpeningsIntegrationTest {
     @Test
     void everyStarterPackOpeningSaysItMayBeRecordedAndIsOtherwiseNeutral() throws Exception {
         int seen = 0;
-        for (String pack : List.of("clinic", "education", "finance", "insurance", "real_estate")) {
+        for (String pack : List.of("clinic", "education", "finance", "insurance", "real_estate", "neet_counselling")) {
             try (InputStream in = new ClassPathResource("packs/" + pack + ".json").getInputStream()) {
                 JsonNode root = mapper.readTree(new String(in.readAllBytes(), StandardCharsets.UTF_8));
                 for (JsonNode script : root.get("scripts")) {
@@ -74,7 +74,7 @@ class StarterOpeningsIntegrationTest {
                 }
             }
         }
-        assertThat(seen).isEqualTo(9);
+        assertThat(seen).isEqualTo(14);
     }
 
     /** The V10 migration itself, run again on two scripts with the old wording: only the draft changes. */

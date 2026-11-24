@@ -176,6 +176,37 @@ class CustomisationIntegrationTest {
         mvc.perform(get("/api/public/branding")).andExpect(jsonPath("$.industryPack").value("finance"));
     }
 
+    @Test
+    void theNeetCounsellingPackIsListedFirstAndKeepsPrivateDetailsPrivate() throws Exception {
+        String admin = login();
+        mvc.perform(auth(get("/api/settings/packs"), admin)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("neet_counselling"))
+                .andExpect(jsonPath("$[0].contactLabel").value("Student"));
+        mvc.perform(auth(post("/api/settings/packs/neet_counselling/apply"), admin)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.stagesAdded").value(5)).andExpect(jsonPath("$.fieldsAdded").value(13))
+                .andExpect(jsonPath("$.scriptsAdded").value(5)).andExpect(jsonPath("$.faqsAdded").value(6));
+        mvc.perform(auth(get("/api/stages"), admin)).andExpect(jsonPath("$[*].label").value(
+                Matchers.hasItems("Counselling session booked", "Seat allotted", "Admitted")));
+        // The roll number proves who is speaking but is never said; category and state are never sent to the AI;
+        // score, rank and the deadlines only once the caller has proved who they are.
+        mvc.perform(auth(get("/api/fields"), admin))
+                .andExpect(jsonPath("$[?(@.key == 'neet_roll_number')].verifyWith").value(Matchers.hasItem(true)))
+                .andExpect(jsonPath("$[?(@.key == 'neet_roll_number')].agentAccess").value(Matchers.hasItem("NONE")))
+                .andExpect(jsonPath("$[?(@.key == 'category')].agentAccess").value(Matchers.hasItem("NONE")))
+                .andExpect(jsonPath("$[?(@.key == 'domicile_state')].agentAccess").value(Matchers.hasItem("NONE")))
+                .andExpect(jsonPath("$[?(@.key == 'neet_score')].agentAccess").value(Matchers.hasItem("AFTER_VERIFY")))
+                .andExpect(jsonPath("$[?(@.key == 'neet_all_india_rank')].agentAccess").value(Matchers.hasItem("AFTER_VERIFY")))
+                .andExpect(jsonPath("$[?(@.key == 'choice_filling_deadline')].fieldType").value(Matchers.hasItem("DATE")));
+        // Drafts to approve, answers switched off: both still hold [placeholders] only MedRank can fill in.
+        mvc.perform(auth(get("/api/voice/scripts"), admin))
+                .andExpect(jsonPath("$[?(@.name == 'Counselling round reminder')].approved").value(Matchers.hasItem(false)))
+                .andExpect(jsonPath("$[?(@.name == 'NEET enquiry follow-up')].systemPrompt").value(
+                        Matchers.hasItem(Matchers.containsString("Never promise or predict a seat"))));
+        mvc.perform(auth(get("/api/faq"), admin))
+                .andExpect(jsonPath("$[?(@.question == 'Can you guarantee a seat?')].active").value(Matchers.hasItem(false)));
+        mvc.perform(get("/api/public/branding")).andExpect(jsonPath("$.industryPack").value("neet_counselling"));
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private long stageId(String key, String token) throws Exception {
