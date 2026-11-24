@@ -359,8 +359,12 @@ class Crm:
         r.raise_for_status()
         return r.json()
 
+    # The opening only reads the CRM's database (the brain warms up in the background), so it answers within a
+    # second; a CRM that takes longer is broken, and the caller should not wait 20 s in silence for the goodbye.
+    OPEN_TIMEOUT_S = 8
+
     def open(self, call_id: str) -> Reply:
-        d = self._call("open", {"call_id": call_id})
+        d = self._call("open", {"call_id": call_id}, timeout=self.OPEN_TIMEOUT_S)
         return Reply(d.get("say") or "", bool(d.get("over")), str(d.get("hint") or "").strip()[:100],
                      d.get("record") is True, d.get("call_back") is not False)
 

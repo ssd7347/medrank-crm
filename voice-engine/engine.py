@@ -106,6 +106,7 @@ _voice = None
 _whisper_lock = threading.Lock()    # one load, even when the warm-up and a first call ask at the same moment
 _voice_lock = threading.Lock()
 _warm = {"warmed": False, "error": None}
+_said_ahead: dict[str, bytes] = {}  # fixed lines made by the warm-up (WAV), so saying them never waits on the voice
 
 
 def whisper():
@@ -146,6 +147,9 @@ def warm_up() -> None:
     try:
         stt_pcm(np.zeros(16000, dtype=np.float32))      # one second of silence
         speak_wav("Hello.")
+        # The "having trouble" goodbyes are said when something has just failed: made now, they start at once.
+        for line in (phone.TROUBLE, phone.TROUBLE_NO_CALL_BACK):
+            _said_ahead[line] = speak_wav(line)
     except Exception as e:      # a missing model or voice file: say so, keep serving
         _warm["error"] = f"{type(e).__name__}: {getattr(e, 'detail', None) or e}"
         log.warning("Warm-up failed, the models will load on first use: %s", _warm["error"])
@@ -240,7 +244,8 @@ def hints_on(model: str, setting: str) -> bool:
 
 
 def tts_pcm(text: str) -> tuple[np.ndarray, int]:
-    with wave.open(io.BytesIO(speak_wav(text[:800])), "rb") as w:
+    wav = _said_ahead.get(text) or speak_wav(text[:800])
+    with wave.open(io.BytesIO(wav), "rb") as w:
         return np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16), w.getframerate()
 
 

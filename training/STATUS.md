@@ -14,6 +14,41 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 24 November 2026: THE "HAVING TROUBLE" GOODBYE REHEARSED LIVE, AND THE SILENCE BEFORE IT CUT (user: "continue")
+
+**Rehearsed live** (until now only unit-tested). The setup was the in-memory test CRM in Plivo mode (`jdbc:h2:mem`
+checked, no PostgreSQL), the real engine (base.en, warmed) and the gateway. The gateway reached the CRM, but the
+engine's `CRM_URL` pointed elsewhere, so the engine could not reach the CRM at the opening. A scratch wrapper
+(`rehearse_heard.py`) kept the agent's audio, and the engine transcribed it:
+
+| Caller | CRM | The agent said | Goodbye began after the answer |
+|---|---|---|---|
+| withheld | refused | "Sorry, I am having trouble on this line. Please call us again later. Goodbye." | 6.8 s, then 3.7 s after the fix |
+| Priya (contact) | refused | "... A member of our team will call you back. Goodbye." | 6.4 s, then 2.5 s after the fix |
+| withheld | hung (accepts, never answers) | "... Please call us again later. Goodbye." | 9.3 s (after the fix; 20 s+ before) |
+| Priya (contact) | hung | "... A member of our team will call you back. Goodbye." | 9.7 s (after the fix) |
+
+The stream URL carried `call_back=no` only for the withheld caller, and each fault went to the engine's outbox. The
+outbox (6 rehearsal reports) was deleted afterwards and all ports freed. A normal opening begins 0.6 to 1.4 s after the
+answer (earlier rehearsals).
+
+**What the silence was** (measured). 2.0 s was Windows's own wait on a refused connection (4.1 s through
+`localhost`). 1.7 s was making the goodbye's audio. With a hung CRM the opening's 20 s timeout would have come first.
+
+**Built (engine).**
+- `phone.Crm.open` waits 8 s (`OPEN_TIMEOUT_S`). The CRM's opening only reads its database (`LiveCallService.open`;
+  the brain warms up in the background). Turns keep 20 s because they wait on the brain.
+- The warm-up also makes both goodbyes (`TROUBLE`, `TROUBLE_NO_CALL_BACK`), kept as WAV in `_said_ahead`. `tts_pcm`
+  uses them, so a fault never waits on the voice. Any other line is made when it is said.
+
+**Tests.** `test_phone` has 2 new tests: the opening waits 8 s and a turn 20; and the goodbyes made at the warm-up are
+said without the voice. The warm-up test now expects both goodbyes made. 6 mutants, all caught (scratchpad
+`mutate_fast_goodbye.py`): the opening waits 20 s, every request waits 8 s, goodbyes not made, only one made, made
+ones not used, a made one used for any line. The engine has 114 tests (112 before), all passing idle and in 2 of 2 runs with every core busy. The backend
+is unchanged.
+
+**Docs.** The voice-engine README (the warm-up, and the waits with the measured silences).
+
 # 20 November 2026: THE FLAKY ENGINE TEST FOUND; THE REHEARSAL'S "STREAM STILL OPEN?" VERDICT FIXED (user: "Yes, find it")
 
 **Found.** The one unexplained failure (next entry down) reproduced with every CPU core kept busy (scratchpad

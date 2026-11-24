@@ -7,9 +7,11 @@ CRM and fake speech models.
 
 import asyncio
 import base64
+import io
 import json
 import unittest
 import warnings
+import wave
 
 import numpy as np
 
@@ -858,6 +860,25 @@ class RecordingCallTest(unittest.TestCase):
         self.assertEqual(headers["X-Voice-Signature"],
                          phone.sign("s" * 40, headers["X-Voice-Timestamp"], json.dumps(body, separators=(",", ":"))))
 
+    def test_the_opening_waits_8_s_for_the_crm_and_a_turn_20(self):
+        seen = []
+
+        class Res:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"say": "Hi", "over": False}
+
+        def post(url, data, timeout, headers):
+            seen.append((url.rsplit("/", 1)[1], timeout))
+            return Res()
+        crm = phone.Crm("http://crm.local:8082", "s" * 40, post=post)
+        crm.open("c1")
+        crm.turn("c1", "Hello")
+        # The opening only reads the CRM's database; a turn waits on the brain.
+        self.assertEqual(seen, [("open", 8), ("turn", 20)])
+
     def test_only_an_explicit_yes_from_the_crm_records(self):
         answers = [{"say": "Hi", "over": False, "record": True}, {"say": "Hi", "over": False},
                    {"say": "Hi", "over": False, "record": "yes"}]
@@ -1056,14 +1077,18 @@ class WarmUpTest(unittest.TestCase):
     def setUp(self):
         import engine
         self.engine = engine
-        saved = (engine.stt_pcm, engine.speak_wav, engine.warm_up, engine.WARM_UP, dict(engine._warm), engine._whisper)
+        saved = (engine.stt_pcm, engine.speak_wav, engine.warm_up, engine.WARM_UP, dict(engine._warm), engine._whisper,
+                 dict(engine._said_ahead))
 
         def restore():
-            (engine.stt_pcm, engine.speak_wav, engine.warm_up, engine.WARM_UP, warm, engine._whisper) = saved
+            (engine.stt_pcm, engine.speak_wav, engine.warm_up, engine.WARM_UP, warm, engine._whisper, ahead) = saved
             engine._warm.clear()
             engine._warm.update(warm)
+            engine._said_ahead.clear()
+            engine._said_ahead.update(ahead)
         self.addCleanup(restore)
         engine._warm.update(warmed=False, error=None)
+        engine._said_ahead.clear()
 
     def health(self):
         from starlette.testclient import TestClient
@@ -1075,8 +1100,30 @@ class WarmUpTest(unittest.TestCase):
         self.engine.speak_wav = lambda text: ran.append(("voice", text)) or b""
         self.assertFalse(self.health()["warmed"])
         self.engine.warm_up()
-        self.assertEqual(ran, [("ears", (16000,), "float32"), ("voice", "Hello.")])
+        self.assertEqual(ran, [("ears", (16000,), "float32"), ("voice", "Hello."), ("voice", phone.TROUBLE),
+                               ("voice", phone.TROUBLE_NO_CALL_BACK)])
         self.assertEqual((self.health()["warmed"], self.health()["warm_up_error"]), (True, None))
+
+    def test_the_goodbyes_made_at_the_warm_up_are_said_without_waiting_on_the_voice(self):
+        def wav(seconds):
+            buf = io.BytesIO()
+            with wave.open(buf, "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(22050)
+                w.writeframes(np.zeros(int(22050 * seconds), dtype=np.int16).tobytes())
+            return buf.getvalue()
+        made = []
+        self.engine.stt_pcm = lambda audio: ""
+        self.engine.speak_wav = lambda text: made.append(text) or wav(0.5 if text == "Hello." else 2.0)
+        self.engine.warm_up()
+        made.clear()
+        for line in (phone.TROUBLE, phone.TROUBLE_NO_CALL_BACK):
+            pcm, rate = self.engine.tts_pcm(line)
+            self.assertEqual((len(pcm), rate), (44100, 22050))
+        self.assertEqual(made, [])                          # made once, at the warm-up
+        self.engine.tts_pcm("Your payment is due on Friday.")
+        self.assertEqual(made, ["Your payment is due on Friday."])      # anything else is made when it is said
 
     def test_a_missing_voice_is_reported_and_does_not_stop_the_engine(self):
         from fastapi import HTTPException

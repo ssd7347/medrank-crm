@@ -30,7 +30,8 @@ uvicorn engine:app --host 127.0.0.1 --port 8090
 ```
 
 Check it: <http://127.0.0.1:8090/health>. As it starts, the engine loads both models and runs each once in the
-background (about 4 s on this laptop), so the first caller does not wait for them: `/health` then says
+background (about 4 s on this laptop when it is idle), and makes the two "having trouble" goodbyes (below) so they
+start at once when something fails. The first caller does not wait for them: `/health` then says
 `"warmed": true`, or gives the reason in `warm_up_error` (the models then load on first use, as with `WARM_UP=off`).
 Other voices: `python download_models.py en_GB-alba-medium`, then set
 `PIPER_VOICE=voices/en_GB-alba-medium.onnx`. A clearer but slower ear: `STT_MODEL=small.en`.
@@ -83,7 +84,11 @@ member of our team will call you back. Goodbye." and ends the call, and tells th
 a call-back) and notes `call_cut_off` in the transcript. Someone the team cannot call back (a withheld number, or
 someone who opted out: the CRM's last `open` or `turn` reply said `"call_back": false`, or, before the first reply,
 the stream URL carried `call_back=no`) hears "Please call us again later" instead of the promise; the fault is still reported, and nothing is booked. The report runs alongside the goodbye, so a CRM that is down
-does not keep the caller waiting. If the voice itself fails, nothing can be said, so the engine reports the fault and
+does not keep the caller waiting. The engine gives the CRM 8 s to answer the opening (which only reads its database)
+and 20 s for each turn (which waits on the brain). Measured on this laptop (24 Nov), a CRM that had hung left the
+caller 9.3 to 9.7 s of silence before the goodbye at the start of a call; in the middle of one it can be up to about
+21 s. A CRM that refused the connection left 2.5 to 3.7 s, about 2 s of it Windows's own wait on a refused
+connection. If the voice itself fails, nothing can be said, so the engine reports the fault and
 hangs up instead of leaving the caller in silence.
 
 When the stream closes (the caller hung up, or the call went to the desk), whatever the caller said that the CRM has
