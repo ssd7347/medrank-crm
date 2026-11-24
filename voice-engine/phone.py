@@ -415,6 +415,7 @@ class Crm:
 TROUBLE = "Sorry, I am having trouble on this line. A member of our team will call you back. Goodbye."
 # For someone the team cannot call back (the CRM's last reply said so): no promise that would not be kept.
 TROUBLE_NO_CALL_BACK = "Sorry, I am having trouble on this line. Please call us again later. Goodbye."
+ONE_MOMENT = "One moment, please."      # said once when the CRM's reply is slow (Call.reply_to)
 _LAST_WORDS: set[asyncio.Task] = set()     # callers' last words still being heard or sent (see Call.stop)
 TRANSFER_WAIT_S = 10.0      # how long Plivo gets to move a transferred call before we close its stream ourselves
 
@@ -445,6 +446,7 @@ class Call:
     not delayed."""
 
     HOLD_S = 1.5                # extra wait after an unfinished-looking turn
+    ONE_MOMENT_AFTER_S = 2.5    # a reply slower than this is preceded by ONE_MOMENT (0: never); engine ONE_MOMENT_AFTER_S
     MOST_JOINS = 2              # a turn takes in at most this many later parts
 
     def __init__(self, call_id: str, send: Callable[[dict], Awaitable[None]], crm: Crm,
@@ -530,7 +532,7 @@ class Call:
                     self.unsent = None
                     if not text:
                         continue
-                    reply = await asyncio.to_thread(self.crm.turn, self.call_id, text)
+                    reply = await self.reply_to(text)
                     self.call_back = reply.call_back
             except Exception as e:     # the CRM or a model failed: say so and end, rather than go silent
                 log.warning("call %s: %s failed: %s", self.call_id, kind, e)
@@ -587,26 +589,47 @@ class Call:
                 return audio
         return None
 
+    async def _play(self, text: str, mark: str) -> int:
+        """Sends ``text`` in the voice, then a checkpoint named ``mark``; returns how many samples were sent."""
+        pcm, rate = await asyncio.to_thread(self.tts, text)
+        audio = ulaw_encode(np.clip(resample(pcm.astype(np.float32), rate, RATE), -32768, 32767))
+        for i in range(0, len(audio), 4000):           # half a second per message
+            await self.send({"event": "playAudio", "media": {"contentType": "audio/x-mulaw", "sampleRate": RATE,
+                                                             "payload": base64.b64encode(audio[i:i + 4000]).decode()}})
+        if self.recorder:
+            self.recorder.say(ulaw_decode(audio))       # exactly what the caller is sent
+        self.speaking = mark
+        await self.send({"event": "checkpoint", "streamId": self.stream_id, "name": mark})
+        return len(audio)
+
+    async def reply_to(self, text: str) -> Reply:
+        """The CRM's reply to what the caller said. One slower than ONE_MOMENT_AFTER_S (the brain using a tool, a busy
+        CRM) is preceded by ONE_MOMENT, once, rather than silence. The request is on its way before anything is
+        awaited, so cancelling this never stops the CRM getting the caller's words."""
+        pending = asyncio.get_running_loop().run_in_executor(None, self.crm.turn, self.call_id, text)
+        if self.ONE_MOMENT_AFTER_S > 0:
+            done, _ = await asyncio.wait({pending}, timeout=self.ONE_MOMENT_AFTER_S)
+            if not done and not self.done and not self.ears.talking():     # never over the caller
+                self.marks += 1
+                try:
+                    await self._play(ONE_MOMENT, f"wait-{self.marks}")
+                except Exception as e:      # the voice failed: the reply, or the fault, still follows
+                    log.warning("call %s: could not say one moment: %s", self.call_id, e)
+        return await pending
+
     async def speak(self, reply: Reply) -> None:
         self.marks += 1
         mark = f"{'end' if reply.over else 'say'}-{self.marks}"
+        sent = 0
         if reply.say:
-            pcm, rate = await asyncio.to_thread(self.tts, reply.say)
-            audio = ulaw_encode(np.clip(resample(pcm.astype(np.float32), rate, RATE), -32768, 32767))
-            for i in range(0, len(audio), 4000):           # half a second per message
-                await self.send({"event": "playAudio", "media": {"contentType": "audio/x-mulaw", "sampleRate": RATE,
-                                                                 "payload": base64.b64encode(audio[i:i + 4000]).decode()}})
-            if self.recorder:
-                self.recorder.say(ulaw_decode(audio))       # exactly what the caller is sent
-            self.speaking = mark
-            await self.send({"event": "checkpoint", "streamId": self.stream_id, "name": mark})
+            sent = await self._play(reply.say, mark)
         if reply.over:
             self.ending = mark
             if not reply.say:
                 await self.hang_up()
             else:
                 # In case Plivo never confirms the goodbye was played: hang up after it surely has.
-                asyncio.get_running_loop().call_later(len(audio) / RATE + 5,
+                asyncio.get_running_loop().call_later(sent / RATE + 5,
                                                       lambda: asyncio.ensure_future(self.hang_up()))
 
     async def hang_up(self) -> None:

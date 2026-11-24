@@ -303,15 +303,20 @@ async def rehearse(hooks: Hooks, api: PretendPlivoApi, lines: list[np.ndarray], 
 
     async def heard(what: str) -> tuple[str, float, float] | None:
         """Waits for the agent's next reply, plays it (as long as it lasts), says "played"; returns its checkpoint."""
-        try:
-            name, audio, first = await asyncio.wait_for(replies.get(), wait_s)
-        except asyncio.TimeoutError:
-            say(f"no reply from the agent within {wait_s:.0f} s ({what})")
-            return None
-        seconds = len(audio) / phone.RATE
-        await asyncio.sleep(seconds / speed)
-        await ws.send(json.dumps({"event": "playedStream", "streamId": "rehearsal", "name": name}))
-        return name, seconds, first
+        deadline = time.monotonic() + wait_s
+        while True:
+            try:
+                name, audio, first = await asyncio.wait_for(replies.get(), max(0.0, deadline - time.monotonic()))
+            except asyncio.TimeoutError:
+                say(f"no reply from the agent within {wait_s:.0f} s ({what})")
+                return None
+            seconds = len(audio) / phone.RATE
+            await asyncio.sleep(seconds / speed)
+            await ws.send(json.dumps({"event": "playedStream", "streamId": "rehearsal", "name": name}))
+            if not name.startswith("wait-"):
+                return name, seconds, first
+            # "One moment, please.": the reply was slow; the real one follows.
+            say(f'agent: "one moment" ({seconds:.1f} s) while the reply was slow ({what})')
 
     listener = asyncio.create_task(listen())
     await ws.send(json.dumps({"event": "start", "start": {"streamId": "rehearsal", "callId": call_uuid}}))

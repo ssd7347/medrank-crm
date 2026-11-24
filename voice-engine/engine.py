@@ -29,6 +29,8 @@ Settings (environment variables):
                  (phone.Outbox). Sent again every 30 s and at start-up, and deleted once the CRM has them. Default
                  outbox/ next to this file. Before switching this machine off for good, /health must say
                  "undelivered": 0.
+  ONE_MOMENT_AFTER_S  Seconds the caller waits for the CRM's reply before the agent says "One moment, please." (once
+                 per turn), rather than silence. Default 2.5; 0 never says it.
 
 Run:  uvicorn engine:app --host 127.0.0.1 --port 8090
 """
@@ -66,6 +68,7 @@ VOICE_HMAC_SECRET = os.environ.get("VOICE_HMAC_SECRET", "")
 NAME_HINTS = os.environ.get("NAME_HINTS", "auto")
 WARM_UP = os.environ.get("WARM_UP", "on")
 OUTBOX = phone.Outbox(os.environ.get("OUTBOX_DIR", str(HERE / "outbox")))
+phone.Call.ONE_MOMENT_AFTER_S = float(os.environ.get("ONE_MOMENT_AFTER_S", phone.Call.ONE_MOMENT_AFTER_S))
 MAX_AUDIO_BYTES = 5 * 1024 * 1024
 
 log = logging.getLogger("uvicorn.error")     # uvicorn's own log, so start-up notes show beside its "Started server"
@@ -148,7 +151,7 @@ def warm_up() -> None:
         stt_pcm(np.zeros(16000, dtype=np.float32))      # one second of silence
         speak_wav("Hello.")
         # The "having trouble" goodbyes are said when something has just failed: made now, they start at once.
-        for line in (phone.TROUBLE, phone.TROUBLE_NO_CALL_BACK):
+        for line in (phone.TROUBLE, phone.TROUBLE_NO_CALL_BACK, phone.ONE_MOMENT):
             _said_ahead[line] = speak_wav(line)
     except Exception as e:      # a missing model or voice file: say so, keep serving
         _warm["error"] = f"{type(e).__name__}: {getattr(e, 'detail', None) or e}"

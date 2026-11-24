@@ -150,9 +150,13 @@ async def call(ws: WebSocket, call_id: str = "", token: str = ""):
                 loud = np.abs(phone.ulaw_decode(base64.b64decode(m["media"]["payload"])).astype(int)).mean() > 500
                 spoke, quiet = spoke or loud, 0 if loud else quiet + 1
                 if spoke and quiet == 20:
-                    await say("end-2" if MODE["reply"] == "end" else "say-2")
+                    if MODE["reply"] == "one moment, then end":     # a slow reply: the filler first
+                        await say("wait-2")
+                        await say("end-3")
+                    else:
+                        await say("end-2" if MODE["reply"] == "end" else "say-2")
                     spoke = False
-            elif m["event"] == "playedStream" and m["name"] == "end-2":
+            elif m["event"] == "playedStream" and m["name"].startswith("end-"):
                 api = f"http://127.0.0.1:{FakeCall.api.port}/v1/Account/A/Call/{uuid}/"
                 if MODE["end"] == "hang up":
                     await asyncio.to_thread(requests.delete, api, timeout=5)
@@ -268,6 +272,14 @@ class FakeCall(unittest.TestCase):
             MODE["end"] = end
             r = self.run_call(connect=websockets.asyncio.client.connect)
             self.assertEqual((r["ending"], r["stream_open_at_transfer"]), ("transferred", still_open), end)
+
+    def test_one_moment_is_played_and_the_real_reply_waited_for(self):
+        MODE["reply"] = "one moment, then end"
+        r = self.run_call()
+        # The filler is not taken for the reply: the goodbye after it is, and the call goes on to the transfer.
+        self.assertEqual((r["ending"], r["stream_open_at_transfer"]), ("transferred", True))
+        self.assertEqual(len(r["turns"]), 1)
+        self.assertTrue(any('"one moment"' in s for s in self.said), self.said)
 
     def test_a_call_the_crm_hangs_up(self):
         MODE["end"] = "hang up"

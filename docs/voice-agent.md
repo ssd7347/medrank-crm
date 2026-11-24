@@ -58,7 +58,9 @@ to be recorded, erased ones, ones past retention and anything that is not Ogg, a
 `GET /api/voice/calls/{id}/recording` to the admin and staff with `app_user.can_hear_recordings` who can see the call
 (audited as `RECORDING_PLAYED`). Retention and erasure delete the file after the database change commits. The speech engine loads
 and runs both its models as it starts (`WARM_UP`, on by default), so the first caller does not wait for them; the
-brain is warmed by the CRM while each call's opening line plays.
+brain is warmed by the CRM while each call's opening line plays. A reply that takes longer than 2.5 s (engine
+setting `ONE_MOMENT_AFTER_S`) is preceded by "One moment, please." once, rather than silence; it is in the recording
+but not in the transcript.
 
 Campaign calls on hold (19 Nov 2026): before a campaign places a call on Plivo, `LineCheck` asks the three things the
 call needs:

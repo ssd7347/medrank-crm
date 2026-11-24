@@ -383,6 +383,99 @@ class CallTest(unittest.TestCase):
                 raise ConnectionError("CRM down")
         self.assertEqual(run(Down([]), [self.START, "wait", last, "wait"], broken_after(0)), [phone.TROUBLE])
 
+    # ------------------------------------------------------------------ "One moment, please." for a slow reply
+
+    def reply_to(self, crm, after=0.1, talking=False, cancel_after=None, voice_fails=False):
+        """Calls Call.reply_to directly; returns (what was said, what was sent, the reply or None if cancelled)."""
+        said, sent = [], []
+
+        async def send(m):
+            sent.append(m)
+
+        async def close():
+            pass
+
+        def voice(text):
+            if voice_fails:
+                raise OSError("voice model missing")
+            said.append(text)
+            return tone(0.5, 440, 4000, rate=22050), 22050
+
+        async def go():
+            call = phone.Call("c1", send, crm, lambda audio: "", voice, close)
+            call.ONE_MOMENT_AFTER_S = after
+            call.ears.talking = lambda: talking
+            task = asyncio.create_task(call.reply_to("Book me for 4 pm"))
+            if cancel_after is None:
+                return await task
+            await asyncio.sleep(cancel_after)
+            task.cancel()
+            await asyncio.sleep(0.8)            # the request already sent carries on
+            return None
+        return said, sent, asyncio.run(go())
+
+    class SlowCrm(FakeCrm):
+        def __init__(self, replies, seconds):
+            super().__init__(replies)
+            self.seconds = seconds
+
+        def turn(self, call_id, said):
+            import time
+            time.sleep(self.seconds)
+            return super().turn(call_id, said)
+
+    def test_a_slow_reply_is_preceded_by_one_moment_once(self):
+        crm = self.SlowCrm([phone.Reply("Booked for 4 pm.", False)], 0.6)
+        said, sent, reply = self.reply_to(crm)
+        self.assertEqual(said, [phone.ONE_MOMENT])                   # once, however long the wait
+        self.assertEqual([m["name"] for m in sent if m["event"] == "checkpoint"], ["wait-1"])
+        self.assertTrue(any(m["event"] == "playAudio" for m in sent))
+        self.assertEqual((reply.say, crm.heard), ("Booked for 4 pm.", ["Book me for 4 pm"]))
+
+    def test_a_quick_reply_or_the_setting_off_or_a_talking_caller_gets_no_one_moment(self):
+        for crm, after, talking in ((self.SlowCrm([phone.Reply("Yes.", False)], 0.0), 0.5, False),   # quick
+                                    (self.SlowCrm([phone.Reply("Yes.", False)], 0.4), 0, False),     # off
+                                    (self.SlowCrm([phone.Reply("Yes.", False)], 0.4), 0.1, True)):   # caller talking
+            said, sent, reply = self.reply_to(crm, after=after, talking=talking)
+            self.assertEqual((said, sent, reply.say), ([], [], "Yes."), (after, talking))
+
+    def test_a_voice_that_fails_on_one_moment_still_lets_the_reply_through(self):
+        crm = self.SlowCrm([phone.Reply("Booked for 4 pm.", False)], 0.4)
+        with self.assertLogs("phone", "WARNING"):
+            said, sent, reply = self.reply_to(crm, voice_fails=True)
+        self.assertEqual((said, sent, reply.say), ([], [], "Booked for 4 pm."))
+
+    def test_the_crm_gets_the_words_even_if_the_wait_is_cancelled(self):
+        crm = self.SlowCrm([phone.Reply("Booked.", False)], 0.3)
+        self.reply_to(crm, after=5, cancel_after=0.05)
+        self.assertEqual(crm.heard, ["Book me for 4 pm"])
+
+    def test_a_slow_turn_that_fails_says_one_moment_then_the_trouble_goodbye(self):
+        last = lambda sent: {"event": "playedStream", "name": [m for m in sent if m["event"] == "checkpoint"][-1]["name"]}
+        speech = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        said = []
+
+        def voice(text):
+            said.append(text)
+            return tone(0.5, 440, 4000, rate=22050), 22050
+
+        class SlowThenDown(FakeCrm):
+            def turn(self, call_id, said):
+                import time
+                time.sleep(0.5)
+                raise ConnectionError("CRM hung")
+        crm = SlowThenDown([])
+        saved = phone.Call.ONE_MOMENT_AFTER_S
+        phone.Call.ONE_MOMENT_AFTER_S = 0.2
+        try:
+            sent, closed, _ = self.run_call(crm, [self.START, "wait", last, speech, "wait", "wait", "wait", "wait",
+                                                  last, "wait"], tts=voice)
+        finally:
+            phone.Call.ONE_MOMENT_AFTER_S = saved
+        self.assertEqual(said, ["Hello, this is Asha. This call may be recorded.", phone.ONE_MOMENT, phone.TROUBLE])
+        self.assertEqual([m["name"] for m in sent if m["event"] == "checkpoint"], ["say-1", "wait-2", "end-3"])
+        self.assertEqual(crm.troubles, ["turn failed: ConnectionError"])
+
     def test_when_the_voice_fails_the_fault_is_reported_and_the_call_ends_instead_of_going_silent(self):
         crm = FakeCrm([])
 
@@ -1101,7 +1194,7 @@ class WarmUpTest(unittest.TestCase):
         self.assertFalse(self.health()["warmed"])
         self.engine.warm_up()
         self.assertEqual(ran, [("ears", (16000,), "float32"), ("voice", "Hello."), ("voice", phone.TROUBLE),
-                               ("voice", phone.TROUBLE_NO_CALL_BACK)])
+                               ("voice", phone.TROUBLE_NO_CALL_BACK), ("voice", phone.ONE_MOMENT)])
         self.assertEqual((self.health()["warmed"], self.health()["warm_up_error"]), (True, None))
 
     def test_the_goodbyes_made_at_the_warm_up_are_said_without_waiting_on_the_voice(self):
@@ -1118,7 +1211,7 @@ class WarmUpTest(unittest.TestCase):
         self.engine.speak_wav = lambda text: made.append(text) or wav(0.5 if text == "Hello." else 2.0)
         self.engine.warm_up()
         made.clear()
-        for line in (phone.TROUBLE, phone.TROUBLE_NO_CALL_BACK):
+        for line in (phone.TROUBLE, phone.TROUBLE_NO_CALL_BACK, phone.ONE_MOMENT):
             pcm, rate = self.engine.tts_pcm(line)
             self.assertEqual((len(pcm), rate), (44100, 22050))
         self.assertEqual(made, [])                          # made once, at the warm-up

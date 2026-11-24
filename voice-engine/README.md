@@ -88,8 +88,11 @@ does not keep the caller waiting. The engine gives the CRM 8 s to answer the ope
 and 20 s for each turn (which waits on the brain). Measured on this laptop (24 Nov), a CRM that had hung left the
 caller 9.3 to 9.7 s of silence before the goodbye at the start of a call; in the middle of one it can be up to about
 21 s. A CRM that refused the connection left 2.5 to 3.7 s, about 2 s of it Windows's own wait on a refused
-connection. If the voice itself fails, nothing can be said, so the engine reports the fault and
-hangs up instead of leaving the caller in silence.
+connection. In the middle of a call, a reply slower than `ONE_MOMENT_AFTER_S` (default 2.5 s; 0 turns it off),
+such as the brain using a tool or a busy CRM, is preceded by "One moment, please.", once per turn and never while
+the caller is talking. It is made at the warm-up, is in the recording, and is not in the CRM's transcript.
+Rehearsed (24 Nov) with the CRM's reply held back 4 s: "One moment, please.", then the reply. If the voice itself
+fails, nothing can be said, so the engine reports the fault and hangs up instead of leaving the caller in silence.
 
 When the stream closes (the caller hung up, or the call went to the desk), whatever the caller said that the CRM has
 not had yet (the turn being heard, turns waiting, what they said over the goodbye, and speech still going because the

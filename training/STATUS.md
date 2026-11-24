@@ -14,6 +14,43 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 24 November 2026: "ONE MOMENT, PLEASE." INSTEAD OF SILENCE WHEN A REPLY IS SLOW (user: "continue the next task")
+
+Mid-call, the caller heard silence while the CRM and the brain answered. That is normally 1 to 3 s, longer when the
+brain uses a tool (booking a call-back), and up to about 21 s if the CRM hangs.
+
+**Built (engine).**
+- `phone.Call.reply_to`: the caller's words go to the CRM at once. If no reply has come within `ONE_MOMENT_AFTER_S`
+  (default 2.5 s; engine setting of the same name, 0 = never), the agent says `ONE_MOMENT` ("One moment, please.")
+  once, then the reply when it comes.
+  - It is not said if the call has ended, or while the caller is talking.
+  - The caller can talk over it as over any line (checkpoint `wait-N`).
+  - If the voice fails on it, the reply still comes. If the CRM then fails, the trouble goodbye follows it.
+  - It is recorded (when the call is) but is not in the CRM's transcript.
+- `_play` is shared by replies and the filler. The warm-up makes the filler with the two goodbyes.
+- `rehearse.py` plays a `wait-` checkpoint and keeps waiting for the real reply, and says so ("one moment" while the
+  reply was slow). Before, it would have taken the filler for the reply.
+
+**Rehearsed live.** The setup was the in-memory test CRM (`jdbc:h2:mem` checked), the real engine and the gateway. A
+scratch proxy (`slow_crm_proxy.py`) held each `turn` reply back 4 s. Priya asked for a person, and the agent said "One
+moment, please. A member of our team will call you back by Wednesday, 25 November, 11:30 AM. Goodbye." The reply began
+5.5 s after she stopped talking. The outbox was empty; everything was stopped and the ports freed.
+
+**Tests.**
+- `test_phone` has 5 new tests: a slow reply gets the filler once; a quick reply, the setting off, or a talking caller
+  get none; a voice failing on it still lets the reply through; the CRM gets the words even if the wait is
+  cancelled; a slow turn that fails says the filler and then the trouble goodbye. The warm-up tests include the
+  filler.
+- `test_rehearse` has 1 new test: the filler is played and the goodbye after it is taken as the reply.
+- 8 mutants, all caught (scratchpad `mutate_one_moment.py`): never said; said for a quick reply, over a talking
+  caller, or with the setting off; the words sent only after a wait; a failed voice ending the turn; not made at the
+  warm-up; the rehearsal taking it for the reply.
+- The setting checked by hand: unset gives 2.5, `0` gives 0.0, `4` gives 4.0.
+- The engine has 120 tests (114 before). All passed idle (60 s) and in 2 runs under 12 burner processes (85 s and
+  59 s). The backend is unchanged.
+
+**Docs.** The voice-engine README (trouble section), the settings list at the top of `engine.py`, and voice-agent.md.
+
 # 24 November 2026: THE "HAVING TROUBLE" GOODBYE REHEARSED LIVE, AND THE SILENCE BEFORE IT CUT (user: "continue")
 
 **Rehearsed live** (until now only unit-tested). The setup was the in-memory test CRM in Plivo mode (`jdbc:h2:mem`
