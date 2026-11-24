@@ -10,7 +10,7 @@ import logging
 import re
 
 TOKEN = re.compile(r"(token=)[^&\s\"']+")
-LOGGERS = ("uvicorn.error", "uvicorn.access")
+LOGGERS = ("uvicorn.error", "uvicorn.access", "phone")
 
 
 def hide(text: str) -> str:

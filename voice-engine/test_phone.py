@@ -9,6 +9,8 @@ import asyncio
 import base64
 import io
 import json
+import re
+import time
 import unittest
 import warnings
 import wave
@@ -500,6 +502,104 @@ class CallTest(unittest.TestCase):
         self.assertEqual([m["name"] for m in sent if m["event"] == "checkpoint"], ["end-1"])
         self.assertEqual((crm.troubles, crm.ended, closed), (["opening failed: ConnectionError"], 1, [True]))
 
+    # ------------------------------------------------------------------ each reply's time, in the engine's log
+
+    REPLY = re.compile(r"call c1: reply (\d+) sent ([\d.]+) s after the caller stopped"
+                       r"(?: \(\"One moment, please\.\" sent after ([\d.]+) s\))?: (.*)$")
+
+    def timed(self, crm, script, **kw):
+        """Runs the call; returns its log lines: (reply lines as (total, one-moment time or None, steps), the rest)."""
+        with self.assertLogs("phone", "INFO") as logs:
+            self.run_call(crm, script, **kw)
+        replies, rest = [], []
+        for line in logs.output:
+            m = self.REPLY.search(line)
+            if m:
+                steps = {k: float(v) for k, v in re.findall(r"([a-zA-Z ]+?) (-?[\d.]+)(?:, |$)", m.group(4))}
+                replies.append((float(m.group(2)), m.group(3) and float(m.group(3)), steps))
+            else:
+                rest.append(line)
+        return replies, rest
+
+    @staticmethod
+    def sleepy(seconds, result):
+        def work(*args):
+            time.sleep(seconds)
+            return result(*args) if callable(result) else result
+        return work
+
+    def test_each_reply_is_timed_from_the_callers_last_word_with_where_the_time_went(self):
+        crm = self.SlowCrm([phone.Reply("Thank you, noted.", False)], 0.3)
+        speech = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        replies, rest = self.timed(crm, [self.START, "wait", speech, "wait", "wait", "wait", "wait"],
+                                   stt=self.sleepy(0.2, "I will pay on Friday."),
+                                   tts=self.sleepy(0.1, lambda text: (tone(0.5, 440, 4000, rate=22050), 22050)))
+        self.assertEqual(len(replies), 1)
+        total, one_moment, steps = replies[0]
+        self.assertIsNone(one_moment)
+        self.assertEqual(list(steps), ["quiet that ends a turn", "ear", "CRM", "voice", "other"])
+        self.assertEqual(steps["quiet that ends a turn"], 0.70)
+        for name, least in (("ear", 0.2), ("CRM", 0.3), ("voice", 0.1)):
+            self.assertGreaterEqual(steps[name], least - 0.01, name)
+            self.assertLess(steps[name], least + 0.25, name)
+        self.assertGreaterEqual(steps["other"], -0.01)
+        self.assertLess(steps["other"], 0.25)
+        self.assertAlmostEqual(sum(steps.values()), total, delta=0.03)
+        opening = [line for line in rest if "opening sent" in line]
+        self.assertEqual(len(opening), 1)
+        self.assertRegex(opening[0], r"call c1: opening sent [\d.]+ s after the stream started: CRM [\d.]+, "
+                                     r"voice 0\.[1-3]\d, other [\d.]+$")
+        self.assertIn(f"call c1: 1 reply; the caller's silence before each: median {total:.2f} s, "
+                      f"longest {total:.2f} s", "\n".join(rest))
+
+    def test_a_slow_reply_says_when_one_moment_went_out_and_the_silence_ends_there(self):
+        crm = self.SlowCrm([phone.Reply("Booked for 4 pm.", False)], 0.6)
+        saved = phone.Call.ONE_MOMENT_AFTER_S
+        phone.Call.ONE_MOMENT_AFTER_S = 0.2
+        self.addCleanup(setattr, phone.Call, "ONE_MOMENT_AFTER_S", saved)
+        speech = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        replies, rest = self.timed(crm, [self.START, "wait", speech, "wait", "wait", "wait", "wait"])
+        total, one_moment, steps = replies[0]
+        self.assertGreaterEqual(one_moment, 0.70 + 0.2 - 0.01)
+        self.assertLess(one_moment, 0.70 + 0.2 + 0.25)
+        self.assertGreaterEqual(total, 0.70 + 0.6 - 0.01)
+        self.assertGreaterEqual(steps["CRM"], 0.6 - 0.01)
+        self.assertAlmostEqual(sum(steps.values()), total, delta=0.03)
+        # The caller's silence ended with "One moment, please.", not with the reply.
+        self.assertIn(f"median {one_moment:.2f} s, longest {one_moment:.2f} s", "\n".join(rest))
+
+    def test_a_turn_in_two_parts_is_timed_from_the_end_of_the_second(self):
+        def ear(audio):
+            return "My date of birth is..." if len(audio) < 3 * phone.STT_RATE else "My date of birth is 15th August."
+        crm = FakeCrm([phone.Reply("Thank you.", False)])
+        first = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        rest = media(np.concatenate([tone(1.0), quiet(0.9)]))
+        replies, _ = self.timed(crm, [self.START, "wait", first, "wait", "wait", rest, "wait", "wait"], stt=ear)
+        self.assertEqual(crm.heard, ["My date of birth is 15th August."])
+        self.assertEqual(len(replies), 1)
+        self.assertLess(replies[0][0], 0.70 + 0.3)          # not from the first part, 0.6 s earlier
+        self.assertNotIn("wait for more", replies[0][2])    # the wait ended in more speech: not the caller's silence
+
+    def test_the_wait_for_the_rest_of_an_unfinished_sentence_is_counted(self):
+        self.hold(0.4)
+        crm = FakeCrm([phone.Reply("Sorry, what is your date of birth?", False)])
+        speech = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        replies, _ = self.timed(crm, [self.START, "wait", speech, "wait", "wait", "wait"],
+                                stt=lambda audio: "My date of birth is...")
+        total, _, steps = replies[0]
+        self.assertEqual(list(steps), ["quiet that ends a turn", "ear", "wait for more", "CRM", "voice", "other"])
+        self.assertGreaterEqual(steps["wait for more"], 0.4 - 0.01)
+        self.assertGreaterEqual(total, 0.70 + 0.4 - 0.01)
+
+    def test_a_turn_that_fails_is_not_counted_as_a_reply(self):
+        class Down(FakeCrm):
+            def turn(self, call_id, said):
+                raise ConnectionError("CRM down")
+        speech = media(np.concatenate([quiet(0.3), tone(1.0), quiet(0.9)]))
+        replies, rest = self.timed(Down([]), [self.START, "wait", speech, "wait"])
+        self.assertEqual(replies, [])
+        self.assertFalse([line for line in rest if "silence" in line])
+        self.assertTrue([line for line in rest if "turn failed" in line])
 
     # ------------------------------------------------------------------ the caller's last words at the hang-up
 

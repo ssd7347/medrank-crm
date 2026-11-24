@@ -131,7 +131,9 @@ Gateway: `CRM_URL=http://127.0.0.1:8082`, `ENGINE_URL=http://127.0.0.1:8090`.
    instead, note them: Plivo's placeholder for a hidden number is not documented, and the CRM treats only a word,
    nothing, fewer than 8 digits or only zeros as withheld (`docs/voice-agent.md`, "A withheld number").
 6. Afterwards: read the transcript and tool trail on `/voice/calls`; write down what Whisper heard against what was
-   said, and the reply times. Then take the tunnel down and stop the GPU machine, but only once the engine's
+   said, and the reply times: the engine's console has a line for each reply, with how long the caller waited and
+   how much of it was the quiet that ends a turn, the ear, the CRM with the brain, and the voice, and a summary at the
+   end of the call (README, "Reply times"). Then take the tunnel down and stop the GPU machine, but only once the engine's
    `/health` says `"undelivered": 0` (a call-back or a "stop calling me" the CRM has not received yet waits in the
    engine's outbox; README, "Real phone calls").
 

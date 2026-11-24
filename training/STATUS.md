@@ -14,6 +14,51 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 24 November 2026: THE ENGINE LOGS EVERY REPLY'S TIME, AND ITS CALL LINES REACH THE CONSOLE AT LAST (user: "continue the next task")
+
+The delivery plan's pass mark includes "reply starts within ~2 s on a phone", and step 6 of the first-call plan says to
+write down the reply times. Nothing measured them on a real call: the engine kept no times, and only rehearse.py
+(the caller's side, no phone line) could.
+
+**Built (engine).**
+- `Call.timed`: each queued turn carries when it ended. For every reply the engine logs how long the caller waited
+  and where the time went: the 0.7 s of quiet that ends a turn, the ear, the wait for the rest of a sentence that
+  looked cut off (only when nothing followed), the CRM with the brain, the voice, and the rest. A turn in two parts
+  is timed from the end of the second. A slow reply also says when "One moment, please." went out. The opening is
+  timed from the stream's start. A summary comes at the end of the call (median and longest silence, which ends at
+  "One moment, please." when that was said). A turn that failed is not counted. The times use `time.perf_counter`,
+  because the event loop's clock ticks only every ~16 ms on Windows (a test caught 0.09 s for a 0.1 s wait).
+- **Bug found and fixed.** The `phone` logger had no handler, so under uvicorn Python showed only its warnings,
+  unformatted. Its INFO lines never appeared: "fault reported, call-back booked", "recording sent" and "the caller's
+  last words sent". `engine.show_call_lines()` now gives it uvicorn's console at INFO. `redact.py` now covers the
+  `phone` logger too (no line there holds a token today).
+
+**Rehearsed live.** The setup was the in-memory test CRM (`jdbc:h2:mem` checked), the real engine (base.en) and the
+gateway. Each line was compared with rehearse.py's own timing:
+
+| Call | Engine | rehearse.py |
+|---|---|---|
+| 3 turns, stand-in brain | 1.48, 1.43, 1.67 s (ear 0.48 to 0.65, CRM 0.02 to 0.06, voice 0.21 to 0.26) | 1.58, 1.53, 1.58 s |
+| 2 turns, CRM held 4 s (`slow_crm_proxy.py`) | 5.47, 5.48 s; "One moment" at 3.74, 3.71 s | 5.5, 5.4 s |
+
+The two agree within about 0.1 s; they measure from slightly different points (the engine from where its ears heard
+the last loud sound, rehearse.py from the end of its audio). The console also showed "recording sent (52 kB)",
+hidden until now. Afterwards everything was stopped and the ports freed. The outbox was empty and removed. The
+rehearsal recordings in the test CRM's `target/test-recordings` were deleted.
+
+**Tests.**
+- `test_phone` has 5 new tests: a reply's steps add up to its time, the quiet is 0.70, and the opening and the
+  summary are logged; a slow reply logs "One moment" and the silence ends there; a turn in two parts is timed from
+  the second; the wait for more is counted; a failed turn is not a reply.
+- `test_redact` has 1 new test: the call lines reach uvicorn's console at INFO, once, with the token hidden.
+- 14 mutants (scratchpad `mutate_reply_times.py`): 13 caught. The one missed was a redundant guard against adding
+  the console twice, which `Logger.addHandler` already prevents (checked). It was removed.
+- The engine has 126 tests (120 before). All passed idle (59 s) and in 2 runs under 12 burner processes (90 s
+  each). The backend is unchanged.
+
+**Docs.** The voice-engine README ("Reply times", with the rehearsal's lines), step 6 of first-real-call.md, and the
+hand-over guide's "Long silences" row.
+
 # 24 November 2026: "ONE MOMENT, PLEASE." INSTEAD OF SILENCE WHEN A REPLY IS SLOW (user: "continue the next task")
 
 Mid-call, the caller heard silence while the CRM and the brain answered. That is normally 1 to 3 s, longer when the

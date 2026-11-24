@@ -126,6 +126,22 @@ once; if not, the turn goes on as it was. Finished sentences are not delayed. Th
 `small.en` writes "is..." where the caller paused, `base.en` often writes a full stop, so with base.en most such
 pauses still make two turns.
 
+**Reply times.** The engine's console shows, for every reply, how long the caller waited and where the time went, then
+a summary when the call ends (`Call.timed`; the call id only, nothing the caller said). From a rehearsal (24 Nov, the
+test CRM's stand-in brain, `base.en` on this laptop):
+
+```
+INFO:     call 7535…: opening sent 0.61 s after the stream started: CRM 0.05, voice 0.54, other 0.02
+INFO:     call 7535…: reply 1 sent 1.48 s after the caller stopped: quiet that ends a turn 0.70, ear 0.53, CRM 0.02, voice 0.21, other 0.01
+INFO:     call 7535…: 3 replies; the caller's silence before each: median 1.48 s, longest 1.67 s
+```
+
+"CRM" includes the brain; "wait for more" appears when the engine waited for the rest of a sentence that looked cut
+off; "other" is the rest (a turn waiting behind the one before it, for example). A slow reply also says when "One
+moment, please." went out, and the silence in the summary ends there. The times run to when the audio was sent to
+Plivo: the phone line's own delay comes on top. The rehearsal's own timing, taken at the caller's end, agreed within
+about 0.1 s.
+
 The engine needs two more settings: `VOICE_HMAC_SECRET` (the CRM's, it checks each call's stream token and signs the
 CRM requests; blank refuses every call) and `CRM_URL`. `OUTBOX_DIR` is optional (above).
 

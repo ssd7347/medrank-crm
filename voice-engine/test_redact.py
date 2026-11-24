@@ -66,6 +66,36 @@ class HideTest(unittest.TestCase):
         self.assertNotIn(TOKEN, log.text())
 
 
+class CallLinesTest(unittest.TestCase):
+    """The calls' own lines (phone.py) reach uvicorn's console at INFO, once, and without a token."""
+
+    def test_the_calls_lines_reach_uvicorns_console(self):
+        uvicorn_log = logging.getLogger("uvicorn")
+        saved = (uvicorn_log.handlers[:], phone.log.handlers[:], phone.log.level, phone.log.propagate)
+
+        def restore():
+            uvicorn_log.handlers[:], phone.log.handlers[:] = saved[0], saved[1]
+            phone.log.setLevel(saved[2])
+            phone.log.propagate = saved[3]
+        self.addCleanup(restore)
+        out = io.StringIO()
+        console = logging.StreamHandler(out)
+        console.setFormatter(DefaultFormatter("%(levelprefix)s %(message)s", use_colors=False))
+        uvicorn_log.handlers[:] = [console]         # as uvicorn's own set-up leaves it, before it imports the engine
+        phone.log.handlers[:] = []
+        phone.log.setLevel(logging.NOTSET)
+        phone.log.propagate = True
+        engine.show_call_lines()
+        engine.show_call_lines()                    # twice: still printed once
+        phone.log.info("call c1: reply 1 sent 1.20 s after the caller stopped")
+        phone.log.warning("call c1: could not send the recording: %s", f"/call?call_id=c1&token={TOKEN}")
+        self.assertEqual(out.getvalue().count("reply 1 sent"), 1)
+        self.assertIn("INFO:     call c1: reply 1 sent 1.20 s after the caller stopped", out.getvalue())
+        self.assertIn("WARNING:  call c1: could not send the recording: /call?call_id=c1&token=[hidden]",
+                      out.getvalue())
+        self.assertNotIn(TOKEN, out.getvalue())
+
+
 class ServerTest(unittest.TestCase):
     """The real engine under a real uvicorn: the line uvicorn writes when a stream is refused carries the address."""
 

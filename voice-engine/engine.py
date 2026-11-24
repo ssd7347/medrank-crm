@@ -74,6 +74,19 @@ MAX_AUDIO_BYTES = 5 * 1024 * 1024
 log = logging.getLogger("uvicorn.error")     # uvicorn's own log, so start-up notes show beside its "Started server"
 
 
+def show_call_lines() -> None:
+    """The calls' own lines (phone.py: each reply's time, a fault reported, a recording sent) go to uvicorn's console
+    too, at INFO. Left alone, the "phone" logger has no handler, so Python showed only its warnings, unformatted.
+    uvicorn sets up its logging before it imports this module."""
+    phone.log.setLevel(logging.INFO)
+    for handler in logging.getLogger("uvicorn").handlers:   # uvicorn.error has none: it passes its lines up to uvicorn
+        phone.log.addHandler(handler)       # (never added twice: addHandler skips one already there)
+        phone.log.propagate = False         # printed once, even if something also gives the root logger a handler
+
+
+show_call_lines()
+
+
 def crm() -> phone.Crm:
     return phone.Crm(CRM_URL, VOICE_HMAC_SECRET, outbox=OUTBOX)
 

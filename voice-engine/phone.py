@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import re
+import statistics
 import time
 import uuid
 from dataclasses import dataclass
@@ -474,13 +475,18 @@ class Call:
         # Records from the start; kept and sent only if the CRM's opening reply says to record (send_recording).
         self.recorder: Recorder | None = Recorder()
         self.record = False
+        # Reply times (timed): when each line of the answer being worked on started to go out, how long its voice
+        # took, and each answer's silence (seconds from the caller's last word to the agent's first sound).
+        self.sounds: list[float] = []
+        self.voice_s = 0.0
+        self.silences: list[float] = []
 
     async def handle(self, msg: dict) -> None:
         event = msg.get("event")
         if event == "start":
             self.stream_id = (msg.get("start") or {}).get("streamId", "")
             self.worker = asyncio.create_task(self._work())
-            await self.jobs.put(("open", None))
+            await self.jobs.put(("open", None, time.perf_counter()))
         elif event == "media" and not self.done:
             media = msg.get("media") or {}
             if media.get("track", "inbound") != "inbound":
@@ -490,7 +496,7 @@ class Call:
                 self.recorder.hear(pcm)
             for utterance in self.ears.feed(pcm):
                 if not self.ending:
-                    await self.jobs.put(("turn", utterance))
+                    await self.jobs.put(("turn", utterance, time.perf_counter()))
                 else:
                     self.late.append(utterance)     # said over the goodbye: no reply, but sent as last words
             if self.speaking and not self.ending and self.ears.talking():
@@ -507,11 +513,16 @@ class Call:
                 await self.hang_up()
 
     async def _work(self) -> None:
+        clock = time.perf_counter       # reply times; the loop's own clock ticks only every ~16 ms on Windows
         while not self.done:
-            kind, audio = await self.jobs.get()
+            kind, audio, at = await self.jobs.get()
+            self.sounds, self.voice_s = [], 0.0
+            took: dict[str, float] | None = {}     # seconds each step took after `at`, for the log (timed)
             try:
                 if kind == "open":
+                    t = clock()
                     reply = await asyncio.to_thread(self.crm.open, self.call_id)
+                    took["CRM"] = clock() - t
                     self.call_back = reply.call_back
                     self.hint = reply.hint
                     self.record = reply.record
@@ -519,20 +530,29 @@ class Call:
                         self.recorder = None    # not to be recorded: nothing kept from here on
                 else:
                     self.unsent = audio
+                    t = clock()
                     text = await self.hear(audio)
+                    took["ear"] = clock() - t
                     joins = 0
                     while text and unfinished(text) and joins < self.MOST_JOINS:
+                        t = clock()
                         more = await self._more()
                         if more is None:
+                            took["wait for more"] = clock() - t
                             break
-                        audio, joins = np.concatenate([audio, more]), joins + 1
+                        (more, at), joins = more, joins + 1     # timed from the end of the part said last
+                        audio = np.concatenate([audio, more])
                         self.unsent = audio
+                        t = clock()
                         text = await self.hear(audio)
+                        took["ear"] = clock() - t
                     # From here the words are the CRM's: the request starts before anything can cancel this task.
                     self.unsent = None
                     if not text:
                         continue
+                    t = clock()
                     reply = await self.reply_to(text)
+                    took["CRM"] = clock() - t
                     self.call_back = reply.call_back
             except Exception as e:     # the CRM or a model failed: say so and end, rather than go silent
                 log.warning("call %s: %s failed: %s", self.call_id, kind, e)
@@ -540,12 +560,37 @@ class Call:
                 reply = Reply(TROUBLE if self.call_back else TROUBLE_NO_CALL_BACK, True)
                 if kind == "open":
                     self.recorder = None        # the CRM never said to record it
+                took = None                     # a fault: not a reply time
             try:
                 await self.speak(reply)
             except Exception as e:     # the voice failed: nothing can be said, so hang up rather than leave silence
                 log.warning("call %s: speaking failed: %s", self.call_id, e)
                 self.report(f"speaking failed: {type(e).__name__}")
                 await self.hang_up()
+                took = None
+            if took is not None and self.sounds:
+                self.timed(kind, at, took)
+
+    # The 700 ms of quiet (Utterances.END_FRAMES) after the caller's last word, which ends a turn, comes before the turn
+    # is queued: it is part of every reply's silence.
+    QUIET_S = Utterances.END_FRAMES * FRAME / RATE
+
+    def timed(self, kind: str, at: float, took: dict[str, float]) -> None:
+        """Logs how long the caller waited for this answer, and where the time went; ``at`` is when the turn was
+        queued (the stream's start for the opening). Measured to when the audio was sent to Plivo: the line's own
+        delay comes on top."""
+        before = self.QUIET_S if kind == "turn" else 0.0
+        first, reply = (before + s - at for s in (self.sounds[0], self.sounds[-1]))
+        steps = ({"quiet that ends a turn": before} if kind == "turn" else {}) | took | {"voice": self.voice_s}
+        steps["other"] = reply - sum(steps.values())
+        where = ", ".join(f"{name} {s:.2f}" for name, s in steps.items())
+        if kind == "turn":
+            self.silences.append(first)
+            filler = f' ("{ONE_MOMENT}" sent after {first:.2f} s)' if len(self.sounds) > 1 else ""
+            log.info("call %s: reply %d sent %.2f s after the caller stopped%s: %s", self.call_id,
+                     len(self.silences), reply, filler, where)
+        else:
+            log.info("call %s: opening sent %.2f s after the stream started: %s", self.call_id, reply, where)
 
     def report(self, what: str) -> None:
         """Tells the CRM the call broke on our side, so it books the call-back the caller is promised. It runs
@@ -570,9 +615,9 @@ class Call:
         hint = (self.hint,) if self.hint else ()
         return (await asyncio.to_thread(self.stt, pcm, *hint)).strip()
 
-    async def _more(self) -> np.ndarray | None:
-        """After an unfinished-looking turn: the caller's next utterance if it starts within HOLD_S seconds (it is
-        then waited for until it ends), else None."""
+    async def _more(self) -> tuple[np.ndarray, float] | None:
+        """After an unfinished-looking turn: the caller's next utterance, and when it ended, if it starts within HOLD_S
+        seconds (it is then waited for until it ends), else None."""
         loop = asyncio.get_running_loop()
         end = loop.time() + self.HOLD_S
         while not self.done:
@@ -582,17 +627,21 @@ class Call:
                     return None
                 left = 0.1                          # the caller is speaking again: wait for the end of it
             try:
-                kind, audio = await asyncio.wait_for(self.jobs.get(), left)
+                kind, audio, at = await asyncio.wait_for(self.jobs.get(), left)
             except asyncio.TimeoutError:
                 continue
             if kind == "turn":
-                return audio
+                return audio, at
         return None
 
     async def _play(self, text: str, mark: str) -> int:
         """Sends ``text`` in the voice, then a checkpoint named ``mark``; returns how many samples were sent."""
+        clock = time.perf_counter
+        t = clock()
         pcm, rate = await asyncio.to_thread(self.tts, text)
+        self.voice_s = clock() - t
         audio = ulaw_encode(np.clip(resample(pcm.astype(np.float32), rate, RATE), -32768, 32767))
+        self.sounds.append(clock())                     # the line starts to go out (timed)
         for i in range(0, len(audio), 4000):           # half a second per message
             await self.send({"event": "playAudio", "media": {"contentType": "audio/x-mulaw", "sampleRate": RATE,
                                                              "payload": base64.b64encode(audio[i:i + 4000]).decode()}})
@@ -652,10 +701,14 @@ class Call:
         self.done = True
         if self.worker:
             self.worker.cancel()
+        if self.silences:
+            n = len(self.silences)
+            log.info("call %s: %d %s; the caller's silence before each: median %.2f s, longest %.2f s", self.call_id,
+                     n, "reply" if n == 1 else "replies", statistics.median(self.silences), max(self.silences))
         parts = [] if self.unsent is None else [self.unsent]
         self.unsent = None
         while not self.jobs.empty():
-            kind, audio = self.jobs.get_nowait()
+            kind, audio, _ = self.jobs.get_nowait()
             if kind == "turn":
                 parts.append(audio)
         parts += self.late
