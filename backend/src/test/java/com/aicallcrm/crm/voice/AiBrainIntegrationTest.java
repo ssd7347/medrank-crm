@@ -244,8 +244,9 @@ class AiBrainIntegrationTest {
         assertThat(FactGuard.reasonWords("You were allotted a seat.", opening)).containsExactly("allotted", "seat");
         // The company's name is not "rank"; the identity question and the caller's own words may be used.
         assertThat(FactGuard.reasonWords("Thank you, this is MedRank. May I have your full name, please?", opening)).isEmpty();
-        assertThat(FactGuard.reasonWords("May I have your NEET roll number?", opening + " [{\"ask_for\":\"NEET roll number\"}]"))
-                .isEmpty();
+        // The pack's identity question is "Roll number", which names no reason ("NEET roll number" would).
+        assertThat(FactGuard.reasonWords("May I have your roll number?", opening)).isEmpty();
+        assertThat(FactGuard.reasonWords("May I have your NEET roll number?", opening)).containsExactly("neet");
         assertThat(FactGuard.reasonWords("Yes, it is about counselling.", "Is this about counselling?")).isEmpty();
     }
 

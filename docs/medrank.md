@@ -11,7 +11,7 @@ own speech engine and brain). Two things are added:
 
     | Field | The AI agent |
     |---|---|
-    | NEET roll number | never says it; the caller may prove who they are with it ("Ask to confirm") |
+    | Roll number (the NEET roll number) | never says it; the caller may prove who they are with it ("Ask to confirm"); its name leaves out "NEET" because the AI asks for it by name before the check |
     | Parent name, Category, Domicile state | never sent to the AI |
     | Course wanted, NEET score, NEET All India Rank, Counselling round, Choice filling deadline, Documents pending, Fee due, Fee due date, Reporting deadline | only after the caller has proved who they are |
 

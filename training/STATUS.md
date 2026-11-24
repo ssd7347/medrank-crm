@@ -14,6 +14,21 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 24 November 2026: THE NEET PACK'S IDENTITY QUESTION NO LONGER SAYS "NEET" (user: "Yes, fix it")
+
+- **Found on the running CRM, not by the tests.** After loading the pack in the dev CRM, the Scripts page warned: the AI
+  asks for "NEET roll number" to check who it is speaking to, so whoever answers hears "NEET" before the check, and the
+  reason guard then lets the AI say it too (an identity question's words count as already used).
+- **Fix**: the field is now "Roll number" (key `roll_number`). `docs/medrank.md` says why it leaves out NEET. The
+  training kit's reference prefix (NR-) follows the new key.
+- **Tests**: `theNeetCounsellingPackIsListedFirstAndKeepsPrivateDetailsPrivate` now asks
+  `/api/voice/scripts/identity-warnings` after loading the pack. It failed on the old pack with the warning above and
+  passes now. `medranksReasonsStayUnsaidUntilTheCheck` shows "roll number" names no reason and "NEET roll number" does.
+  The four affected test classes (57 tests) and the training kit (80) pass.
+- **Still open, in the common CRM's packs**: finance asks for "Loan account number" and insurance for "Policy number".
+  Both draw the same warning ("loan", "policy"). They are left for the common CRM, not changed here.
+- **Dev CRM**: it was loaded with the old pack, so its field is renamed by hand under Custom fields.
+
 # 24 November 2026: THE MEDRANK EDITION (user: "change this crm for medrank crm" / "use the current code and modify it for the medrank crm with the ai real calling" / "for this medrank crm use the medrank-crm github repo")
 
 The user chose: replace `main` of `ssd7347/medrank-crm` with this edition, after keeping the old MBBS-CRM app there

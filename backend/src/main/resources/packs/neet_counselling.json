@@ -11,7 +11,7 @@
     {"label": "Admitted", "color": "#16a34a", "category": "WON"}
   ],
   "fields": [
-    {"label": "NEET roll number", "type": "TEXT", "agentAccess": "NONE", "verifyWith": true},
+    {"label": "Roll number", "type": "TEXT", "agentAccess": "NONE", "verifyWith": true},
     {"label": "Parent name", "type": "TEXT", "agentAccess": "NONE", "verifyWith": false},
     {"label": "Course wanted", "type": "TEXT", "agentAccess": "AFTER_VERIFY", "verifyWith": false},
     {"label": "NEET score", "type": "NUMBER", "agentAccess": "AFTER_VERIFY", "verifyWith": false},

@@ -238,7 +238,7 @@ def make_person(script: Script, rng: random.Random) -> Person:
             values[k] = said[k] = rng.choice(TEXT_VALUES[k])
         else:  # reference numbers: customer, loan, policy, patient, student and enquiry IDs
             prefix = {"loan": "LN", "policy": "POL", "patient": "PT", "student": "ST", "enquiry": "ENQ",
-                      "neet": "NR"}.get(k.split("_")[0], "CUST")
+                      "roll": "NR"}.get(k.split("_")[0], "CUST")
             digits = str(rng.randint(100000, 999999))
             values[k] = f"{prefix}-{digits}"
             said[k] = rng.choice([digits, f"{prefix} {digits}", " ".join(digits)])

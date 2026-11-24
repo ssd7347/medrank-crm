@@ -185,13 +185,17 @@ class CustomisationIntegrationTest {
         mvc.perform(auth(post("/api/settings/packs/neet_counselling/apply"), admin)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.stagesAdded").value(5)).andExpect(jsonPath("$.fieldsAdded").value(13))
                 .andExpect(jsonPath("$.scriptsAdded").value(5)).andExpect(jsonPath("$.faqsAdded").value(6));
+        // The identity question names no reason: whoever answers hears "roll number", not "NEET".
+        mvc.perform(auth(get("/api/voice/scripts/identity-warnings"), admin)).andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(Matchers.not(Matchers.hasItem(Matchers.containsStringIgnoringCase(
+                        "roll number")))));
         mvc.perform(auth(get("/api/stages"), admin)).andExpect(jsonPath("$[*].label").value(
                 Matchers.hasItems("Counselling session booked", "Seat allotted", "Admitted")));
         // The roll number proves who is speaking but is never said; category and state are never sent to the AI;
         // score, rank and the deadlines only once the caller has proved who they are.
         mvc.perform(auth(get("/api/fields"), admin))
-                .andExpect(jsonPath("$[?(@.key == 'neet_roll_number')].verifyWith").value(Matchers.hasItem(true)))
-                .andExpect(jsonPath("$[?(@.key == 'neet_roll_number')].agentAccess").value(Matchers.hasItem("NONE")))
+                .andExpect(jsonPath("$[?(@.key == 'roll_number')].verifyWith").value(Matchers.hasItem(true)))
+                .andExpect(jsonPath("$[?(@.key == 'roll_number')].agentAccess").value(Matchers.hasItem("NONE")))
                 .andExpect(jsonPath("$[?(@.key == 'category')].agentAccess").value(Matchers.hasItem("NONE")))
                 .andExpect(jsonPath("$[?(@.key == 'domicile_state')].agentAccess").value(Matchers.hasItem("NONE")))
                 .andExpect(jsonPath("$[?(@.key == 'neet_score')].agentAccess").value(Matchers.hasItem("AFTER_VERIFY")))
