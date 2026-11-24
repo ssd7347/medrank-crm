@@ -2,7 +2,7 @@
 
 This is the AI Call CRM (tag `common-crm-v1` in `ssd7347/ai-call-crm`) set up for MedRank, a NEET UG
 admission-counselling company. It keeps everything the common CRM has, including the real AI phone calls (Plivo, our
-own speech engine and brain). Three things are added:
+own speech engine and brain). Four things are added:
 
 - **The "NEET UG counselling (MedRank)" starter pack** (`backend/src/main/resources/packs/neet_counselling.json`),
   listed first. It adds:
@@ -29,12 +29,16 @@ own speech engine and brain). Three things are added:
 - **The browser-tab icon is MedRank's shield** (`frontend/src/app/favicon.ico`, cropped from the MedRank Academy
   logo). The logo in the menu and on the login page is a setting, not code: upload the shield in **Company
   settings** (PNG, JPEG or WebP, up to 300 KB). The full logo with its words is too small to read there.
+- **The website is in the logo's colours**: a pale mint background, deep green text, and a green-to-teal
+  login panel (`frontend/src/app/globals.css`). Set the **brand colour** in Company settings to the logo green
+  `#0a7a40`, so that buttons and highlights match. Every text colour passes WCAG AA contrast.
 
 ## Setting it up
 
 Follow `docs/new-customer-setup.md`, with these choices:
 
-1. **Company settings**: company name MedRank, the agent's name, the brand colour, contacts called "Student".
+1. **Company settings**: company name MedRank, the agent's name, brand colour `#0a7a40`, contacts called "Student",
+   and the logo (the shield).
 2. **Starter pack**: load "NEET UG counselling (MedRank)".
 3. **Fill in the [placeholders]** in the six answers (services, packages and fees, round dates, the documents list,
    how to book) and switch them on. Check the round dates against the official MCC and state counselling notices

@@ -23,24 +23,26 @@
   /* Text placed on a brand-600 background. */
   --color-on-brand: #ffffff;
 
-  --color-canvas: #f4f6fb;
+  /* Backgrounds in MedRank's logo colours: a pale mint canvas, with deep green and teal (24 Nov 2026, not committed). */
+  --color-canvas: #f1f8f5;
   --color-surface: #ffffff;
-  --color-raised: #f8f9fd;
-  --color-muted: #eceff8;
-  --color-line: #e0e4f0;
-  --color-line-strong: #c5cce0;
-  --color-ink: #1e3a8a;
-  --color-ink-soft: #34509e;
-  --color-ink-faint: #5468a6;
-  --color-navy: #1a3278;
+  --color-raised: #f6fbf9;
+  --color-muted: #e6f2ee;
+  --color-line: #d9e9e3;
+  --color-line-strong: #bcd6cd;
+  /* Deep greens from MedRank's logo; each passes WCAG AA on every surface here (faint: 5.1:1 on muted). */
+  --color-ink: #0b3d26;
+  --color-ink-soft: #1d5a3c;
+  --color-ink-faint: #3f6e58;
+  --color-navy: #0b4d2e;
 
   --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-serif), ui-serif, Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  --shadow-card: 0 1px 2px rgb(22 33 74 / 0.04), 0 10px 30px -18px rgb(22 33 74 / 0.18);
-  --shadow-lift: 0 2px 4px rgb(22 33 74 / 0.05), 0 18px 40px -18px rgb(22 33 74 / 0.28);
-  --shadow-gold: 0 8px 20px -10px rgb(43 63 158 / 0.55);
+  --shadow-card: 0 1px 2px rgb(11 50 32 / 0.04), 0 10px 30px -18px rgb(11 50 32 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(11 50 32 / 0.05), 0 18px 40px -18px rgb(11 50 32 / 0.28);
+  --shadow-gold: 0 8px 20px -10px rgb(10 122 64 / 0.55);
 }
 
 :root {
@@ -49,8 +51,8 @@
 
 body {
   background:
-    radial-gradient(1100px 520px at 88% -14%, rgb(43 63 158 / 0.10), transparent 60%),
-    radial-gradient(900px 480px at -12% 112%, rgb(110 90 190 / 0.06), transparent 60%),
+    radial-gradient(1100px 520px at 88% -14%, rgb(0 150 180 / 0.12), transparent 60%),
+    radial-gradient(900px 480px at -12% 112%, rgb(10 122 64 / 0.09), transparent 60%),
     var(--color-canvas);
   background-attachment: fixed;
   color: var(--color-ink);
@@ -58,19 +60,19 @@ body {
 }
 
 ::selection {
-  background: rgb(43 63 158 / 0.18);
-  color: #1a3278;
+  background: rgb(10 122 64 / 0.18);
+  color: #0b4d2e;
 }
 
 /* Quiet scrollbars that belong to the theme. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #c5cce0 transparent;
+  scrollbar-color: #bcd6cd transparent;
 }
 
 /* Keyboard focus: a fine royal-blue ring everywhere, never the browser's default blue. */
 :focus-visible {
-  outline: 2px solid rgb(43 63 158 / 0.75);
+  outline: 2px solid rgb(10 122 64 / 0.75);
   outline-offset: 2px;
 }
 
@@ -82,7 +84,7 @@ body {
 /* A hairline of royal blue fading to silver under display headings and the like. */
 .gold-rule {
   height: 1px;
-  background: linear-gradient(90deg, rgb(43 63 158 / 0.85), rgb(150 160 200 / 0.35) 45%, transparent);
+  background: linear-gradient(90deg, rgb(10 122 64 / 0.85), rgb(140 190 170 / 0.35) 45%, transparent);
 }
 
 /* Small-caps labels: section names, table headings, eyebrows. */
@@ -137,7 +139,7 @@ body {
 
 /* Native <dialog> centring and scroll lock. */
 dialog::backdrop {
-  background: rgb(17 26 61 / 0.35);
+  background: rgb(8 36 24 / 0.35);
   backdrop-filter: blur(3px);
 }
 html:has(dialog[open]) {

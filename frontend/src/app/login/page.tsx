@@ -156,7 +156,7 @@ export default function LoginPage() {
   const { companyName, agentName, loginHeadline, loginText } = useBranding();
   return (
     <main className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-      <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-navy via-brand-800 to-brand-700 p-12 text-white lg:flex">
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-navy via-[#0a6b42] to-[#00809c] p-12 text-white lg:flex">
         {/* Deep royal blue with a soft glow and a fine silver frame: the brand's quiet signature. */}
         <div aria-hidden className="pointer-events-none absolute -top-40 -right-40 h-[28rem] w-[28rem] rounded-full bg-brand-400/30 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute inset-6 rounded-lg border border-white/15" />

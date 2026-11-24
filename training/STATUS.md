@@ -14,6 +14,22 @@ private details before verification, reply starts within ~2 s on a phone; otherw
 | 3 (– 13 Nov) | CRM online (model or Claude); real test calls to team phones | server/GPU account if own model |
 | 4 (– 23 Nov) | client scripts/data, compliance (TRAI/DLT, hours, DND), hand-over guide, buffer | client walkthrough |
 
+# 24 November 2026: MEDRANK'S LOOK: LOGO, TAB ICON AND THE LOGO'S GREENS (user: "change the favicon too" / "change the background color to match the logo" / "Yes, deep green" / "commit it")
+
+- **Tab icon**: MedRank's shield, cropped from the MedRank Academy logo (16 to 64 px).
+  - The first version broke every page with a 500: Next.js reads only RGBA images inside an .ico, and its images were
+    RGB. It was remade as RGBA, and the pages load again.
+- **Colours**:
+  - Backgrounds are pale mint with teal and green glows.
+  - Text is deep green (`#0b3d26`, `#1d5a3c`, `#3f6e58`). Each passes WCAG AA on every surface; the faintest is
+    5.1:1, better than the old blue's 4.7:1.
+  - The login panel is a green-to-teal gradient.
+  - Shadows, the selection, the focus outline, badges and the test-console ring are green; no blue is left in the
+    website code.
+  - Type-check and lint pass. It was looked at on the dashboard and the login page.
+- **Settings in the dev CRM (not code)**: the logo is the shield (`Downloads\MedRank-CRM-logo.png`) and the brand
+  colour is `#0a7a40`. `docs/medrank.md` says to set both.
+
 # 24 November 2026: THE NEET PACK'S IDENTITY QUESTION NO LONGER SAYS "NEET" (user: "Yes, fix it")
 
 - **Found on the running CRM, not by the tests.** After loading the pack in the dev CRM, the Scripts page warned: the AI
